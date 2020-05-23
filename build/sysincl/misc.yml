@@ -128,10 +128,6 @@
     - atomic.h:      contrib/libs/musl/src/internal/atomic.h
     - bits/fenv.h:   contrib/libs/musl/arch/x86_64/bits/fenv.h
 
-- source_filter: "^contrib/libs/unixodbc"
-  includes:
-    - argz.h:        contrib/libs/unixodbc/libltdl/argz.h
-
 - source_filter: "^contrib/libs/zbar"
   includes:
     - error.h:       contrib/libs/zbar/zbar/error.h
@@ -523,3 +519,29 @@
 - source_filter: "^contrib/libs/dpdk"
   includes:
     - process.h: contrib/libs/dpdk/drivers/bus/dpaa/include/process.h
+
+- source_filter: "^contrib/libs/usrsctp/"
+  includes:
+    - netinet/sctp_uio.h: contrib/libs/usrsctp/usrsctplib/netinet/sctp_uio.h
+
+- source_filter: "^contrib/libs/libsrtp/"
+  includes:
+  - alloc.h: contrib/libs/libsrtp/crypto/include/alloc.h
+  - err.h: contrib/libs/libsrtp/crypto/include/err.h
+  - stat.h: contrib/libs/libsrtp/crypto/include/stat.h
+
+- source_filter: "^infra/contrib/unbound/unbound"
+  includes:
+    - validator/validator.h: infra/contrib/unbound/unbound/validator/validator.h
+
+- source_filter: "^contrib/restricted/openal-soft"
+  includes:
+    - threads.h: contrib/restricted/openal-soft/common/threads.h
+
+- source_filter: "^devtools/experimental/umbrella/embedded"
+  includes:
+    - threads.h: devtools/experimental/umbrella/include/c11/threads.h
+
+- source_filter: "^speechkit/libs/spotter"
+  includes:
+    - threads.h: speechkit/libs/spotter/c11-threads/threads.h

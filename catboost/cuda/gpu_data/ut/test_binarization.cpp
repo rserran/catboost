@@ -13,7 +13,7 @@
 #include <catboost/private/libs/quantization/grid_creator.h>
 #include <catboost/private/libs/quantization/utils.h>
 
-#include <library/unittest/registar.h>
+#include <library/cpp/unittest/registar.h>
 
 using namespace std;
 using namespace NCatboostCuda;
@@ -243,7 +243,8 @@ Y_UNIT_TEST_SUITE(BinarizationsTests) {
                 desc,
                 docsMapping,
                 features,
-                MakeAtomicShared<NCB::TFeaturesArraySubsetIndexing>(
+                TDatasetPermutationOrderAndSubsetIndexing::ConstructShared(
+                    dataProvider->ObjectsData->GetFeaturesArraySubsetIndexing(),
                     std::move(order)
                 )
             );

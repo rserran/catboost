@@ -355,7 +355,8 @@ namespace NCB {
             hasClassificationOnlyMetrics ||
             knownClassCount ||
             (inputClassificationInfo.ClassWeights.size() > 0) ||
-            (inputClassificationInfo.ClassLabels.size() > 0)
+            (inputClassificationInfo.ClassLabels.size() > 0) ||
+            inputClassificationInfo.TargetBorder
         );
         bool multiClassTargetData = false;
 
@@ -508,17 +509,17 @@ namespace NCB {
         TRestorableFastRng64* rand, // for possible pairs generation
         NPar::TLocalExecutor* localExecutor,
         TOutputPairsInfo* outputPairsInfo) {
-
+        
         if (mainLossFunction) {
             CB_ENSURE(
                 IsMultiRegressionObjective(mainLossFunction->GetLossFunction()) || rawData.GetTargetDimension() <= 1,
                 "Currently only multi-regression objectives work with multidimensional target"
             );
         }
-
+        
         TMaybe<ui32> knownClassCount = inputClassificationInfo.KnownClassCount;
 
-        bool isRealTarget = true;
+        bool isRealTarget = !inputClassificationInfo.TargetBorder;
         if (targetCreationOptions.IsClass) {
             isRealTarget
                 = mainLossFunction

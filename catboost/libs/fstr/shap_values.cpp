@@ -1,6 +1,7 @@
 #include "shap_values.h"
 
 #include "util.h"
+#include "shap_exact.h"
 
 #include <catboost/private/libs/algo/features_data_helpers.h>
 #include <catboost/private/libs/algo/index_calcer.h>
@@ -178,7 +179,7 @@ static void ExtendFeaturePathIfFeatureNotFixed(
     int feature,
     TVector<TFeaturePathElement>* featurePath
 ) {
-    if (!fixedFeatureParams.Defined() || 
+    if (!fixedFeatureParams.Defined() ||
         (fixedFeatureParams->FixedFeatureMode == TFixedFeatureParams::EMode::NotFixed || fixedFeatureParams->Feature != feature)) {
         *featurePath = ExtendFeaturePath(
             oldFeaturePath,
@@ -396,19 +397,19 @@ static void CalcNonObliviousInternalShapValuesForLeafRecursive(
         newOnePathsFraction = featurePath[sameFeatureIndex].OnePathsFraction;
         featurePath = UnwindFeaturePath(featurePath, sameFeatureIndex);
     }
-    
-    const double hotCoefficient = goNodeIdx != nodeIdx ? 
+
+    const double hotCoefficient = goNodeIdx != nodeIdx ?
         subtreeWeights[0][goNodeIdx - startOffset] / subtreeWeights[0][nodeIdx - startOffset] : -1.0;
-    const double coldCoefficient = skipNodeIdx != nodeIdx ? 
+    const double coldCoefficient = skipNodeIdx != nodeIdx ?
         subtreeWeights[0][skipNodeIdx - startOffset] / subtreeWeights[0][nodeIdx - startOffset] : -1.0;
-    TConditionsFeatureFraction conditionsFeatureFraction{
+    TConditionsFeatureFraction conditionsFeatureFraction {
         fixedFeatureParams,
         combinationClass,
         conditionFeatureFraction,
         hotCoefficient,
         coldCoefficient
     };
-    
+
     if (goNodeIdx != nodeIdx && !FuzzyEquals(1 + subtreeWeights[0][goNodeIdx - startOffset], 1 + 0.0)) {
         double newZeroPathsFractionGoNode = newZeroPathsFraction * hotCoefficient;
         CalcNonObliviousInternalShapValuesForLeafRecursive(
@@ -596,6 +597,8 @@ static inline void CalcObliviousApproximateShapValuesForLeaf(
     bool calcInternalValues,
     TVector<TShapValue>* shapValues
 ) {
+   shapValues->clear();
+
    if (calcInternalValues) {
         CalcObliviousApproximateShapValuesForLeafImplementation(
             forest,
@@ -617,6 +620,41 @@ static inline void CalcObliviousApproximateShapValuesForLeaf(
        );
        UnpackInternalShaps(shapValuesInternal, combinationClassFeatures, shapValues);
    }
+}
+
+static inline void CalcObliviousExactShapValuesForLeaf(
+    const TModelTrees& forest,
+    const TVector<int>& binFeatureCombinationClass,
+    const TVector<TVector<int>>& combinationClassFeatures,
+    size_t documentLeafIdx,
+    size_t treeIdx,
+    const TVector<TVector<double>>& subtreeWeights,
+    bool calcInternalValues,
+    TVector<TShapValue>* shapValues
+) {
+    shapValues->clear();
+
+    if (calcInternalValues) {
+        CalcObliviousExactShapValuesForLeafImplementation(
+            forest,
+            binFeatureCombinationClass,
+            documentLeafIdx,
+            treeIdx,
+            subtreeWeights,
+            shapValues
+        );
+    } else {
+        TVector<TShapValue> shapValuesInternal;
+        CalcObliviousExactShapValuesForLeafImplementation(
+            forest,
+            binFeatureCombinationClass,
+            documentLeafIdx,
+            treeIdx,
+            subtreeWeights,
+            &shapValuesInternal
+        );
+        UnpackInternalShaps(shapValuesInternal, combinationClassFeatures, shapValues);
+    }
 }
 
 static inline void CalcNonObliviousShapValuesForLeaf(
@@ -737,6 +775,8 @@ static inline void CalcNonObliviousApproximateShapValuesForLeaf(
     bool calcInternalValues,
     TVector<TShapValue>* shapValues
 ) {
+    shapValues->clear();
+
     if (calcInternalValues) {
         CalcNonObliviousApproximateShapValuesForLeafImplementation(
             forest,
@@ -1124,7 +1164,7 @@ void CalcShapValuesForDocumentMulti(
                         );
                     }
                     break;
-                case ECalcTypeShapValues::Normal:
+                case ECalcTypeShapValues::Regular:
                     if (model.IsOblivious()) {
                         CalcObliviousShapValuesForLeaf(
                             *model.ModelTrees.Get(),
@@ -1158,6 +1198,19 @@ void CalcShapValuesForDocumentMulti(
                             preparedTrees.AverageApproxByTree[treeIdx]
                         );
                     }
+                    break;
+                case ECalcTypeShapValues::Exact:
+                    CB_ENSURE(model.IsOblivious(), "'Exact' calculation type is supported only for symmetric trees.");
+                    CalcObliviousExactShapValuesForLeaf(
+                        *model.ModelTrees.Get(),
+                        preparedTrees.BinFeatureCombinationClass,
+                        preparedTrees.CombinationClassFeatures,
+                        docIndices[treeIdx],
+                        treeIdx,
+                        preparedTrees.SubtreeWeightsForAllTrees[treeIdx],
+                        preparedTrees.CalcInternalValues,
+                        &shapValuesByLeaf
+                    );
                     break;
             }
 
@@ -1286,7 +1339,7 @@ static void CalcShapValuesByLeafForTreeBlock(
                             &shapValuesByLeaf[leafIdx]
                         );
                         break;
-                    case ECalcTypeShapValues::Normal:
+                    case ECalcTypeShapValues::Regular:
                         CalcObliviousShapValuesForLeaf(
                             forest,
                             binFeatureCombinationClass,
@@ -1298,6 +1351,18 @@ static void CalcShapValuesByLeafForTreeBlock(
                             fixedFeatureParams,
                             &shapValuesByLeaf[leafIdx],
                             preparedTrees->AverageApproxByTree[treeIdx]
+                        );
+                        break;
+                    case ECalcTypeShapValues::Exact:
+                        CalcObliviousExactShapValuesForLeaf(
+                            forest,
+                            binFeatureCombinationClass,
+                            combinationClassFeatures,
+                            leafIdx,
+                            treeIdx,
+                            preparedTrees->SubtreeWeightsForAllTrees[treeIdx],
+                            calcInternalValues,
+                            &shapValuesByLeaf[leafIdx]
                         );
                         break;
                 }
@@ -1644,7 +1709,7 @@ void CalcShapValuesInternalForFeature(
                                 );
                             }
                             break;
-                        case ECalcTypeShapValues::Normal:
+                        case ECalcTypeShapValues::Regular:
                             if (model.IsOblivious()) {
                                 CalcObliviousShapValuesForLeaf(
                                     forest,
@@ -1678,6 +1743,19 @@ void CalcShapValuesInternalForFeature(
                                     preparedTrees.AverageApproxByTree[treeIdx]
                                 );
                             }
+                            break;
+                        case ECalcTypeShapValues::Exact:
+                            CB_ENSURE(model.IsOblivious(), "'Exact' calculation type is supported only for symmetric trees.");
+                            CalcObliviousExactShapValuesForLeaf(
+                                forest,
+                                preparedTrees.BinFeatureCombinationClass,
+                                preparedTrees.CombinationClassFeatures,
+                                docIndices[treeIdx],
+                                treeIdx,
+                                preparedTrees.SubtreeWeightsForAllTrees[treeIdx],
+                                preparedTrees.CalcInternalValues,
+                                &shapValuesByLeaf
+                            );
                             break;
                     }
 
@@ -1830,7 +1908,7 @@ static TVector<TVector<TVector<double>>> SwapFeatureAndDocumentAxes(const TVecto
 
 // returned: ShapValues[featureIdx][dim][documentIdx]
 TVector<TVector<TVector<double>>> CalcShapValueWithQuantizedData(
-    const TFullModel& model, 
+    const TFullModel& model,
     const TVector<TIntrusivePtr<NModelEvaluation::IQuantizedData>>& quantizedFeatures,
     const TVector<TVector<NModelEvaluation::TCalcerIndexType>>& indices,
     const TMaybe<TFixedFeatureParams>& fixedFeatureParams,

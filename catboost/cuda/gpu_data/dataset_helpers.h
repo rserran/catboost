@@ -11,7 +11,7 @@
 #include <catboost/cuda/data/binarizations_manager.h>
 #include <catboost/cuda/data/data_utils.h>
 
-#include <library/threading/local_executor/local_executor.h>
+#include <library/cpp/threading/local_executor/local_executor.h>
 #include <util/generic/fwd.h>
 
 namespace NCatboostCuda {
@@ -175,30 +175,6 @@ namespace NCatboostCuda {
         NPar::TLocalExecutor* LocalExecutor;
     };
 
-    struct TPreQuantizedColumn {
-    public:
-        TPreQuantizedColumn(ui32 featureId, TConstArrayRef<ui8> prequantizedVals)
-            : FullSubsetIndexing(NCB::TFullSubset<ui32>(prequantizedVals.size()))
-            , ValuesHolder(
-                featureId,
-                TCompressedArray(
-                    prequantizedVals.size(),
-                    /*bitsPerKey*/ 8,
-                    NCB::TMaybeOwningArrayHolder<ui64>::CreateNonOwning(
-                        TArrayRef<ui64>(
-                            (ui64*)prequantizedVals.begin(),
-                            (ui64*)prequantizedVals.end()
-                        )
-                    )
-                ),
-                &FullSubsetIndexing
-            )
-        {}
-    public:
-        NCB::TFeaturesArraySubsetIndexing FullSubsetIndexing;
-        NCB::TQuantizedFloatValuesHolder ValuesHolder;
-    };
-
     template <class TLayoutPolicy = TFeatureParallelLayout>
     class TCtrsWriter {
     public:
@@ -227,22 +203,22 @@ namespace NCatboostCuda {
                     CtrCalcer.ComputeBinarizedCtrs(group, &learnCtrs, &testCtrs);
                     for (ui32 i = 0; i < group.size(); ++i) {
                         const ui32 featureId = group[i];
-                        TPreQuantizedColumn prequantizedLearnColumn(featureId, learnCtrs[i].BinarizedCtr);
-                        IndexBuilder.Write(
+                        IndexBuilder.WriteBinsVector(
                             DataSetId,
                             featureId,
                             learnCtrs[i].BinCount,
-                            &prequantizedLearnColumn.ValuesHolder);
+                            /*permute=*/true,
+                            learnCtrs[i].BinarizedCtr);
 
                         if (testCtrs.size()) {
                             CB_ENSURE(TestDataSetId != (ui32)-1, "Error: set test dataset");
                             CB_ENSURE(testCtrs[i].BinCount == learnCtrs[i].BinCount);
-                            TPreQuantizedColumn prequantizedTestColumn(featureId, testCtrs[i].BinarizedCtr);
-                            IndexBuilder.Write(
+                            IndexBuilder.WriteBinsVector(
                                 TestDataSetId,
                                 featureId,
                                 testCtrs[i].BinCount,
-                                &prequantizedTestColumn.ValuesHolder);
+                                /*permute=*/true,
+                                testCtrs[i].BinarizedCtr);
                         }
                     }
                     CheckInterrupted(); // check after long-lasting operation
@@ -350,12 +326,12 @@ namespace NCatboostCuda {
                 const auto featureId = FeaturesManager.GetId(feature);
                 if (featureIds.contains(featureId)) {
 
-                    TPreQuantizedColumn prequantizedColumn(featureId, binarizedFeature);
-                    IndexBuilder.Write(
+                    IndexBuilder.WriteBinsVector(
                         dataSetId,
                         featureId,
                         binCount,
-                        &prequantizedColumn.ValuesHolder
+                        /*permute=*/true,
+                        binarizedFeature
                     );
                 }
                 CheckInterrupted(); // check after long-lasting operation*/

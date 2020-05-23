@@ -88,6 +88,14 @@ public:
         return S_.at(Pos_);
     }
 
+    TChar* operator& () {
+        return S_.begin() + Pos_;
+    }
+
+    const TChar* operator& () const {
+        return S_.cbegin() + Pos_;
+    }
+
     TBasicCharRef& operator=(TChar c) {
         Y_ASSERT(Pos_ < S_.size());
 
@@ -403,10 +411,10 @@ public:
     }
 
     explicit TBasicString(const TBasicStringBuf<TCharType, TTraits> s)
-        : Data_(Allocate(s.Length))
+        : Data_(Allocate(s.size()))
     {
-        if (0 != s.Length) {
-            TTraits::Copy(Data_, s.Start, s.Length);
+        if (0 != s.size()) {
+            TTraits::Copy(Data_, s.data(), s.size());
         }
     }
 
@@ -440,7 +448,7 @@ public:
 private:
     template <typename... R>
     static size_t SumLength(const TBasicStringBuf<TCharType, TTraits> s1, const R&... r) noexcept {
-        return s1.Length + SumLength(r...);
+        return s1.size() + SumLength(r...);
     }
 
     template <typename... R>
@@ -454,8 +462,8 @@ private:
 
     template <typename... R>
     static void CopyAll(TCharType* p, const TBasicStringBuf<TCharType, TTraits> s, const R&... r) {
-        TTraits::Copy(p, s.Start, s.Length);
-        CopyAll(p + s.Length, r...);
+        TTraits::Copy(p, s.data(), s.size());
+        CopyAll(p + s.size(), r...);
     }
 
     template <typename... R, class TNextCharType, typename = std::enable_if_t<std::is_same<TCharType, TNextCharType>::value>>
@@ -553,7 +561,7 @@ public:
     }
 
     TBasicString& assign(const TBasicStringBuf<TCharType, TTraits> s) {
-        return assign(s.Start, s.Length);
+        return assign(s.data(), s.size());
     }
 
     TBasicString& assign(const TBasicStringBuf<TCharType, TTraits> s, size_t spos, size_t sn = TBase::npos) {
@@ -561,7 +569,7 @@ public:
     }
 
     TBasicString& AssignNoAlias(const TBasicStringBuf<TCharType, TTraits> s) {
-        return AssignNoAlias(s.Start, s.Length);
+        return AssignNoAlias(s.data(), s.size());
     }
 
     TBasicString& AssignNoAlias(const TBasicStringBuf<TCharType, TTraits> s, size_t spos, size_t sn = TBase::npos) {
@@ -689,7 +697,7 @@ public:
     }
 
     TBasicString& AppendNoAlias(const TBasicStringBuf<TCharType, TTraits> s) {
-        return AppendNoAlias(s.Start, s.Length);
+        return AppendNoAlias(s.data(), s.size());
     }
 
     TBasicString& AppendNoAlias(const TBasicStringBuf<TCharType, TTraits> s, size_t spos, size_t sn = TBase::npos) {
@@ -697,7 +705,7 @@ public:
     }
 
     TBasicString& append(const TBasicStringBuf<TCharType, TTraits> s) {
-        return append(s.Start, s.Length);
+        return append(s.data(), s.size());
     }
 
     TBasicString& append(const TBasicStringBuf<TCharType, TTraits> s, size_t spos, size_t sn = TBase::npos) {
@@ -977,10 +985,11 @@ public:
     }
 
     TBasicString& replace(size_t pos, size_t n, const TBasicStringBuf<TCharType, TTraits> s, size_t spos = 0, size_t sn = TBase::npos) {
-        return replace(pos, n, s.Start, spos, sn, s.Length);
+        return replace(pos, n, s.data(), spos, sn, s.size());
     }
 
-    // ~~~ main driver: should be protected (in the future)
+private:
+    // ~~~ main driver
     TBasicString& replace(size_t pos, size_t del, const TCharType* pc, size_t pos1, size_t ins, size_t len1) {
         size_t len = length();
         // 'pc' can point to a single character that is not null terminated, so in this case TTraits::GetLength must not be called
@@ -1034,6 +1043,7 @@ public:
         return *this;
     }
 
+public:
     // ~~~ Reversion ~~~~
     void reverse() {
         Detach();
