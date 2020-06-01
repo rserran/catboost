@@ -587,6 +587,13 @@ public:
         SetConsoleOutputCP(CP_UTF8);
 
         _CrtSetDbgFlag(_CRTDBG_ALLOC_MEM_DF | _CRTDBG_LEAK_CHECK_DF);
+
+        if (!IsDebuggerPresent()) {
+            _CrtSetReportMode(_CRT_ASSERT, _CRTDBG_MODE_FILE | _CRTDBG_MODE_DEBUG);
+            _CrtSetReportFile(_CRT_ASSERT, _CRTDBG_FILE_STDERR);
+            _CrtSetReportMode(_CRT_ERROR, _CRTDBG_MODE_FILE | _CRTDBG_MODE_DEBUG);
+            _CrtSetReportFile(_CRT_ERROR, _CRTDBG_FILE_STDERR);
+        }
     }
     ~TWinEnvironment() {
         if (!IsDebuggerPresent()) {
@@ -640,11 +647,7 @@ static void GracefulShutdownHandler(int) {
 }
 #endif
 
-#if !defined(UTMAIN)
-#define UTMAIN NUnitTest::RunMain
-#endif
-
-int UTMAIN(int argc, char** argv) {
+int NUnitTest::RunMain(int argc, char** argv) {
 #if defined(_linux_) && defined(CLANG_COVERAGE)
     {
         struct sigaction sa;

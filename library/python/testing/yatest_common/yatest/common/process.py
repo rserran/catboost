@@ -481,19 +481,24 @@ def execute(
 
 
 def _get_command_output_file(cmd, ext):
-    command_name = get_command_name(cmd)
-    file_name = command_name + "." + ext
+    parts = [get_command_name(cmd)]
+    if 'YA_RETRY_INDEX' in os.environ:
+        parts.append('retry{}'.format(os.environ.get('YA_RETRY_INDEX')))
+    if int(os.environ.get('YA_SPLIT_COUNT', '0')):
+        parts.append('chunk{}'.format(os.environ.get('YA_SPLIT_INDEX', '0')))
+
+    filename = '.'.join(parts + [ext])
     try:
         # if execution is performed from test, save out / err to the test logs dir
         import yatest.common
         import pytest
         if not hasattr(pytest, 'config'):
             raise ImportError("not in test")
-        file_name = path.get_unique_file_path(yatest.common.output_path(), file_name)
-        yatest_logger.debug("Command %s will be placed to %s", ext, os.path.basename(file_name))
-        return open(file_name, "wb+")
+        filename = path.get_unique_file_path(yatest.common.output_path(), filename)
+        yatest_logger.debug("Command %s will be placed to %s", ext, os.path.basename(filename))
+        return open(filename, "wb+")
     except ImportError:
-        return tempfile.NamedTemporaryFile(delete=False, suffix=file_name)
+        return tempfile.NamedTemporaryFile(delete=False, suffix=filename)
 
 
 def _get_proc_tree_info(pids):

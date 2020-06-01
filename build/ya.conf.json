@@ -299,6 +299,9 @@
         "yfm": {
             "description": "YFM-extended markdown processor for Cloud deploy"
         },
+        "yfm-docs": {
+            "description": "YFM-extended markdown processor for Cloud deploy (v3)"
+        },
         "aws": {
             "description": "Run aws"
         },
@@ -307,6 +310,9 @@
         },
         "fio": {
             "description": "flexible I/O tester"
+        },
+        "foremost": {
+            "description": "Foremost is a Linux program to recover files based on their headers"
         },
         "stress-ng": {
             "description": "stress load tester"
@@ -4948,6 +4954,22 @@
                 }
             ]
         },
+        "foremost": {
+            "tools": {
+                "foremost": {
+                    "bottle": "foremost",
+                    "executable": "foremost"
+                }
+            },
+            "platforms": [
+                {
+                    "host": {
+                        "os": "LINUX"
+                    },
+                    "default": true
+                }
+            ]
+        },
         "atop": {
             "tools": {
                 "atop": {
@@ -5136,6 +5158,34 @@
                 }
             ]
         },
+        "yfm-docs": {
+            "tools": {
+                "yfm-docs": {
+                    "bottle": "yfm-docs",
+                    "executable": "yfm-docs"
+                }
+            },
+            "platforms": [
+                {
+                    "host": {
+                        "os": "LINUX"
+                    },
+                    "default": true
+                },
+                {
+                    "host": {
+                        "os": "DARWIN"
+                    },
+                    "default": true
+                },
+                {
+                    "host": {
+                        "os": "WIN"
+                    },
+                    "default": true
+                }
+            ]
+        },
         "aws": {
             "tools": {
                 "aws": {
@@ -5275,7 +5325,7 @@
         "ymake": {
             "formula": {
                 "sandbox_id": [
-                    679323188
+                    688910450
                 ],
                 "match": "ymake"
             },
@@ -5299,7 +5349,7 @@
         "arc": {
             "formula": {
                 "sandbox_id": [
-                    678290682
+                    689583683
                 ],
                 "match": "arc"
             },
@@ -5323,8 +5373,8 @@
         "yo": {
             "formula": {
                 "sandbox_id": [
-                    650884119,
-                    650884133
+                    685060491,
+                    685060488
                 ],
                 "match": "yo"
             },
@@ -5755,37 +5805,59 @@
             },
             "executable": {
                 "c++": [
-                    "llvm-toolchain", "bin", "clang++"
+                    "llvm-toolchain",
+                    "bin",
+                    "clang++"
                 ],
                 "cc": [
-                    "llvm-toolchain", "bin", "clang"
+                    "llvm-toolchain",
+                    "bin",
+                    "clang"
                 ],
                 "strip": [
-                    "llvm-toolchain", "bin", "llvm-strip"
+                    "llvm-toolchain",
+                    "bin",
+                    "llvm-strip"
                 ],
                 "c++filt": [
-                    "llvm-toolchain", "bin", "i686-linux-android-c++filt"
+                    "llvm-toolchain",
+                    "bin",
+                    "i686-linux-android-c++filt"
                 ],
                 "clang-format": [
-                    "llvm-toolchain", "bin", "clang-format"
+                    "llvm-toolchain",
+                    "bin",
+                    "clang-format"
                 ],
                 "clang-tidy": [
-                    "llvm-toolchain", "bin", "clang-tidy"
+                    "llvm-toolchain",
+                    "bin",
+                    "clang-tidy"
                 ],
                 "llvm-cov": [
-                    "llvm-toolchain", "bin", "llvm-cov"
+                    "llvm-toolchain",
+                    "bin",
+                    "llvm-cov"
                 ],
                 "llvm-profdata": [
-                    "llvm-toolchain", "bin", "llvm-profdata"
+                    "llvm-toolchain",
+                    "bin",
+                    "llvm-profdata"
                 ],
                 "llvm-symbolizer": [
-                    "llvm-toolchain", "bin", "llvm-symbolizer"
+                    "llvm-toolchain",
+                    "bin",
+                    "llvm-symbolizer"
                 ],
                 "nm": [
-                    "llvm-toolchain", "bin", "llvm-nm"
+                    "llvm-toolchain",
+                    "bin",
+                    "llvm-nm"
                 ],
                 "objcopy": [
-                    "llvm-toolchain", "bin", "llvm-objcopy"
+                    "llvm-toolchain",
+                    "bin",
+                    "llvm-objcopy"
                 ]
             }
         },
@@ -6364,7 +6436,7 @@
         "yp-util": {
             "formula": {
                 "sandbox_id": [
-                    673622896
+                    684215068
                 ],
                 "match": "yp_util"
             },
@@ -6390,7 +6462,7 @@
         "yd-migrate": {
             "formula": {
                 "sandbox_id": [
-                    679096104
+                    686552043
                 ],
                 "match": "yd_migrate"
             },
@@ -6773,7 +6845,7 @@
         },
         "horadric": {
             "formula": {
-                "sandbox_id": 681610231,
+                "sandbox_id": 689750243,
                 "match": "horadric"
             },
             "executable": {
@@ -6784,7 +6856,7 @@
         },
         "zcli": {
             "formula": {
-                "sandbox_id": 575360578,
+                "sandbox_id": 687250976,
                 "match": "zcli"
             },
             "executable": {
@@ -6883,7 +6955,7 @@
         },
         "ya-tc": {
             "formula": {
-                "sandbox_id": 661776613,
+                "sandbox_id": 686194294,
                 "match": "ya-tc"
             },
             "executable": {
@@ -7009,6 +7081,19 @@
                     "fio",
                     "bin",
                     "fio"
+                ]
+            }
+        },
+        "foremost": {
+            "formula": {
+                "sandbox_id": [
+                    684724398
+                ],
+                "match": "infra/kernel/tools/foremost/build/foremost-static.tar.gz"
+            },
+            "executable": {
+                "foremost": [
+                    "foremost"
                 ]
             }
         },
@@ -7172,6 +7257,17 @@
             "executable": {
                 "yfm": [
                     "yfm-transform"
+                ]
+            }
+        },
+        "yfm-docs": {
+            "formula": {
+                "sandbox_id": 684962069,
+                "match": "yfm-docs"
+            },
+            "executable": {
+                "yfm-docs": [
+                    "yfm-docs"
                 ]
             }
         },

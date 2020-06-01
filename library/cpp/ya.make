@@ -8,9 +8,15 @@ RECURSE(
     binsaver
     binsaver/ut_util
     binsaver/ut
+    blockcodecs
+    blockcodecs/fuzz
+    blockcodecs/ut
+    build_info
     cgiparam
     cgiparam/fuzz
     cgiparam/ut
+    charset
+    charset/ut
     colorizer
     colorizer/ut
     containers
@@ -23,9 +29,13 @@ RECURSE(
     diff
     diff/ut
     digest
+    dns
+    dns/ut
     dot_product
     dot_product/bench
     dot_product/ut
+    enumbitset
+    enumbitset/ut
     fast_log
     float16
     float16/ut
@@ -46,7 +56,13 @@ RECURSE(
     json/writer/ut
     json/yson
     json/yson/ut
+    logger
+    logger/global
+    logger/global/ut
+    logger/ut
     malloc
+    lcs
+    lcs/ut
     lfalloc
     lfalloc/dbg
     lfalloc/dbg_info
@@ -59,13 +75,20 @@ RECURSE(
     resource
     resource/ut
     sse
+    statistics
+    statistics/ut
     streams
     string_utils
+    svnversion
     terminate_handler
     terminate_handler/sample
     testing
     text_processing
     threading
+    token
+    token/serialization
+    token/serialization/ut
+    token/ut
     tokenizer
     tokenizer/ut
     unicode
