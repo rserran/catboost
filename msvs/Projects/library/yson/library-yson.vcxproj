@@ -79,21 +79,6 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClCompile Include="$(SolutionDir)..\library\yson\all.cpp"/>
-    <ClInclude Include="$(SolutionDir)..\library\yson\consumer.h"/>
-    <ClInclude Include="$(SolutionDir)..\library\yson\detail.h"/>
-    <ClInclude Include="$(SolutionDir)..\library\yson\format.h"/>
-    <ClInclude Include="$(SolutionDir)..\library\yson\json_writer.h"/>
-    <ClInclude Include="$(SolutionDir)..\library\yson\lexer.h"/>
-    <ClInclude Include="$(SolutionDir)..\library\yson\lexer_detail.h"/>
-    <ClInclude Include="$(SolutionDir)..\library\yson\parser.h"/>
-    <ClInclude Include="$(SolutionDir)..\library\yson\parser_detail.h"/>
-    <ClInclude Include="$(SolutionDir)..\library\yson\public.h"/>
-    <ClInclude Include="$(SolutionDir)..\library\yson\token.h"/>
-    <ClInclude Include="$(SolutionDir)..\library\yson\tokenizer.h"/>
-    <ClInclude Include="$(SolutionDir)..\library\yson\varint.h"/>
-    <ClInclude Include="$(SolutionDir)..\library\yson\writer.h"/>
-    <ClInclude Include="$(SolutionDir)..\library\yson\yson2json_adapter.h"/>
-    <ClInclude Include="$(SolutionDir)..\library\yson\zigzag.h"/>
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets"/>
   <ImportGroup Label="ExtensionTargets"/>
@@ -106,6 +91,9 @@
     </ProjectReference>
     <ProjectReference Include="$(SolutionDir)Projects\contrib\libs\double-conversion\contrib-libs-double-conversion.vcxproj">
       <Project>{1BA2A109-73A9-0A33-0C89-68ACB8229C74}</Project>
+    </ProjectReference>
+    <ProjectReference Include="$(SolutionDir)Projects\contrib\libs\libc_compat\contrib-libs-libc_compat.vcxproj">
+      <Project>{116AA49B-0C0D-7CF7-45DB-A708FB126C84}</Project>
     </ProjectReference>
     <ProjectReference Include="$(SolutionDir)Projects\contrib\libs\rapidjson\contrib-libs-rapidjson.vcxproj">
       <Project>{9CDB08FB-219D-3356-E006-1AC8AECC636E}</Project>

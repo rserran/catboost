@@ -1,44 +1,13 @@
 
 
 RECURSE(
-    chromium_trace
-    chromium_trace/benchmark
-    chromium_trace/examples
-    chromium_trace/ut
     cpp
-    fast_exp
-    fast_exp/benchmark
-    fast_exp/ut
-    langmask
-    langmask/proto
-    langmask/python
-    langmask/serialization
-    langmask/ut
-    langs
-    langs/ut
-    linear_regression
-    linear_regression/benchmark
-    linear_regression/ut
     neh
     neh/asio/ut
     neh/ut
-    netliba
-    object_factory
-    object_factory/ut
-    overloaded
-    overloaded/ut
-    packers
-    packers/ut
-    par
     python
     testing
 )
-
-IF (HAVE_CUDA)
-    RECURSE(
-    cuda
-)
-ENDIF()
 
 IF (NOT SANITIZER_TYPE)
     RECURSE(

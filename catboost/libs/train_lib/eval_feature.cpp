@@ -482,10 +482,15 @@ static void PrepareFolds(
         const ui32 offsetInRange = featureEvalOptions.Offset;
         CB_ENSURE_INTERNAL(offsetInRange + foldCount <= testSubsets.size(), "Dataset permutation logic failed");
     }
-    // group subsets, maybe trivial
-    TVector<NCB::TArraySubsetIndexing<ui32>> trainSubsets
-        = CalcTrainSubsets(testSubsets, objectsGrouping.GetGroupCount());
+    const ui32 offsetInRange = !cvParams.Initialized() ? featureEvalOptions.Offset : 0;
 
+    TVector<NCB::TArraySubsetIndexing<ui32>> trainSubsets
+        = CalcTrainSubsetsRange(testSubsets, objectsGrouping.GetGroupCount(), TIndexRange<ui32>(offsetInRange, offsetInRange + foldCount));
+
+    if (!cvParams.Initialized()) {
+        TakeMiddleElements(offsetInRange, foldCount, &trainSubsets);
+        TakeMiddleElements(offsetInRange, foldCount, &testSubsets);
+    }
     testSubsets.swap(trainSubsets);
 
     CB_ENSURE(foldsData->empty(), "Need empty vector of folds data");
@@ -497,11 +502,6 @@ static void PrepareFolds(
         testFoldsData = foldsData;
     }
 
-    if (!cvParams.Initialized()) {
-        const ui32 offsetInRange = featureEvalOptions.Offset;
-        TakeMiddleElements(offsetInRange, foldCount, &trainSubsets);
-        TakeMiddleElements(offsetInRange, foldCount, &testSubsets);
-    }
     CreateFoldData(
         srcData,
         cpuUsedRamLimit,
@@ -970,6 +970,10 @@ static void EvaluateFeaturesImpl(
             callbacks->FoldIndex = offsetInRange + foldIdx;
             callbacks->ResetIterationIndex();
             foldContext.OutputOptions.SetSaveSnapshotFlag(outputFileOptions.SaveSnapshot());
+            CATBOOST_NOTICE_LOG << "Learn dataset: " << foldContext.TrainingData.Learn->ObjectsGrouping->GetObjectCount() << " objects, "
+                << foldContext.TrainingData.Learn->ObjectsGrouping->GetGroupCount() << " groups" << Endl;
+            CATBOOST_NOTICE_LOG << "Test dataset: " << foldContext.TrainingData.Test[0]->ObjectsGrouping->GetObjectCount() << " objects, "
+                << foldContext.TrainingData.Test[0]->ObjectsGrouping->GetGroupCount() << " groups" << Endl;
             Train(
                 dataSpecificOptions,
                 JoinFsPaths(topLevelTrainDir, foldDir),
@@ -1039,6 +1043,9 @@ static void EvaluateFeaturesImpl(
                 ETrainingKind::Baseline,
                 featureSetIdx,
                 foldsData);
+            CB_ENSURE(
+                HaveFeaturesToEvaluate(newFoldsData),
+                "All features in baseline for feature set " << featureSetIdx << " are ignored or constant");
             trainFullModels(/*isTest*/false, featureSetIdx, &newFoldsData);
         } else {
             results->BestMetrics[/*isTest*/0][featureSetIdx] = results->BestMetrics[/*isTest*/0][0];

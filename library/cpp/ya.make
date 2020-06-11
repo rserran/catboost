@@ -17,6 +17,7 @@ RECURSE(
     cgiparam/ut
     charset
     charset/ut
+    chromium_trace
     colorizer
     colorizer/ut
     containers
@@ -36,6 +37,9 @@ RECURSE(
     dot_product/ut
     enumbitset
     enumbitset/ut
+    fast_exp
+    fast_exp/benchmark
+    fast_exp/ut
     fast_log
     float16
     float16/ut
@@ -56,19 +60,36 @@ RECURSE(
     json/writer/ut
     json/yson
     json/yson/ut
-    logger
-    logger/global
-    logger/global/ut
-    logger/ut
-    malloc
+    langs
+    langs/ut
+    langmask
+    langmask/proto
+    langmask/serialization
+    langmask/ut
     lcs
     lcs/ut
     lfalloc
     lfalloc/dbg
     lfalloc/dbg_info
     lfalloc/yt
+    linear_regression
+    linear_regression/benchmark
+    linear_regression/ut
+    logger
+    logger/global
+    logger/global/ut
+    logger/ut
+    malloc
+    netliba
+    object_factory
+    object_factory/ut
     on_disk
     openssl
+    overloaded
+    overloaded/ut
+    packers
+    packers/ut
+    par
     pop_count
     pop_count/benchmark
     pop_count/ut
@@ -114,5 +135,11 @@ IF (OS_WINDOWS)
 ELSE()
     RECURSE(
     sse/ut
+)
+ENDIF()
+
+IF (HAVE_CUDA)
+    RECURSE(
+    cuda
 )
 ENDIF()

@@ -149,6 +149,9 @@ ALLOW .* -> vendor/github.com/montanaflynn/stats
 # runtime dependencies of go-swagger
 ALLOW .* -> vendor/github.com/go-openapi
 
+# CONTRIB-469: swagger code generator for both client and server
+ALLOW .* -> vendor/github.com/go-swagger/go-swagger/cmd/swagger
+
 # redis client
 ALLOW .* -> vendor/github.com/go-redis/redis/v7
 
@@ -241,6 +244,8 @@ ALLOW .* -> vendor/golang.org/x/xerrors
 
 # golang.org/x/sys required for SO_REUSEPORT, for example
 ALLOW .* -> vendor/golang.org/x/sys
+
+ALLOW .* -> vendor/golang.org/x/mod
 
 # basic LDAP v3 functionality for the GO programming language
 ALLOW .* -> vendor/gopkg.in/ldap.v3
@@ -389,6 +394,9 @@ ALLOW .* -> vendor/github.com/vishvananda/netns
 
 # CONTRIB-1545 Go bindings for creating BPF programs.
 ALLOW .* -> vendor/github.com/iovisor/gobpf
+
+# CONTRIB-1878 pure Go library for loading, compiling, and debugging eBPF programs
+ALLOW .* -> vendor/github.com/cilium/ebpf
 
 # CONTRIB-1561 Go pretty format for numbers
 ALLOW .* -> vendor/github.com/dustin/go-humanize
