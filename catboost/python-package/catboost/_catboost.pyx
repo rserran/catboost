@@ -408,6 +408,12 @@ cdef extern from "catboost/private/libs/options/enums.h":
     cdef cppclass EFstrType:
         pass
 
+    cdef cppclass EExplainableModelOutput:
+        pass
+
+    cdef cppclass ECalcTypeShapValues:
+        pass
+
     cdef cppclass EPreCalcShapValues:
         pass
 
@@ -461,6 +467,7 @@ cdef extern from "catboost/libs/data/features_layout.h" namespace "NCB":
             const ui32 featureCount,
             const TVector[ui32]& catFeatureIndices,
             const TVector[ui32]& textFeatureIndices,
+            const TVector[ui32]& embeddingFeatureIndices,
             const TVector[TString]& featureId,
             bool_t allFeaturesAreSparse
         ) except +ProcessException
@@ -706,6 +713,7 @@ cdef extern from "catboost/private/libs/data_util/line_data_reader.h" namespace 
     cdef cppclass TDsvFormatOptions:
         bool_t HasHeader
         char Delimiter
+        bool_t IgnoreCsvQuoting
 
 cdef extern from "catboost/private/libs/options/load_options.h" namespace "NCatboostOptions":
     cdef cppclass TColumnarPoolFormatParams:
@@ -1358,20 +1366,24 @@ cdef extern from "catboost/libs/fstr/calc_fstr.h":
         const EFstrType type,
         const TFullModel& model,
         const TDataProviderPtr dataset,
+        const TDataProviderPtr referenceDataset,
         int threadCount,
         EPreCalcShapValues mode,
         int logPeriod,
-        ECalcTypeShapValues calcType
+        ECalcTypeShapValues calcType,
+        EExplainableModelOutput modelOutputType
     ) nogil except +ProcessException
 
     cdef TVector[TVector[TVector[double]]] GetFeatureImportancesMulti(
         const EFstrType type,
         const TFullModel& model,
         const TDataProviderPtr dataset,
+        const TDataProviderPtr referenceDataset,
         int threadCount,
         EPreCalcShapValues mode,
         int logPeriod,
-        ECalcTypeShapValues calcType
+        ECalcTypeShapValues calcType,
+        EExplainableModelOutput modelOutputType
     ) nogil except +ProcessException
 
     cdef TVector[TVector[TVector[TVector[double]]]] CalcShapFeatureInteractionMulti(
@@ -1999,6 +2011,13 @@ cdef ECalcTypeShapValues string_to_calc_type(shap_calc_type) except *:
     return calc_type
 
 
+cdef EExplainableModelOutput string_to_model_output(model_output_str) except *:
+    cdef EExplainableModelOutput model_output
+    if not TryFromString[EExplainableModelOutput](to_arcadia_string(model_output_str), model_output):
+        raise CatBoostError("Unknown shap values mode {}.".format(model_output_str))
+    return model_output
+
+
 cdef class _PreprocessParams:
     cdef TJsonValue tree
     cdef TMaybe[TCustomObjectiveDescriptor] customObjectiveDescriptor
@@ -2308,9 +2327,16 @@ cdef void list_to_vector(values_list, TVector[ui32]* values_vector) except *:
             values_vector[0].push_back(value)
 
 
-cdef TFeaturesLayout* _init_features_layout(data, cat_features, text_features, feature_names) except*:
+cdef TFeaturesLayout* _init_features_layout(
+    data,
+    cat_features,
+    text_features,
+    embedding_features,
+    feature_names
+) except*:
     cdef TVector[ui32] cat_features_vector
     cdef TVector[ui32] text_features_vector
+    cdef TVector[ui32] embedding_features_vector
     cdef TVector[TString] feature_names_vector
     cdef bool_t all_features_are_sparse
 
@@ -2323,6 +2349,7 @@ cdef TFeaturesLayout* _init_features_layout(data, cat_features, text_features, f
 
     list_to_vector(cat_features, &cat_features_vector)
     list_to_vector(text_features, &text_features_vector)
+    list_to_vector(embedding_features, &embedding_features_vector)
 
     if feature_names is not None:
         for feature_name in feature_names:
@@ -2336,6 +2363,7 @@ cdef TFeaturesLayout* _init_features_layout(data, cat_features, text_features, f
         <ui32>feature_count,
         cat_features_vector,
         text_features_vector,
+        embedding_features_vector,
         feature_names_vector,
         all_features_are_sparse)
 
@@ -3538,7 +3566,7 @@ cdef class _PoolBase:
                 builder_visitor[0].AddTarget(target_idx, <TConstArrayRef[TString]>string_target_data)
 
 
-    cpdef _read_pool(self, pool_file, cd_file, pairs_file, feature_names_file, delimiter, bool_t has_header, int thread_count, dict quantization_params):
+    cpdef _read_pool(self, pool_file, cd_file, pairs_file, feature_names_file, delimiter, bool_t has_header, bool_t ignore_csv_quoting, int thread_count, dict quantization_params):
         cdef TPathWithScheme pool_file_path
         pool_file_path = TPathWithScheme(<TStringBuf>to_arcadia_string(pool_file), TStringBuf(<char*>'dsv'))
 
@@ -3553,6 +3581,7 @@ cdef class _PoolBase:
         cdef TColumnarPoolFormatParams columnarPoolFormatParams
         columnarPoolFormatParams.DsvFormat.HasHeader = has_header
         columnarPoolFormatParams.DsvFormat.Delimiter = ord(delimiter)
+        columnarPoolFormatParams.DsvFormat.IgnoreCsvQuoting = ignore_csv_quoting
         if len(cd_file):
             columnarPoolFormatParams.CdFilePath = TPathWithScheme(<TStringBuf>to_arcadia_string(cd_file), TStringBuf(<char*>'dsv'))
 
@@ -3777,7 +3806,13 @@ cdef class _PoolBase:
         data_meta_info.HasTimestamp = False
         data_meta_info.HasPairs = pairs is not None
 
-        data_meta_info.FeaturesLayout = _init_features_layout(data, cat_features, text_features, feature_names)
+        data_meta_info.FeaturesLayout = _init_features_layout(
+            data,
+            cat_features,
+            text_features,
+            [],
+            feature_names
+        )
 
         do_use_raw_data_in_features_order = False
         if isinstance(data, FeaturesData):
@@ -4571,8 +4606,7 @@ cdef class _CatBoost:
         )
         return _vector_of_double_to_np_array(fstr)
 
-    cpdef _calc_fstr(self, type_name, _PoolBase pool, int thread_count, int verbose, shap_mode_name, interaction_indices,
-                     shap_calc_type):
+    cpdef _calc_fstr(self, type_name, _PoolBase pool, _PoolBase reference_data, int thread_count, int verbose, model_output_name, shap_mode_name, interaction_indices, shap_calc_type):
         thread_count = UpdateThreadCount(thread_count);
         cdef TVector[TString] feature_ids = GetMaybeGeneratedModelFeatureIds(
             dereference(self.__model),
@@ -4586,13 +4620,18 @@ cdef class _CatBoost:
         if pool:
             dataProviderPtr = pool.__pool
 
+        cdef TDataProviderPtr referenceDataProviderPtr
         cdef EFstrType fstr_type = string_to_fstr_type(type_name)
         cdef EPreCalcShapValues shap_mode = string_to_shap_mode(shap_mode_name)
+        cdef EExplainableModelOutput model_output = string_to_model_output(model_output_name)
         cdef TMaybe[pair[int, int]] pair_of_features
 
         if shap_calc_type == 'Exact':
             assert dereference(self.__model).IsOblivious(), "'Exact' calculation type is supported only for symmetric trees."
         cdef ECalcTypeShapValues calc_type = string_to_calc_type(shap_calc_type)
+        if reference_data:
+            referenceDataProviderPtr = reference_data.__pool
+            TryFromString[ECalcTypeShapValues](to_arcadia_string("Independent"), calc_type)
 
         if type_name == 'ShapValues' and dereference(self.__model).GetDimensionsCount() > 1:
             with nogil:
@@ -4600,10 +4639,12 @@ cdef class _CatBoost:
                     fstr_type,
                     dereference(self.__model),
                     dataProviderPtr,
+                    referenceDataProviderPtr,
                     thread_count,
                     shap_mode,
                     verbose,
-                    calc_type
+                    calc_type,
+                    model_output
                 )
             return _3d_vector_of_double_to_np_array(fstr_multi), native_feature_ids
         elif type_name == 'ShapInteractionValues':
@@ -4632,10 +4673,12 @@ cdef class _CatBoost:
                     fstr_type,
                     dereference(self.__model),
                     dataProviderPtr,
+                    referenceDataProviderPtr,
                     thread_count,
                     shap_mode,
                     verbose,
-                    calc_type
+                    calc_type,
+                    model_output
                 )
             return _2d_vector_of_double_to_np_array(fstr), native_feature_ids
 

@@ -4,7 +4,7 @@
 
 #include <util/generic/xrange.h>
 
-#include <library/cpp/unittest/registar.h>
+#include <library/cpp/testing/unittest/registar.h>
 
 using namespace std;
 using namespace NCB;
@@ -33,6 +33,7 @@ static TDataProviderPtr SmallFloatPool(EWeightsMode addWeights, ETargetDimMode m
             metaInfo.HasWeights = addWeights;
             metaInfo.FeaturesLayout = MakeIntrusive<TFeaturesLayout>(
                 (ui32)3,
+                TVector<ui32>{},
                 TVector<ui32>{},
                 TVector<ui32>{},
                 TVector<TString>{});

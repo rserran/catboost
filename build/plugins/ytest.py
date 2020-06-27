@@ -120,7 +120,7 @@ def validate_test(unit, kw):
             errors.append("BOOSTTEST is not allowed here")
     elif valid_kw.get('SCRIPT-REL-PATH') == 'gtest':
         project_path = valid_kw.get('BUILD-FOLDER-PATH', "")
-        if not project_path.startswith(("adfox", "contrib", "devtools", "mail", "mds", "yp", "yt")):
+        if not project_path.startswith(("contrib", "devtools", "mail", "mds", "yp")):
             errors.append("GTEST is not allowed here")
 
     size_timeout = collections.OrderedDict(sorted(consts.TestSize.DefaultTimeouts.items(), key=lambda t: t[1]))
@@ -506,6 +506,7 @@ def onadd_check(unit, *args):
         script_rel_path = check_type
 
     use_arcadia_python = unit.get('USE_ARCADIA_PYTHON')
+    test_files = serialize_list(flat_args[1:])
     test_record = {
         'TEST-NAME': check_type.lower(),
         'TEST-TIMEOUT': test_timeout,
@@ -524,7 +525,9 @@ def onadd_check(unit, *args):
         'USE_ARCADIA_PYTHON': use_arcadia_python or '',
         'OLD_PYTEST': 'no',
         'PYTHON-PATHS': '',
-        'FILES': serialize_list(flat_args[1:])
+        # TODO remove FILES, see DEVTOOLS-7052
+        'FILES': test_files,
+        'TEST-FILES': test_files,
     }
 
     data = dump_test(unit, test_record)
@@ -547,6 +550,7 @@ def onadd_check_py_imports(unit, *args):
     test_dir = get_norm_unit_path(unit)
 
     use_arcadia_python = unit.get('USE_ARCADIA_PYTHON')
+    test_files = serialize_list([get_norm_unit_path(unit, unit.filename())])
     test_record = {
         'TEST-NAME': "pyimports",
         'TEST-TIMEOUT': '',
@@ -565,7 +569,9 @@ def onadd_check_py_imports(unit, *args):
         'USE_ARCADIA_PYTHON': use_arcadia_python or '',
         'OLD_PYTEST': 'no',
         'PYTHON-PATHS': '',
-        'FILES': serialize_list([get_norm_unit_path(unit, unit.filename())])
+        # TODO remove FILES, see DEVTOOLS-7052
+        'FILES': test_files,
+        'TEST-FILES': test_files,
     }
     if unit.get('NO_CHECK_IMPORTS_FOR_VALUE') != "None":
         test_record["NO-CHECK"] = serialize_list(get_values_list(unit, 'NO_CHECK_IMPORTS_FOR_VALUE') or ["*"])

@@ -457,6 +457,9 @@ ALLOW .* -> vendor/github.com/dave/dst
 # CONTRIB-1874 Parse and demux MPEG Transport Streams
 ALLOW .* -> vendor/github.com/asticode/go-astits
 
+# CONTRIB-1896 Fast, portable, non-Turing complete expression evaluation with gradual typing                                                                   
+ALLOW .* -> vendor/github.com/google/cel-go
+
 #
 # Temporary exceptions.
 #
@@ -490,7 +493,6 @@ ALLOW locdoc/doc/daas-farm/pkg/daasclient -> vendor/github.com/pkg/errors
 ALLOW locdoc/doc/daas-farm/pkg/menugen -> vendor/github.com/pkg/errors
 ALLOW locdoc/doc/daas-farm/pkg/wikiclient -> vendor/github.com/pkg/errors
 ALLOW locdoc/doc/daas-farm/pkg/wikigen -> vendor/github.com/pkg/errors
-ALLOW market/sre/library/golang/dispenser -> vendor/github.com/pkg/errors
 ALLOW market/sre/services/rtcstats2graphite/src/internal/blogic -> vendor/github.com/pkg/errors
 ALLOW market/sre/services/rtcstats2graphite/src/internal/nanny -> vendor/github.com/pkg/errors
 ALLOW market/sre/services/rtcstats2graphite/src/internal/oops -> vendor/github.com/pkg/errors
@@ -501,8 +503,6 @@ ALLOW market/sre/tools/ya-gde/src/pkg/hostinfo -> vendor/github.com/pkg/errors
 ALLOW market/sre/tools/ya-gde/src/pkg/util -> vendor/github.com/pkg/errors
 ALLOW transfer_manager/go/pkg/abstract -> vendor/github.com/pkg/errors
 ALLOW yabs/telephony/platform/inventory/api/http -> vendor/github.com/pkg/errors
-ALLOW yabs/telephony/platform/inventory/core -> vendor/github.com/pkg/errors
-ALLOW yabs/telephony/platform/push-service/api/http -> vendor/github.com/pkg/errors
 ALLOW yt/jaeger/plugin/cmd/agent -> vendor/github.com/pkg/errors
 ALLOW yt/jaeger/plugin/cmd/collector -> vendor/github.com/pkg/errors
 
@@ -514,24 +514,18 @@ ALLOW edadeal/backend/go/charm/cmd/charm -> vendor/github.com/jackc/pgx
 ALLOW edadeal/backend/go/gluon/internal/app/bootstrap -> vendor/github.com/jackc/pgx
 ALLOW edadeal/backend/go/nachalnik/internal/app/bootstrap -> vendor/github.com/jackc/pgx
 ALLOW edadeal/backend/go/nachalnik/internal/pkg/store -> vendor/github.com/jackc/pgx
-ALLOW edadeal/backend/go/susanin/internal/app/bootstrap -> vendor/github.com/jackc/pgx
 ALLOW extsearch/video/robot/rt_transcoder/video-manager/db -> vendor/github.com/jackc/pgx
 ALLOW games/backend/internal/db_utils -> vendor/github.com/jackc/pgx
 ALLOW games/backend/internal -> vendor/github.com/jackc/pgx
 ALLOW games/backend/pkg/database -> vendor/github.com/jackc/pgx
 ALLOW games/backend -> vendor/github.com/jackc/pgx
-ALLOW infra/maxwell/go/pkg/storages/jobstorages -> vendor/github.com/jackc/pgx
 ALLOW mail/calendar/load/bbmock -> vendor/github.com/jackc/pgx
 ALLOW mail/collectors/tests-load/pandora -> vendor/github.com/jackc/pgx
 ALLOW market/sre/services/dist_meta_store/app -> vendor/github.com/jackc/pgx
 ALLOW market/sre/services/dist_meta_store/database -> vendor/github.com/jackc/pgx
-ALLOW mds/karl/pkg/mdb -> vendor/github.com/jackc/pgx
-ALLOW mds/valve/pkg/storage -> vendor/github.com/jackc/pgx
 ALLOW quasar/gackend/db -> vendor/github.com/jackc/pgx
 ALLOW quasar/tsup/db -> vendor/github.com/jackc/pgx
 ALLOW transfer_manager/go/cmd/load_generator -> vendor/github.com/jackc/pgx
-ALLOW transfer_manager/go/pkg/configurator -> vendor/github.com/jackc/pgx
-ALLOW transfer_manager/go/pkg/dbaas -> vendor/github.com/jackc/pgx
 ALLOW transfer_manager/go/pkg/mapreduce/pg_to_yt -> vendor/github.com/jackc/pgx
 ALLOW transfer_manager/go/pkg/sink/pg -> vendor/github.com/jackc/pgx
 ALLOW transfer_manager/go/pkg/source/pg -> vendor/github.com/jackc/pgx

@@ -277,6 +277,7 @@ class Pool(_PoolBase):
         pairs=None,
         delimiter='\t',
         has_header=False,
+        ignore_csv_quoting=False,
         weight=None,
         group_id=None,
         group_weight=None,
@@ -340,6 +341,9 @@ class Pool(_PoolBase):
         has_header : bool optional (default=False)
             If True, read column names from first line.
 
+        ignore_csv_quoting : bool optional (default=False)
+            If True ignore quoting '"'.
+
         weight : list or numpy.ndarray, optional (default=None)
             Weight for each instance.
             If not None, giving 1 dimensional array like data.
@@ -394,7 +398,7 @@ class Pool(_PoolBase):
                     raise CatBoostError(
                         "feature_names should have None or string type when the pool is read from the file."
                     )
-                self._read(data, column_description, pairs, feature_names, delimiter, has_header, thread_count)
+                self._read(data, column_description, pairs, feature_names, delimiter, has_header, ignore_csv_quoting, thread_count)
             else:
                 if isinstance(data, FeaturesData):
                     if any(v is not None for v in [cat_features, text_features, feature_names]):
@@ -827,6 +831,7 @@ class Pool(_PoolBase):
         feature_names_path,
         delimiter,
         has_header,
+        ignore_csv_quoting,
         thread_count,
         quantization_params=None
     ):
@@ -852,6 +857,7 @@ class Pool(_PoolBase):
                 feature_names_path,
                 delimiter[0],
                 has_header,
+                ignore_csv_quoting,
                 thread_count,
                 quantization_params
             )
@@ -1288,9 +1294,8 @@ class _CatBoostBase(object):
         metrics_description_list = metrics_description if isinstance(metrics_description, list) else [metrics_description]
         return self._object._base_eval_metrics(pool, metrics_description_list, ntree_start, ntree_end, eval_period, thread_count, result_dir, tmp_dir)
 
-    def _calc_fstr(self, type, pool, thread_count, verbose, shap_mode, interaction_indices, shap_calc_type):
-        return self._object._calc_fstr(type.name, pool, thread_count, verbose, shap_mode, interaction_indices,
-                                       shap_calc_type)
+    def _calc_fstr(self, type, pool, reference_data, thread_count, verbose, model_output, shap_mode, interaction_indices, shap_calc_type):
+        return self._object._calc_fstr(type.name, pool, reference_data, thread_count, verbose, model_output, shap_mode, interaction_indices, shap_calc_type)
 
     def _calc_ostr(self, train_pool, test_pool, top_size, ostr_type, update_method, importance_values_sign, thread_count, verbose):
         return self._object._calc_ostr(train_pool, test_pool, top_size, ostr_type, update_method, importance_values_sign, thread_count, verbose)
@@ -2257,7 +2262,8 @@ class CatBoost(_CatBoostBase):
         else:
             return np.array(getattr(self, "_prediction_values_change", None))
 
-    def get_feature_importance(self, data=None, type=EFstrType.FeatureImportance, prettified=False, thread_count=-1, verbose=False, fstr_type=None, shap_mode="Auto", interaction_indices=None, shap_calc_type="Regular"):
+
+    def get_feature_importance(self, data=None, reference_data=None, type=EFstrType.FeatureImportance, prettified=False, thread_count=-1, verbose=False, fstr_type=None, shap_mode="Auto", model_output="Raw", interaction_indices=None, shap_calc_type="Regular"):
         """
         Parameters
         ----------
@@ -2394,7 +2400,7 @@ class CatBoost(_CatBoostBase):
                 raise CatBoostError("data is empty.")
 
         with log_fixup():
-            fstr, feature_names = self._calc_fstr(type, data, thread_count, verbose, shap_mode, interaction_indices,
+            fstr, feature_names = self._calc_fstr(type, data, reference_data, thread_count, verbose, model_output, shap_mode, interaction_indices,
                                                   shap_calc_type)
         if type in (EFstrType.PredictionValuesChange, EFstrType.LossFunctionChange, EFstrType.PredictionDiff):
             feature_importances = [value[0] for value in fstr]

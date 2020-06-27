@@ -7,7 +7,7 @@
 #include <util/generic/ptr.h>
 #include <utility>
 
-#include <library/cpp/unittest/registar.h>
+#include <library/cpp/testing/unittest/registar.h>
 
 class TLogElementTest: public TTestBase {
     UNIT_TEST_SUITE(TLogElementTest);
@@ -24,12 +24,12 @@ void TLogElementTest::TestMoveCtor() {
     TStringStream output;
     TLog log(new TStreamLogBackend(&output));
 
-    THolder<TLogElement> src = new TLogElement(&log);
+    THolder<TLogElement> src = MakeHolder<TLogElement>(&log);
 
     TString message = "Hello, World!";
     (*src) << message;
 
-    THolder<TLogElement> dst = new TLogElement(std::move(*src));
+    THolder<TLogElement> dst = MakeHolder<TLogElement>(std::move(*src));
 
     src.Destroy();
     UNIT_ASSERT(output.Str() == "");

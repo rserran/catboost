@@ -20,12 +20,6 @@ ALLOW devtools/experimental/mds -> contrib/deprecated/wangle
 DENY .* -> contrib/deprecated/folly
 DENY .* -> contrib/deprecated/wangle
 
-ALLOW contrib/deprecated/http-parser -> contrib/deprecated/http-parser
-ALLOW mds -> contrib/deprecated/http-parser
-ALLOW devtools/experimental/mds -> contrib/deprecated/http-parser
-ALLOW contrib/libs/libgit2 -> contrib/deprecated/http-parser
-DENY .* -> contrib/deprecated/http-parser
-
 ALLOW contrib/deprecated/uriparser -> contrib/deprecated/uriparser
 ALLOW mds -> contrib/deprecated/uriparser
 ALLOW devtools/experimental/mds -> contrib/deprecated/uriparser
@@ -108,11 +102,9 @@ ALLOW passport/cpp/daemons/blackbox/ut/totp_manual/tests -> contrib/python/MySQL
 ALLOW passport/cpp/recipes/passport/passport_mock -> contrib/python/MySQL-python
 ALLOW passport/python/adm_api -> contrib/python/MySQL-python
 ALLOW passport/python/api -> contrib/python/MySQL-python
-ALLOW passport/python/core -> contrib/python/MySQL-python
+ALLOW passport/python/core/tests -> contrib/python/MySQL-python
 ALLOW passport/python/dbscripts -> contrib/python/MySQL-python
 ALLOW passport/python/grants_configurator -> contrib/python/MySQL-python
-ALLOW passport/python/oauth/core/db/eav -> contrib/python/MySQL-python
-ALLOW passport/python/perimeter_api -> contrib/python/MySQL-python
 ALLOW passport/python/social -> contrib/python/MySQL-python
 ALLOW passport/python/yasms/db -> contrib/python/MySQL-python
 ALLOW testenv/core -> contrib/python/MySQL-python
@@ -205,3 +197,6 @@ ALLOW ydo/database/models -> contrib/python/pycrypto
 ALLOW yweb/antispam/cid -> contrib/python/pycrypto
 ALLOW mail/payments/payments -> contrib/python/pycrypto
 DENY .* -> contrib/python/pycrypto
+
+ALLOW yql/udfs/common/python/python_arc -> contrib/python/Geohash
+DENY .* -> contrib/python/Geohash
