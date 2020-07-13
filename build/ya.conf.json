@@ -207,6 +207,9 @@
         "horadric": {
             "description": "Run horadric generator"
         },
+        "logbroker": {
+            "description": "Logbroker configuration utility"
+        },
         "zcli": {
             "description": "Run zcli (console client for zephyr)"
         },
@@ -359,6 +362,12 @@
         },
         "ya_sed": {
             "description": "This tool simplifies replacing of some text in Arcadia"
+        },
+        "black": {
+            "description": "Python styler"
+        },
+        "yadi": {
+            "description": "Arcadia version of Yadi"
         }
     },
     "toolchain": {
@@ -2897,6 +2906,13 @@
                         "os": "DARWIN"
                     },
                     "default": true
+                },
+                {
+                    "host": {
+                        "os": "LINUX",
+                        "arch": "ppc64le"
+                    },
+                    "default": true
                 }
             ],
             "env": {
@@ -2934,6 +2950,13 @@
                 {
                     "host": {
                         "os": "DARWIN"
+                    },
+                    "default": true
+                },
+                {
+                    "host": {
+                        "os": "LINUX",
+                        "arch": "ppc64le"
                     },
                     "default": true
                 }
@@ -4570,6 +4593,28 @@
                 }
             ]
         },
+        "logbroker": {
+            "tools": {
+                "logbroker": {
+                    "bottle": "logbroker",
+                    "executable": "logbroker"
+                }
+            },
+            "platforms": [
+                {
+                    "host": {
+                        "os": "LINUX"
+                    },
+                    "default": true
+                },
+                {
+                    "host": {
+                        "os": "DARWIN"
+                    },
+                    "default": true
+                }
+            ]
+        },
         "zcli": {
             "tools": {
                 "zcli": {
@@ -5321,6 +5366,62 @@
                     "default": true
                 }
             ]
+        },
+        "black": {
+            "tools": {
+                "black": {
+                    "bottle": "black",
+                    "executable": "black"
+                }
+            },
+            "platforms": [
+                {
+                    "host": {
+                        "os": "LINUX"
+                    },
+                    "default": true
+                },
+                {
+                    "host": {
+                        "os": "WIN"
+                    },
+                    "default": true
+                },
+                {
+                    "host": {
+                        "os": "DARWIN"
+                    },
+                    "default": true
+                }
+            ]
+        },
+        "yadi": {
+            "tools": {
+                "yadi": {
+                    "bottle": "yadi",
+                    "executable": "yadi-arc"
+                }
+            },
+            "platforms": [
+                {
+                    "host": {
+                        "os": "LINUX"
+                    },
+                    "default": true
+                },
+                {
+                    "host": {
+                        "os": "DARWIN"
+                    },
+                    "default": true
+                },
+                {
+                    "host": {
+                        "os": "WIN"
+                    },
+                    "default": true
+                }
+            ]
         }
     },
     "bottles": {
@@ -5355,7 +5456,7 @@
         "ymake": {
             "formula": {
                 "sandbox_id": [
-                    708793611
+                    721007034
                 ],
                 "match": "ymake"
             },
@@ -5379,7 +5480,7 @@
         "arc": {
             "formula": {
                 "sandbox_id": [
-                    704714381
+                    719061199
                 ],
                 "match": "arc"
             },
@@ -6112,7 +6213,7 @@
         },
         "ytyndexer": {
             "formula": {
-                "sandbox_id": 651914180,
+                "sandbox_id": 712000152,
                 "match": "YTYNDEXER"
             },
             "executable": {
@@ -6267,7 +6368,8 @@
             "formula": {
                 "sandbox_id": [
                     510387094,
-                    491831556
+                    491831556,
+                    717207102
                 ],
                 "match": "GDB"
             },
@@ -6324,7 +6426,7 @@
         "yp-util": {
             "formula": {
                 "sandbox_id": [
-                    684215068
+                    719427098
                 ],
                 "match": "yp_util"
             },
@@ -6350,7 +6452,7 @@
         "yd-migrate": {
             "formula": {
                 "sandbox_id": [
-                    698190739
+                    722826973
                 ],
                 "match": "yd_migrate"
             },
@@ -6733,7 +6835,7 @@
         },
         "horadric": {
             "formula": {
-                "sandbox_id": 710415268,
+                "sandbox_id": 722489677,
                 "match": "horadric"
             },
             "executable": {
@@ -6742,9 +6844,20 @@
                 ]
             }
         },
+        "logbroker": {
+            "formula": {
+                "sandbox_id": 722489256,
+                "match": "logbroker"
+            },
+            "executable": {
+                "logbroker": [
+                    "logbroker"
+                ]
+            }
+        },
         "zcli": {
             "formula": {
-                "sandbox_id": 696374987,
+                "sandbox_id": 722517364,
                 "match": "zcli"
             },
             "executable": {
@@ -6843,7 +6956,7 @@
         },
         "ya-tc": {
             "formula": {
-                "sandbox_id": 686194294,
+                "sandbox_id": 718927543,
                 "match": "ya-tc"
             },
             "executable": {
@@ -6947,7 +7060,7 @@
         "qyp": {
             "formula": {
                 "sandbox_id": [
-                    695452688
+                    714273705
                 ],
                 "match": "infra/qyp/vmctl/bin/vmctl"
             },
@@ -7139,7 +7252,7 @@
         },
         "yfm-docs": {
             "formula": {
-                "sandbox_id": 703861407,
+                "sandbox_id": 711384171,
                 "match": "yfm-docs"
             },
             "executable": {
@@ -7161,7 +7274,7 @@
         },
         "sedem": {
             "formula": {
-                "sandbox_id": 709486799,
+                "sandbox_id": 718286879,
                 "match": "SEDEM archive"
             },
             "executable": {
@@ -7197,6 +7310,30 @@
             "executable": {
                 "ya_sed": [
                     "ya_sed"
+                ]
+            }
+        },
+        "black": {
+            "formula": {
+                "sandbox_id": [
+                    718136999
+                ],
+                "match": "black"
+            },
+            "executable": {
+                "black": [
+                    "black"
+                ]
+            }
+        },
+        "yadi": {
+            "formula": {
+                "sandbox_id": 722671172,
+                "match": "yadi-arc"
+            },
+            "executable": {
+                "yadi-arc": [
+                    "yadi-arc"
                 ]
             }
         }

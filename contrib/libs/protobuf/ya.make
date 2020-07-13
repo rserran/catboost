@@ -1,5 +1,7 @@
 LIBRARY()
 
+PROVIDES(protobuf)
+
 LICENSE(
     BSD3
 )
@@ -33,8 +35,6 @@ SRCS(
     api.pb.cc
     arena.cc
     arenastring.cc
-    compiler/importer.cc
-    compiler/parser.cc
     descriptor.cc
     descriptor.pb.cc
     descriptor_database.cc
