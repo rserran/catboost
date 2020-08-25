@@ -166,7 +166,7 @@ namespace NCatboostCuda {
         THolder<TObjective> CreateTarget(const TFeatureParallelDataSet& dataSet) const {
             auto slice = dataSet.GetSamplesMapping().GetObjectsSlice();
             CB_ENSURE(slice.Size());
-            return new TObjective(dataSet,
+            return MakeHolder<TObjective>(dataSet,
                                   Random,
                                   slice,
                                   TargetOptions);
@@ -561,7 +561,7 @@ namespace NCatboostCuda {
                     "You can't use boost_from_average with baseline now.");
                 CB_ENSURE(!TestDataProvider || !TestDataProvider->TargetData->GetBaseline(),
                     "You can't use boost_from_average with baseline now.");
-                state->StartingPoint = NCB::CalcOptimumConstApprox(
+                state->StartingPoint = NCB::CalcOneDimensionalOptimumConstApprox(
                     CatBoostOptions.LossFunctionDescription,
                     DataProvider->TargetData->GetOneDimensionalTarget().GetOrElse(TConstArrayRef<float>()),
                     GetWeights(*DataProvider->TargetData));

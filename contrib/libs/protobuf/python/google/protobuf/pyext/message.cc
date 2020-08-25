@@ -36,7 +36,7 @@
 #include <map>
 #include <memory>
 #ifndef _SHARED_PTR_H
-#include "stubs/shared_ptr.h"
+#include <google/protobuf/stubs/shared_ptr.h>
 #endif
 #include <vector>
 #include "structmember.h"  // A Python header file.
@@ -47,16 +47,16 @@
 #ifndef Py_TYPE
 #define Py_TYPE(ob) (((PyObject*)(ob))->ob_type)
 #endif
-#include "descriptor.pb.h"
-#include "stubs/common.h"
-#include <contrib/libs/protobuf/stubs/logging.h>
-#include "io/coded_stream.h"
-#include "io/zero_copy_stream_impl_lite.h"
-#include "util/message_differencer.h"
-#include "descriptor.h"
-#include "message.h"
-#include "text_format.h"
-#include "unknown_field_set.h"
+#include <google/protobuf/descriptor.pb.h>
+#include <google/protobuf/stubs/common.h>
+#include <google/protobuf/stubs/logging.h>
+#include <google/protobuf/io/coded_stream.h>
+#include <google/protobuf/io/zero_copy_stream_impl_lite.h>
+#include <google/protobuf/util/message_differencer.h>
+#include <google/protobuf/descriptor.h>
+#include <google/protobuf/message.h>
+#include <google/protobuf/text_format.h>
+#include <google/protobuf/unknown_field_set.h>
 #include "pyext/descriptor.h"
 #include "pyext/descriptor_pool.h"
 #include "pyext/extension_dict.h"
@@ -66,7 +66,7 @@
 #include "pyext/message_factory.h"
 #include "pyext/safe_numerics.h"
 #include "pyext/scoped_pyobject_ptr.h"
-#include "stubs/strutil.h"
+#include <google/protobuf/stubs/strutil.h>
 
 #if PY_MAJOR_VERSION >= 3
   #define PyInt_AsLong PyLong_AsLong

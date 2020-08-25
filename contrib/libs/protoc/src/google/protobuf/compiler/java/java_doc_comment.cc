@@ -32,12 +32,12 @@
 //  Based on original Protocol Buffers design by
 //  Sanjay Ghemawat, Jeff Dean, and others.
 
-#include "compiler/java/java_doc_comment.h"
+#include <google/protobuf/compiler/java/java_doc_comment.h>
 
 #include <vector>
 
-#include "io/printer.h"
-#include "stubs/strutil.h"
+#include <google/protobuf/io/printer.h>
+#include <google/protobuf/stubs/strutil.h>
 
 namespace google {
 namespace protobuf {

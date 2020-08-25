@@ -119,9 +119,13 @@
   includes:
     - error.h:       contrib/libs/cppkafka/include/cppkafka/error.h
 
-- source_filter: "^contrib/libs/libevent"
+- source_filter: "^contrib/libs/clang10-rt"
   includes:
-    - sys/queue.h:   contrib/libs/libevent/compat/sys/queue.h
+    - xray/xray_interface.h: contrib/libs/clang10-rt/include/xray/xray_interface.h
+
+- source_filter: "^contrib/libs/llvm"
+  includes:
+    - plugin-api.h # GNU linker plugin API.
 
 - source_filter: "^contrib/libs/musl"
   includes:
@@ -382,7 +386,7 @@
   includes:
     - mem.h
 
-- source_filter: "^contrib/libs/(authparser|libcoro-perl|libev-perl|libevent-perl|perl-JavaScript-V8|uatraits)"
+- source_filter: "^contrib/libs/(authparser|libcoro-perl|libev-perl|libevent-perl|uatraits)"
   includes:
     - patchlevel.h
 
@@ -544,3 +548,12 @@
 - source_filter: "^voicetech/spotter/embedded"
   includes:
     - threads.h: voicetech/spotter/embedded/contrib/c11-threads/threads.h
+
+- source_filter: "^contrib/python/pymqi"
+  includes:
+    # IBM MQ
+    - cmqc.h
+    - cmqxc.h
+    - cmqcfc.h
+    - cmqbc.h
+

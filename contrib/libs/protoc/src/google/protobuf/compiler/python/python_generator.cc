@@ -45,27 +45,27 @@
 // directly.
 
 #include <algorithm>
-#include "stubs/hash.h"
+#include <google/protobuf/stubs/hash.h>
 #include <limits>
 #include <map>
 #include <memory>
 #ifndef _SHARED_PTR_H
-#include "stubs/shared_ptr.h"
+#include <google/protobuf/stubs/shared_ptr.h>
 #endif
 #include <utility>
 #include <vector>
 
-#include "compiler/python/python_generator.h"
-#include "descriptor.pb.h"
+#include <google/protobuf/compiler/python/python_generator.h>
+#include <google/protobuf/descriptor.pb.h>
 
-#include <contrib/libs/protobuf/stubs/logging.h>
-#include "stubs/common.h"
-#include "stubs/stringprintf.h"
-#include "io/printer.h"
-#include "io/zero_copy_stream.h"
-#include "descriptor.h"
-#include "stubs/strutil.h"
-#include "stubs/substitute.h"
+#include <google/protobuf/stubs/logging.h>
+#include <google/protobuf/stubs/common.h>
+#include <google/protobuf/stubs/stringprintf.h>
+#include <google/protobuf/io/printer.h>
+#include <google/protobuf/io/zero_copy_stream.h>
+#include <google/protobuf/descriptor.h>
+#include <google/protobuf/stubs/strutil.h>
+#include <google/protobuf/stubs/substitute.h>
 
 
 namespace google {

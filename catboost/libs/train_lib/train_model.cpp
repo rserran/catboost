@@ -420,8 +420,8 @@ static void Train(
 
         profile.FinishIteration();
 
-        TProfileResults profileResults = profile.GetProfileResults();
-        ctx->LearnProgress->MetricsAndTimeHistory.TimeHistory.push_back(TTimeInfo(profileResults));
+        const TProfileResults profileResults = profile.GetProfileResults();
+        ctx->LearnProgress->MetricsAndTimeHistory.TimeHistory.emplace_back(profileResults);
 
         Log(
             iter,
@@ -629,7 +629,7 @@ static void SaveModel(
         }
 
         *modelPtr->ModelTrees.GetMutable() = std::move(modelTrees);
-        modelPtr->SetScaleAndBias({1, ctx.LearnProgress->StartingApprox.GetOrElse(0)});
+        modelPtr->SetScaleAndBias({1, ctx.LearnProgress->StartingApprox.GetOrElse({})});
         modelPtr->UpdateDynamicData();
 
         EFinalFeatureCalcersComputationMode featureCalcerComputationMode
@@ -771,7 +771,7 @@ namespace {
                 }
             }
 
-            TMaybe<double> startingApprox;
+            TMaybe<TVector<double>> startingApprox;
             if (catboostOptions.BoostingOptions->BoostFromAverage.Get()) {
                 // TODO(fedorlebed): add boost from average support for multiregression
                 CB_ENSURE(trainingData.Learn->TargetData->GetTargetDimension() != 0, "Target is required for boosting from average");
@@ -782,6 +782,14 @@ namespace {
                     *trainingData.Learn->TargetData->GetOneDimensionalTarget(),
                     GetWeights(*trainingData.Learn->TargetData)
                 );
+            } else {
+                if (catboostOptions.LossFunctionDescription->GetLossFunction() == ELossFunction::RMSEWithUncertainty) {
+                    startingApprox = CalcOptimumConstApprox(
+                        catboostOptions.LossFunctionDescription,
+                        *trainingData.Learn->TargetData->GetOneDimensionalTarget(),
+                        GetWeights(*trainingData.Learn->TargetData)
+                    );
+                }
             }
             TLearnContext ctx(
                 catboostOptions,
@@ -911,10 +919,10 @@ static void TrainModel(
 
     const bool isGpuDeviceType = taskType == ETaskType::GPU;
     if (isGpuDeviceType && TTrainerFactory::Has(ETaskType::GPU)) {
-        modelTrainerHolder = TTrainerFactory::Construct(ETaskType::GPU);
+        modelTrainerHolder.Reset(TTrainerFactory::Construct(ETaskType::GPU));
     } else {
         CB_ENSURE(!isGpuDeviceType, "Can't load GPU learning library. Module was not compiled or driver  is incompatible with package. Please install latest NVDIA driver and check again");
-        modelTrainerHolder = TTrainerFactory::Construct(ETaskType::CPU);
+        modelTrainerHolder.Reset(TTrainerFactory::Construct(ETaskType::CPU));
     }
 
     if (outputOptions.SaveSnapshot()) {
@@ -935,6 +943,7 @@ static void TrainModel(
             catBoostOptions.DataProcessingOptions->FloatFeaturesBinarization.Get(),
             catBoostOptions.DataProcessingOptions->PerFloatFeatureQuantization.Get(),
             catBoostOptions.DataProcessingOptions->TextProcessingOptions.Get(),
+            catBoostOptions.DataProcessingOptions->EmbeddingProcessingOptions.Get(),
             /*allowNansInTestOnly*/true
         );
         /* TODO(akhropov): reuse float features quantization data from initLearnProgress if data quantization
@@ -1174,6 +1183,7 @@ void TrainModel(
         catBoostOptions.DataProcessingOptions->FloatFeaturesBinarization.Get(),
         catBoostOptions.DataProcessingOptions->PerFloatFeatureQuantization.Get(),
         catBoostOptions.DataProcessingOptions->TextProcessingOptions.Get(),
+        catBoostOptions.DataProcessingOptions->EmbeddingProcessingOptions.Get(),
         /*allowNansInTestOnly*/true
     );
     if (loadOptions.BordersFile) {
@@ -1290,7 +1300,7 @@ static void ModelBasedEval(
     CB_ENSURE(TTrainerFactory::Has(ETaskType::GPU),
         "Can't load GPU learning library. Module was not compiled or driver is incompatible with package. Please install latest NVDIA driver and check again.");
 
-    THolder<IModelTrainer> modelTrainerHolder = TTrainerFactory::Construct(ETaskType::GPU);
+    THolder<IModelTrainer> modelTrainerHolder(TTrainerFactory::Construct(ETaskType::GPU));
     if (outputOptions.SaveSnapshot()) {
         UpdateUndefinedRandomSeed(ETaskType::GPU, outputOptions, &updatedTrainOptionsJson, [&](IInputStream* in, TString& params) {
             ::Load(in, params);
@@ -1310,6 +1320,7 @@ static void ModelBasedEval(
             catBoostOptions.DataProcessingOptions->FloatFeaturesBinarization.Get(),
             catBoostOptions.DataProcessingOptions->PerFloatFeatureQuantization.Get(),
             catBoostOptions.DataProcessingOptions->TextProcessingOptions.Get(),
+            catBoostOptions.DataProcessingOptions->EmbeddingProcessingOptions.Get(),
             /*allowNansInTestOnly*/true
         );
     }
@@ -1422,6 +1433,7 @@ void ModelBasedEval(
         catBoostOptions.DataProcessingOptions->FloatFeaturesBinarization.Get(),
         catBoostOptions.DataProcessingOptions->PerFloatFeatureQuantization.Get(),
         catBoostOptions.DataProcessingOptions->TextProcessingOptions.Get(),
+        catBoostOptions.DataProcessingOptions->EmbeddingProcessingOptions.Get(),
         /*allowNansInTestOnly*/true
     );
     if (loadOptions.BordersFile) {

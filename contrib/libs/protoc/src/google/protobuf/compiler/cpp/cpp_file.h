@@ -37,13 +37,13 @@
 
 #include <memory>
 #ifndef _SHARED_PTR_H
-#include "stubs/shared_ptr.h"
+#include <google/protobuf/stubs/shared_ptr.h>
 #endif
 #include <vector>
-#include "stubs/common.h"
-#include "compiler/cpp/cpp_field.h"
-#include "compiler/cpp/cpp_helpers.h"
-#include "compiler/cpp/cpp_options.h"
+#include <google/protobuf/stubs/common.h>
+#include <google/protobuf/compiler/cpp/cpp_field.h>
+#include <google/protobuf/compiler/cpp/cpp_helpers.h>
+#include <google/protobuf/compiler/cpp/cpp_options.h>
 
 namespace google {
 namespace protobuf {

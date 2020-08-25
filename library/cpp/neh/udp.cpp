@@ -63,7 +63,7 @@ namespace {
                 case AF_INET: {
                     const TIpAddress a = *(const sockaddr_in*)addr;
 
-                    return new TIPv4Addr(TIpAddress(InetToHost(INADDR_LOOPBACK), a.Port()));
+                    return MakeHolder<TIPv4Addr>(TIpAddress(InetToHost(INADDR_LOOPBACK), a.Port()));
                 }
 
                 case AF_INET6: {
@@ -71,7 +71,7 @@ namespace {
 
                     a.sin6_addr = in6addr_loopback;
 
-                    return new TIPv6Addr(a);
+                    return MakeHolder<TIPv6Addr>(a);
                 }
             }
 
@@ -400,27 +400,27 @@ namespace {
                 {
                 }
 
-                TStringBuf Scheme() override {
+                TStringBuf Scheme() const override {
                     return AsStringBuf("udp");
                 }
 
-                TString RemoteHost() override {
+                TString RemoteHost() const override {
                     return H_;
                 }
 
-                TStringBuf Service() override {
+                TStringBuf Service() const override {
                     return ((TRequestPacket&)(*this)).Service;
                 }
 
-                TStringBuf Data() override {
+                TStringBuf Data() const override {
                     return ((TRequestPacket&)(*this)).Data;
                 }
 
-                TStringBuf RequestId() override {
+                TStringBuf RequestId() const override {
                     return ((TRequestPacket&)(*this)).Guid;
                 }
 
-                bool Canceled() override {
+                bool Canceled() const override {
                     //TODO ?
                     return false;
                 }

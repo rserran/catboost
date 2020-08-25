@@ -9,12 +9,12 @@ namespace NMonoForest {
         const auto& trees = *model.ModelTrees.Get();
         CB_ENSURE(trees.IsOblivious());
 
-        const auto& treeSizes = trees.GetTreeSizes();
-        const auto& treeStartOffsets = trees.GetTreeStartOffsets();
-        const auto& leafValues = trees.GetLeafValues();
-        const auto& leafWeights = trees.GetLeafWeights();
+        const auto& treeSizes = trees.GetModelTreeData()->GetTreeSizes();
+        const auto& treeStartOffsets = trees.GetModelTreeData()->GetTreeStartOffsets();
+        const auto& leafValues = trees.GetModelTreeData()->GetLeafValues();
+        const auto& leafWeights = trees.GetModelTreeData()->GetLeafWeights();
         const auto& leafCounts = trees.GetTreeLeafCounts();
-        const auto& splits = trees.GetTreeSplits();
+        const auto& splits = trees.GetModelTreeData()->GetTreeSplits();
 
         TVector<TBinarySplit> binSplits;
         binSplits.reserve(trees.GetBinFeatures().size());
@@ -26,6 +26,7 @@ namespace NMonoForest {
         int leafValuesOffset = 0;
         int leafWeightsOffset = 0;
         TAdditiveModel<TObliviousTree> additiveModel;
+        double bias = scaleAndBias.GetOneDimensionalBiasOrZero("Non single-dimension approxes are not supported");
         for (auto tree : xrange(trees.GetTreeCount())) {
             TVector<TBinarySplit> treeSplits;
             for (auto idx : xrange(treeStartOffsets[tree], treeStartOffsets[tree] + treeSizes[tree])) {
@@ -35,9 +36,9 @@ namespace NMonoForest {
                 leafValues.begin() + leafValuesOffset,
                 leafValues.begin() + leafValuesOffset + leafCounts[tree] * trees.GetDimensionsCount());
 
-            double  bias = tree == 0 ? scaleAndBias.Bias : 0;
+            double treeBias = tree == 0 ? bias : 0;
             for (auto& leafVal : treeLeafValues) {
-                leafVal = scaleAndBias.Scale * (bias + leafVal);
+                leafVal = scaleAndBias.Scale * (treeBias + leafVal);
             }
             leafValuesOffset += leafCounts[tree] * trees.GetDimensionsCount();
             TVector<double> treeLeafWeights(

@@ -1,14 +1,14 @@
 #pragma once
 
-#include <contrib/libs/protobuf/io/coded_stream.h>
-#include <contrib/libs/protobuf/io/zero_copy_stream_impl_lite.h>
+#include <google/protobuf/io/coded_stream.h>
+#include <google/protobuf/io/zero_copy_stream_impl_lite.h>
 
 #include "onnx/onnx_pb.h"
 
 #ifdef ONNX_USE_LITE_PROTO
-#include <contrib/libs/protobuf/message_lite.h>
+#include <google/protobuf/message_lite.h>
 #else // ONNX_USE_LITE_PROTO
-#include <contrib/libs/protobuf/message.h>
+#include <google/protobuf/message.h>
 #endif  // !ONNX_USE_LITE_PROTO
 
 namespace ONNX_NAMESPACE {

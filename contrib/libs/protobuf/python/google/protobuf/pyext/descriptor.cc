@@ -32,11 +32,11 @@
 
 #include <Python.h>
 #include <frameobject.h>
-#include "stubs/hash.h"
+#include <google/protobuf/stubs/hash.h>
 
-#include "io/coded_stream.h"
-#include "descriptor.pb.h"
-#include "dynamic_message.h"
+#include <google/protobuf/io/coded_stream.h>
+#include <google/protobuf/descriptor.pb.h>
+#include <google/protobuf/dynamic_message.h>
 #include "pyext/descriptor.h"
 #include "pyext/descriptor_containers.h"
 #include "pyext/descriptor_pool.h"

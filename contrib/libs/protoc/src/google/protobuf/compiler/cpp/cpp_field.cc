@@ -32,24 +32,24 @@
 //  Based on original Protocol Buffers design by
 //  Sanjay Ghemawat, Jeff Dean, and others.
 
-#include "compiler/cpp/cpp_field.h"
+#include <google/protobuf/compiler/cpp/cpp_field.h>
 #include <memory>
 #ifndef _SHARED_PTR_H
-#include "stubs/shared_ptr.h"
+#include <google/protobuf/stubs/shared_ptr.h>
 #endif
 
-#include "compiler/cpp/cpp_helpers.h"
-#include "compiler/cpp/cpp_primitive_field.h"
-#include "compiler/cpp/cpp_string_field.h"
-#include "compiler/cpp/cpp_enum_field.h"
-#include "compiler/cpp/cpp_map_field.h"
-#include "compiler/cpp/cpp_message_field.h"
-#include "descriptor.pb.h"
-#include "wire_format.h"
-#include "io/printer.h"
-#include <contrib/libs/protobuf/stubs/logging.h>
-#include "stubs/common.h"
-#include "stubs/strutil.h"
+#include <google/protobuf/compiler/cpp/cpp_helpers.h>
+#include <google/protobuf/compiler/cpp/cpp_primitive_field.h>
+#include <google/protobuf/compiler/cpp/cpp_string_field.h>
+#include <google/protobuf/compiler/cpp/cpp_enum_field.h>
+#include <google/protobuf/compiler/cpp/cpp_map_field.h>
+#include <google/protobuf/compiler/cpp/cpp_message_field.h>
+#include <google/protobuf/descriptor.pb.h>
+#include <google/protobuf/wire_format.h>
+#include <google/protobuf/io/printer.h>
+#include <google/protobuf/stubs/logging.h>
+#include <google/protobuf/stubs/common.h>
+#include <google/protobuf/stubs/strutil.h>
 
 namespace google {
 namespace protobuf {

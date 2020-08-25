@@ -129,6 +129,8 @@ enum class ELossFunction {
     Huber,
     Tweedie,
 
+    RMSEWithUncertainty,
+
     /* multiclassification errors */
 
     MultiClass,
@@ -225,7 +227,10 @@ enum class EPredictionType {
     Class,
     RawFormulaVal,
     Exponent,
-    InternalRawFormulaVal
+    RMSEWithUncertainty,
+    InternalRawFormulaVal,
+    VirtEnsembles,
+    TotalUncertainty
 };
 
 enum class EFstrType {
@@ -343,16 +348,26 @@ enum class EFeatureCalcerType : ui32 {
     BoW,
     NaiveBayes,
     BM25,
-    CosDistanceWithClassCenter,
-    GaussianHomoscedasticModel,
-    GaussianHeteroscedasticModel,
-    EmbeddingDistanceToClass
+    LDA
 };
 
 enum class EAutoClassWeightsType {
     Balanced,
     SqrtBalanced,
     None
+};
+
+enum class EAucType {
+    Classic,
+    Ranking,
+    Mu,
+    OneVsAll
+};
+
+enum class EF1AverageType {
+    Micro,
+    Macro,
+    Weighted
 };
 
 namespace NCB {

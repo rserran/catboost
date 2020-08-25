@@ -101,6 +101,7 @@ bool THttp2Options::UseResponseAsErrorMessage = false;
 bool THttp2Options::FullHeadersAsErrorMessage = false;
 bool THttp2Options::ErrorDetailsAsResponseBody = false;
 bool THttp2Options::RedirectionNotError = false;
+bool THttp2Options::AnyResponseIsNotError = false;
 bool THttp2Options::TcpKeepAlive = false;
 i32 THttp2Options::LimitRequestsPerConnection = -1;
 
@@ -113,7 +114,7 @@ bool THttp2Options::Set(TStringBuf name, TStringBuf value) {
     HTTP2_TRY_SET(TDuration, ConnectTimeout)
     else HTTP2_TRY_SET(TDuration, InputDeadline)
     else HTTP2_TRY_SET(TDuration, OutputDeadline)
-    else HTTP2_TRY_SET(TDuration, SymptomSlowConnect) else HTTP2_TRY_SET(size_t, InputBufferSize) else HTTP2_TRY_SET(bool, KeepInputBufferForCachedConnections) else HTTP2_TRY_SET(size_t, AsioThreads) else HTTP2_TRY_SET(size_t, AsioServerThreads) else HTTP2_TRY_SET(bool, EnsureSendingCompleteByAck) else HTTP2_TRY_SET(int, Backlog) else HTTP2_TRY_SET(TDuration, ServerInputDeadline) else HTTP2_TRY_SET(TDuration, ServerOutputDeadline) else HTTP2_TRY_SET(TDuration, ServerInputDeadlineKeepAliveMax) else HTTP2_TRY_SET(TDuration, ServerInputDeadlineKeepAliveMin) else HTTP2_TRY_SET(bool, ServerUseDirectWrite) else HTTP2_TRY_SET(bool, UseResponseAsErrorMessage) else HTTP2_TRY_SET(bool, FullHeadersAsErrorMessage) else HTTP2_TRY_SET(bool, ErrorDetailsAsResponseBody) else HTTP2_TRY_SET(bool, RedirectionNotError) else HTTP2_TRY_SET(bool, TcpKeepAlive) else HTTP2_TRY_SET(i32, LimitRequestsPerConnection) else {
+    else HTTP2_TRY_SET(TDuration, SymptomSlowConnect) else HTTP2_TRY_SET(size_t, InputBufferSize) else HTTP2_TRY_SET(bool, KeepInputBufferForCachedConnections) else HTTP2_TRY_SET(size_t, AsioThreads) else HTTP2_TRY_SET(size_t, AsioServerThreads) else HTTP2_TRY_SET(bool, EnsureSendingCompleteByAck) else HTTP2_TRY_SET(int, Backlog) else HTTP2_TRY_SET(TDuration, ServerInputDeadline) else HTTP2_TRY_SET(TDuration, ServerOutputDeadline) else HTTP2_TRY_SET(TDuration, ServerInputDeadlineKeepAliveMax) else HTTP2_TRY_SET(TDuration, ServerInputDeadlineKeepAliveMin) else HTTP2_TRY_SET(bool, ServerUseDirectWrite) else HTTP2_TRY_SET(bool, UseResponseAsErrorMessage) else HTTP2_TRY_SET(bool, FullHeadersAsErrorMessage) else HTTP2_TRY_SET(bool, ErrorDetailsAsResponseBody) else HTTP2_TRY_SET(bool, RedirectionNotError) else HTTP2_TRY_SET(bool, AnyResponseIsNotError) else HTTP2_TRY_SET(bool, TcpKeepAlive) else HTTP2_TRY_SET(i32, LimitRequestsPerConnection) else {
         return false;
     }
     return true;
@@ -1205,7 +1206,7 @@ namespace {
     void THttpRequest::OnResponse(TAutoPtr<THttpParser>& rsp) {
         DBGOUT("THttpRequest::OnResponse()");
         ReleaseConn();
-        if (Y_LIKELY(rsp->RetCode() >= 200 && rsp->RetCode() < (!THttp2Options::RedirectionNotError ? 300 : 400))) {
+        if (Y_LIKELY(((rsp->RetCode() >= 200 && rsp->RetCode() < (!THttp2Options::RedirectionNotError ? 300 : 400)) || THttp2Options::AnyResponseIsNotError))) {
             NotifyResponse(rsp->DecodedContent(), rsp->FirstLine(), rsp->Headers());
         } else {
             TString message;
@@ -1356,15 +1357,15 @@ namespace {
             }
 
         protected:
-            TStringBuf Scheme() override {
+            TStringBuf Scheme() const override {
                 return AsStringBuf("http");
             }
 
-            TString RemoteHost() override {
+            TString RemoteHost() const override {
                 return RemoteHost_;
             }
 
-            TStringBuf Service() override {
+            TStringBuf Service() const override {
                 return TStringBuf(H_.Path).Skip(1);
             }
 
@@ -1384,11 +1385,11 @@ namespace {
                 return H_.Cgi;
             }
 
-            TStringBuf RequestId() override {
+            TStringBuf RequestId() const override {
                 return TStringBuf();
             }
 
-            bool Canceled() override {
+            bool Canceled() const override {
                 if (!C_) {
                     return false;
                 }
@@ -1449,7 +1450,7 @@ namespace {
             {
             }
 
-            TStringBuf Data() override {
+            TStringBuf Data() const override {
                 return H_.Cgi;
             }
         };
@@ -1461,7 +1462,7 @@ namespace {
             {
             }
 
-            TStringBuf Data() override {
+            TStringBuf Data() const override {
                 return P_->DecodedContent();
             }
         };

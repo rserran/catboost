@@ -35,11 +35,11 @@
 
 #include <memory>
 #ifndef _SHARED_PTR_H
-#include "stubs/shared_ptr.h"
+#include <google/protobuf/stubs/shared_ptr.h>
 #endif
 
-#include "descriptor.h"
-#include "message.h"
+#include <google/protobuf/descriptor.h>
+#include <google/protobuf/message.h>
 
 namespace google {
 namespace protobuf {

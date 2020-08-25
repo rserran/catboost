@@ -1184,7 +1184,7 @@ namespace NNeh {
             }
 
             void Handshake() {
-                Ssl_ = SSL_new(SslCtx_);
+                Ssl_.Reset(SSL_new(SslCtx_));
                 if (THttpsOptions::EnableSslClientDebug) {
                     SSL_set_info_callback(Ssl_.Get(), InfoCB);
                 }
@@ -1228,7 +1228,7 @@ namespace NNeh {
                 }
 
                 if (THttpsOptions::CheckCertificateHostname) {
-                    TX509Holder peerCert = SSL_get_peer_certificate(Ssl_.Get());
+                    TX509Holder peerCert(SSL_get_peer_certificate(Ssl_.Get()));
                     if (!peerCert) {
                         ythrow TSslException(AsStringBuf("SSL_get_peer_certificate(client)"));
                     }
@@ -1297,7 +1297,7 @@ namespace NNeh {
                 }
 
                 TErrorRef error;
-                THolder<TConnCache::TConnection> s = SocketCache()->Connect(c, Msg_.Addr, Addr_, &error);
+                THolder<TConnCache::TConnection> s(SocketCache()->Connect(c, Msg_.Addr, Addr_, &error));
                 if (!s) {
                     Hndl_->NotifyError(error);
                     return;
@@ -1388,7 +1388,7 @@ namespace NNeh {
 
                 void Handshake() override {
                     if (!Ssl_) {
-                        Ssl_ = SSL_new(SslCtx_);
+                        Ssl_.Reset(SSL_new(SslCtx_));
                         if (THttpsOptions::EnableSslServerDebug) {
                             SSL_set_info_callback(Ssl_.Get(), InfoCB);
                         }
@@ -1558,11 +1558,11 @@ namespace NNeh {
                     }
                 }
 
-                TStringBuf Scheme() override {
+                TStringBuf Scheme() const override {
                     return AsStringBuf("https");
                 }
 
-                TString RemoteHost() override {
+                TString RemoteHost() const override {
                     return RemoteHost_;
                 }
 
@@ -1578,15 +1578,15 @@ namespace NNeh {
                     return H_.Cgi;
                 }
 
-                TStringBuf Service() override {
+                TStringBuf Service() const override {
                     return TStringBuf(H_.Path).Skip(1);
                 }
 
-                TStringBuf RequestId() override {
+                TStringBuf RequestId() const override {
                     return TStringBuf();
                 }
 
-                bool Canceled() override {
+                bool Canceled() const override {
                     if (!IO_) {
                         return false;
                     }
@@ -1647,7 +1647,7 @@ namespace NNeh {
                 {
                 }
 
-                TStringBuf Data() override {
+                TStringBuf Data() const override {
                     return H_.Cgi;
                 }
 
@@ -1664,7 +1664,7 @@ namespace NNeh {
                 {
                 }
 
-                TStringBuf Data() override {
+                TStringBuf Data() const override {
                     return Data_;
                 }
 

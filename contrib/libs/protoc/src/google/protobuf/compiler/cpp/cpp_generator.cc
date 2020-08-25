@@ -32,20 +32,20 @@
 //  Based on original Protocol Buffers design by
 //  Sanjay Ghemawat, Jeff Dean, and others.
 
-#include "compiler/cpp/cpp_generator.h"
+#include <google/protobuf/compiler/cpp/cpp_generator.h>
 
 #include <vector>
 #include <memory>
 #ifndef _SHARED_PTR_H
-#include "stubs/shared_ptr.h"
+#include <google/protobuf/stubs/shared_ptr.h>
 #endif
 #include <utility>
 
-#include "compiler/cpp/cpp_file.h"
-#include "compiler/cpp/cpp_helpers.h"
-#include "io/printer.h"
-#include "io/zero_copy_stream.h"
-#include "descriptor.pb.h"
+#include <google/protobuf/compiler/cpp/cpp_file.h>
+#include <google/protobuf/compiler/cpp/cpp_helpers.h>
+#include <google/protobuf/io/printer.h>
+#include <google/protobuf/io/zero_copy_stream.h>
+#include <google/protobuf/descriptor.pb.h>
 
 namespace google {
 namespace protobuf {

@@ -247,7 +247,7 @@ namespace NCatboostCuda {
         const auto optimizationImplementation = GetTrainerFactoryKey(trainCatBoostOptions);
 
         if (TGpuTrainerFactory::Has(optimizationImplementation)) {
-            THolder<IGpuTrainer> trainer = TGpuTrainerFactory::Construct(optimizationImplementation);
+            THolder<IGpuTrainer> trainer(TGpuTrainerFactory::Construct(optimizationImplementation));
             model = trainer->TrainModel(featuresManager,
                                         internalOptions,
                                         trainCatBoostOptions,
@@ -281,7 +281,7 @@ namespace NCatboostCuda {
         const auto optimizationImplementation = GetTrainerFactoryKey(trainCatBoostOptions);
         CB_ENSURE(TGpuTrainerFactory::Has(optimizationImplementation),
             "Error: optimization scheme is not supported for GPU learning " << optimizationImplementation);
-        THolder<IGpuTrainer> trainer = TGpuTrainerFactory::Construct(optimizationImplementation);
+        THolder<IGpuTrainer> trainer(TGpuTrainerFactory::Construct(optimizationImplementation));
         TGpuAwareRandom random(trainCatBoostOptions.RandomSeed);
         trainer->ModelBasedEval(featuresManager,
             trainCatBoostOptions,
@@ -332,13 +332,6 @@ namespace NCatboostCuda {
                 (trainingData.Learn->ObjectsData->GetQuantizedFeaturesInfo()
                     ->CalcMaxCategoricalFeaturesUniqueValuesCountOnLearn()
                   > updatedCatboostOptions.CatFeatureParams.Get().OneHotMaxSize.Get());
-
-            TTrainingDataProviders trainingDataForFinalCtrCalculation;
-            // TODO(kirillovs): remove casts later
-            if (saveFinalCtrsInModel) {
-                // do it at this stage to check before training
-                trainingDataForFinalCtrCalculation = trainingData.Cast<TQuantizedForCPUObjectsDataProvider>();
-            }
 
             auto quantizedFeaturesInfo = trainingData.Learn->ObjectsData->GetQuantizedFeaturesInfo();
             TVector<TExclusiveFeaturesBundle> exclusiveBundlesCopy;
@@ -475,7 +468,7 @@ namespace NCatboostCuda {
                 featureCalcerComputationMode);
 
             coreModelToFullModelConverter.WithBinarizedDataComputedFrom(
-                                             std::move(trainingDataForFinalCtrCalculation),
+                                             trainingData,
                                              std::move(featureCombinationToProjection),
                                              targetClassifiers)
                 .WithPerfectHashedToHashedCatValuesMap(

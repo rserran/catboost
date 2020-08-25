@@ -33,8 +33,8 @@
 
 #include <Python.h>
 
-#include "stubs/hash.h"
-#include "descriptor.h"
+#include <google/protobuf/stubs/hash.h>
+#include <google/protobuf/descriptor.h>
 
 namespace google {
 namespace protobuf {

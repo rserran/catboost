@@ -32,31 +32,31 @@
 //  Based on original Protocol Buffers design by
 //  Sanjay Ghemawat, Jeff Dean, and others.
 
-#include "compiler/cpp/cpp_message.h"
+#include <google/protobuf/compiler/cpp/cpp_message.h>
 
 #include <algorithm>
-#include "stubs/hash.h"
+#include <google/protobuf/stubs/hash.h>
 #include <map>
 #include <memory>
 #ifndef _SHARED_PTR_H
-#include "stubs/shared_ptr.h"
+#include <google/protobuf/stubs/shared_ptr.h>
 #endif
 #include <utility>
 #include <vector>
 
-#include "compiler/cpp/cpp_enum.h"
-#include "compiler/cpp/cpp_extension.h"
-#include "compiler/cpp/cpp_field.h"
-#include "compiler/cpp/cpp_helpers.h"
-#include "io/coded_stream.h"
-#include "io/printer.h"
-#include "descriptor.pb.h"
-#include "generated_message_table_driven.h"
-#include "generated_message_util.h"
-#include "map_entry_lite.h"
-#include "wire_format.h"
-#include "stubs/strutil.h"
-#include "stubs/substitute.h"
+#include <google/protobuf/compiler/cpp/cpp_enum.h>
+#include <google/protobuf/compiler/cpp/cpp_extension.h>
+#include <google/protobuf/compiler/cpp/cpp_field.h>
+#include <google/protobuf/compiler/cpp/cpp_helpers.h>
+#include <google/protobuf/io/coded_stream.h>
+#include <google/protobuf/io/printer.h>
+#include <google/protobuf/descriptor.pb.h>
+#include <google/protobuf/generated_message_table_driven.h>
+#include <google/protobuf/generated_message_util.h>
+#include <google/protobuf/map_entry_lite.h>
+#include <google/protobuf/wire_format.h>
+#include <google/protobuf/stubs/strutil.h>
+#include <google/protobuf/stubs/substitute.h>
 
 
 namespace google {

@@ -177,6 +177,9 @@
         "rsync": {
             "description": "Run RSync"
         },
+        "yf": {
+            "description": "Run YF client"
+        },
         "yt": {
             "description": "Run YT client"
         },
@@ -245,23 +248,29 @@
         "apphost": {
             "description": "Run local apphost instance"
         },
-        "go_1.14.3": {
-            "description": "Run go tool (1.14.3)"
-        },
-        "gofmt_1.14.3": {
-            "description": "Run gofmt tool (1.14.3)"
+        "news": {
+            "description": "Run news team tools"
         },
         "go": {
-            "description": "Run go tool (1.14.4)"
+            "description": "Run go tool (1.14.6)"
         },
         "gofmt": {
-            "description": "Run gofmt tool (1.14.4)"
+            "description": "Run gofmt tool (1.14.6)"
+        },
+        "go_1.15": {
+            "description": "Run go tool (1.15)"
+        },
+        "gofmt_1.15": {
+            "description": "Run gofmt tool (1.15)"
         },
         "godoc": {
             "description": "Arcadia version of godoc"
         },
         "yo": {
             "description": "Tool for managing vendor/ directory"
+        },
+        "mockgen": {
+            "description": "Run GoMock (go mocking framework)"
         },
         "dlv": {
             "description": "Debugger for the Go programming language"
@@ -310,6 +319,12 @@
         },
         "fio": {
             "description": "flexible I/O tester"
+        },
+        "amduprof-cli": {
+            "description": "AMDuProfCLI is a command-line tool for AMD uProf Profiler"
+        },
+        "amduprof-pcm": {
+            "description": "AMDuProfPcm is a command-line tool to monitor CPU performance metrics of AMD processors"
         },
         "foremost": {
             "description": "Foremost is a Linux program to recover files based on their headers"
@@ -368,6 +383,9 @@
         },
         "yadi": {
             "description": "Arcadia version of Yadi"
+        },
+        "grpc_cli": {
+            "description": "GRPC command-line tool"
         }
     },
     "toolchain": {
@@ -892,6 +910,34 @@
                 {
                     "host": {
                         "os": "DARWIN"
+                    },
+                    "default": true
+                }
+            ]
+        },
+        "mockgen": {
+            "tools": {
+                "mockgen": {
+                    "bottle": "mockgen",
+                    "executable": "mockgen"
+                }
+            },
+            "platforms": [
+                {
+                    "host": {
+                        "os": "LINUX"
+                    },
+                    "default": true
+                },
+                {
+                    "host": {
+                        "os": "DARWIN"
+                    },
+                    "default": true
+                },
+                {
+                    "host": {
+                        "os": "WIN"
                     },
                     "default": true
                 }
@@ -1657,6 +1703,16 @@
                         "os": "LINUX"
                     },
                     "target": {
+                        "os": "LINUX",
+                        "arch": "power9le"
+                    },
+                    "default": true
+                },
+                {
+                    "host": {
+                        "os": "LINUX"
+                    },
+                    "target": {
                         "os": "DARWIN",
                         "arch": "x86_64"
                     },
@@ -1739,6 +1795,16 @@
                     "target": {
                         "os": "LINUX",
                         "arch": "ppc64le"
+                    },
+                    "default": true
+                },
+                {
+                    "host": {
+                        "os": "DARWIN"
+                    },
+                    "target": {
+                        "os": "LINUX",
+                        "arch": "power9le"
                     },
                     "default": true
                 },
@@ -1840,6 +1906,17 @@
                     "target": {
                         "os": "LINUX",
                         "arch": "ppc64le"
+                    },
+                    "default": true
+                },
+                {
+                    "host": {
+                        "os": "LINUX",
+                        "arch": "ppc64le"
+                    },
+                    "target": {
+                        "os": "LINUX",
+                        "arch": "power9le"
                     },
                     "default": true
                 }
@@ -2411,6 +2488,16 @@
                         "os": "LINUX"
                     },
                     "target": {
+                        "os": "LINUX",
+                        "arch": "power9le"
+                    },
+                    "default": false
+                },
+                {
+                    "host": {
+                        "os": "LINUX"
+                    },
+                    "target": {
                         "os": "DARWIN",
                         "arch": "x86_64"
                     },
@@ -2493,6 +2580,16 @@
                     "target": {
                         "os": "LINUX",
                         "arch": "ppc64le"
+                    },
+                    "default": false
+                },
+                {
+                    "host": {
+                        "os": "DARWIN"
+                    },
+                    "target": {
+                        "os": "LINUX",
+                        "arch": "power9le"
                     },
                     "default": false
                 },
@@ -3703,6 +3800,22 @@
                 }
             ]
         },
+        "yf": {
+            "tools": {
+                "yf": {
+                    "bottle": "yf",
+                    "executable": "yf"
+                }
+            },
+            "platforms": [
+                {
+                    "host": {
+                        "os": "LINUX"
+                    },
+                    "default": true
+                }
+            ]
+        },
         "yp-util": {
             "tools": {
                 "yp-util": {
@@ -4877,19 +4990,11 @@
                 }
             ]
         },
-        "golang_1_14_3": {
+        "news": {
             "tools": {
-                "golang_1.14.3": {
-                    "bottle": "golang_1.14.3",
-                    "executable": "golangi_1.14.3"
-                },
-                "go_1.14.3": {
-                    "bottle": "golang_1.14.3",
-                    "executable": "go_1.14.3"
-                },
-                "gofmt_1.14.3": {
-                    "bottle": "golang_1.14.3",
-                    "executable": "gofmt_1.14.3"
+                "news": {
+                    "bottle": "news",
+                    "executable": "news_launcher"
                 }
             },
             "platforms": [
@@ -4904,31 +5009,21 @@
                         "os": "DARWIN"
                     },
                     "default": true
-                },
-                {
-                    "host": {
-                        "os": "WIN"
-                    },
-                    "default": true
                 }
-            ],
-            "params": {
-                "type": "golang",
-                "version": "1.14.3"
-            }
+            ]
         },
-        "golang_1_14_4": {
+        "golang_1_14_6": {
             "tools": {
                 "golang": {
-                    "bottle": "golang_1.14.4",
+                    "bottle": "golang_1.14.6",
                     "executable": "golang"
                 },
                 "go": {
-                    "bottle": "golang_1.14.4",
+                    "bottle": "golang_1.14.6",
                     "executable": "go"
                 },
                 "gofmt": {
-                    "bottle": "golang_1.14.4",
+                    "bottle": "golang_1.14.6",
                     "executable": "gofmt"
                 }
             },
@@ -4954,7 +5049,47 @@
             ],
             "params": {
                 "type": "golang",
-                "version": "1.14.4"
+                "version": "1.14.6"
+            }
+        },
+        "golang_1_15": {
+            "tools": {
+                "golang_1.15": {
+                    "bottle": "golang_1.15",
+                    "executable": "golang_1.15"
+                },
+                "go_1.15": {
+                    "bottle": "golang_1.15",
+                    "executable": "go_1.15"
+                },
+                "gofmt_1.15": {
+                    "bottle": "golang_1.15",
+                    "executable": "gofmt_1.15"
+                }
+            },
+            "platforms": [
+                {
+                    "host": {
+                        "os": "LINUX"
+                    },
+                    "default": true
+                },
+                {
+                    "host": {
+                        "os": "DARWIN"
+                    },
+                    "default": true
+                },
+                {
+                    "host": {
+                        "os": "WIN"
+                    },
+                    "default": true
+                }
+            ],
+            "params": {
+                "type": "golang",
+                "version": "1.15"
             }
         },
         "godoc": {
@@ -5046,6 +5181,26 @@
                 "fio": {
                     "bottle": "fio",
                     "executable": "fio"
+                }
+            },
+            "platforms": [
+                {
+                    "host": {
+                        "os": "LINUX"
+                    },
+                    "default": true
+                }
+            ]
+        },
+        "amduprof": {
+            "tools": {
+                "amduprof-cli": {
+                    "bottle": "amduprof",
+                    "executable": "amduprof-cli"
+                },
+                "amduprof-pcm": {
+                    "bottle": "amduprof",
+                    "executable": "amduprof-pcm"
                 }
             },
             "platforms": [
@@ -5422,6 +5577,34 @@
                     "default": true
                 }
             ]
+        },
+        "grpc_cli": {
+            "tools": {
+                "grpc_cli": {
+                    "bottle": "grpc_cli",
+                    "executable": "grpc_cli"
+                }
+            },
+            "platforms": [
+                {
+                    "host": {
+                        "os": "DARWIN"
+                    },
+                    "default": true
+                },
+                {
+                    "host": {
+                        "os": "LINUX"
+                    },
+                    "default": true
+                },
+                {
+                    "host": {
+                        "os": "WIN"
+                    },
+                    "default": true
+                }
+            ]
         }
     },
     "bottles": {
@@ -5456,7 +5639,7 @@
         "ymake": {
             "formula": {
                 "sandbox_id": [
-                    721007034
+                    741467155
                 ],
                 "match": "ymake"
             },
@@ -5480,7 +5663,7 @@
         "arc": {
             "formula": {
                 "sandbox_id": [
-                    719061199
+                    751869207
                 ],
                 "match": "arc"
             },
@@ -5504,14 +5687,29 @@
         "yo": {
             "formula": {
                 "sandbox_id": [
-                    690780196,
-                    690780173
+                    747461269,
+                    747461262
                 ],
                 "match": "yo"
             },
             "executable": {
                 "yo": [
                     "yo"
+                ]
+            }
+        },
+        "mockgen": {
+            "formula": {
+                "sandbox_id": [
+                    742810450,
+                    742810460,
+                    742810456
+                ],
+                "match": "mockgen"
+            },
+            "executable": {
+                "mockgen": [
+                    "mockgen"
                 ]
             }
         },
@@ -5627,7 +5825,7 @@
         },
         "python": {
             "formula": {
-                "sandbox_id": 706382834,
+                "sandbox_id": 739011318,
                 "match": "Python"
             },
             "executable": {
@@ -5890,7 +6088,7 @@
         "clang10": {
             "formula": {
                 "sandbox_id": [
-                    692883308
+                    729633486
                 ],
                 "match": "CLANG"
             },
@@ -6423,10 +6621,19 @@
                 ]
             }
         },
+        "yf": {
+            "formula": {
+                "sandbox_id": [
+                    755713272
+                ],
+                "match": "yf-client"
+            },
+            "executable": "yf-client"
+        },
         "yp-util": {
             "formula": {
                 "sandbox_id": [
-                    719427098
+                    742726144
                 ],
                 "match": "yp_util"
             },
@@ -6439,7 +6646,7 @@
         "yp": {
             "formula": {
                 "sandbox_id": [
-                    653024184
+                    752743095
                 ],
                 "match": "yp"
             },
@@ -6452,7 +6659,7 @@
         "yd-migrate": {
             "formula": {
                 "sandbox_id": [
-                    722826973
+                    730864285
                 ],
                 "match": "yd_migrate"
             },
@@ -6465,7 +6672,7 @@
         "dctl": {
             "formula": {
                 "sandbox_id": [
-                    706519642
+                    752029088
                 ],
                 "match": "dctl"
             },
@@ -6835,7 +7042,7 @@
         },
         "horadric": {
             "formula": {
-                "sandbox_id": 722489677,
+                "sandbox_id": 755894524,
                 "match": "horadric"
             },
             "executable": {
@@ -6846,7 +7053,7 @@
         },
         "logbroker": {
             "formula": {
-                "sandbox_id": 722489256,
+                "sandbox_id": 755894865,
                 "match": "logbroker"
             },
             "executable": {
@@ -6857,7 +7064,7 @@
         },
         "zcli": {
             "formula": {
-                "sandbox_id": 722517364,
+                "sandbox_id": 756054680,
                 "match": "zcli"
             },
             "executable": {
@@ -6934,7 +7141,7 @@
         },
         "ycmerge": {
             "formula": {
-                "sandbox_id": 677658685,
+                "sandbox_id": 756004626,
                 "match": "ycmerge"
             },
             "executable": {
@@ -6956,7 +7163,7 @@
         },
         "ya-tc": {
             "formula": {
-                "sandbox_id": 718927543,
+                "sandbox_id": 728126496,
                 "match": "ya-tc"
             },
             "executable": {
@@ -6978,7 +7185,7 @@
         },
         "apphost": {
             "formula": {
-                "sandbox_id": 706572474,
+                "sandbox_id": 748278401,
                 "match": "app_host_launcher"
             },
             "executable": {
@@ -6987,32 +7194,23 @@
                 ]
             }
         },
-        "golang_1.14.3": {
+        "news": {
             "formula": {
-                "sandbox_id": [
-                    676231434,
-                    676232261,
-                    676232843
-                ],
-                "match": "GOLANG"
+                "sandbox_id": 755527058,
+                "match": "news_launcher"
             },
             "executable": {
-                "go_1.14.3": [
-                    "bin",
-                    "go"
-                ],
-                "gofmt_1.14.3": [
-                    "bin",
-                    "gofmt"
+                "news_launcher": [
+                    "news_launcher"
                 ]
             }
         },
-        "golang_1.14.4": {
+        "golang_1.14.6": {
             "formula": {
                 "sandbox_id": [
-                    691135671,
-                    691136200,
-                    691136779
+                    727341832,
+                    727342274,
+                    727342815
                 ],
                 "match": "GOLANG"
             },
@@ -7022,6 +7220,26 @@
                     "go"
                 ],
                 "gofmt": [
+                    "bin",
+                    "gofmt"
+                ]
+            }
+        },
+        "golang_1.15": {
+            "formula": {
+                "sandbox_id": [
+                    746358746,
+                    746359485,
+                    746360126
+                ],
+                "match": "GOLANG"
+            },
+            "executable": {
+                "go_1.15": [
+                    "bin",
+                    "go"
+                ],
+                "gofmt_1.15": [
                     "bin",
                     "gofmt"
                 ]
@@ -7085,6 +7303,26 @@
                 ]
             }
         },
+        "amduprof": {
+            "formula": {
+                "sandbox_id": [
+                    747426974
+                ],
+                "match": "AMDuProf_Linux_x64_3.2.228.tar.gz"
+            },
+            "executable": {
+                "amduprof-cli": [
+                    "AMDuProf_Linux_x64_3.2.228",
+                    "bin",
+                    "AMDuProfCLI"
+                ],
+                "amduprof-pcm": [
+                    "AMDuProf_Linux_x64_3.2.228",
+                    "bin",
+                    "AMDuProfPcm"
+                ]
+            }
+        },
         "foremost": {
             "formula": {
                 "sandbox_id": [
@@ -7129,7 +7367,7 @@
         "bpftrace": {
             "formula": {
                 "sandbox_id": [
-                    618519570
+                    734898487
                 ],
                 "match": "infra/kernel/tools/bpftrace/build/bpftrace-static.tar.gz"
             },
@@ -7157,7 +7395,7 @@
         "stress-ng": {
             "formula": {
                 "sandbox_id": [
-                    535192029
+                    755257561
                 ],
                 "match": "infra/kernel/tools/stress-ng/build/stress-ng-static.tar.gz"
             },
@@ -7252,7 +7490,7 @@
         },
         "yfm-docs": {
             "formula": {
-                "sandbox_id": 711384171,
+                "sandbox_id": 750434041,
                 "match": "yfm-docs"
             },
             "executable": {
@@ -7274,7 +7512,7 @@
         },
         "sedem": {
             "formula": {
-                "sandbox_id": 718286879,
+                "sandbox_id": 741091797,
                 "match": "SEDEM archive"
             },
             "executable": {
@@ -7328,12 +7566,23 @@
         },
         "yadi": {
             "formula": {
-                "sandbox_id": 722671172,
+                "sandbox_id": 737277857,
                 "match": "yadi-arc"
             },
             "executable": {
                 "yadi-arc": [
                     "yadi-arc"
+                ]
+            }
+        },
+        "grpc_cli": {
+            "formula": {
+                "sandbox_id": 739261887,
+                "match": "grpc_cli"
+            },
+            "executable": {
+                "grpc_cli": [
+                    "grpc_cli"
                 ]
             }
         }

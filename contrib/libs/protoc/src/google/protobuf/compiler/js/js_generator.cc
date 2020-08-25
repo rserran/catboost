@@ -28,7 +28,7 @@
 // (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-#include "compiler/js/js_generator.h"
+#include <google/protobuf/compiler/js/js_generator.h>
 
 #include <assert.h>
 #include <algorithm>
@@ -36,21 +36,21 @@
 #include <map>
 #include <memory>
 #ifndef _SHARED_PTR_H
-#include "stubs/shared_ptr.h"
+#include <google/protobuf/stubs/shared_ptr.h>
 #endif
 #include <string>
 #include <utility>
 #include <vector>
 
-#include "stubs/logging.h"
-#include "stubs/common.h"
-#include "stubs/stringprintf.h"
-#include "compiler/js/well_known_types_embed.h"
-#include "io/printer.h"
-#include "io/zero_copy_stream.h"
-#include "descriptor.pb.h"
-#include "descriptor.h"
-#include "stubs/strutil.h"
+#include <google/protobuf/stubs/logging.h>
+#include <google/protobuf/stubs/common.h>
+#include <google/protobuf/stubs/stringprintf.h>
+#include <google/protobuf/compiler/js/well_known_types_embed.h>
+#include <google/protobuf/io/printer.h>
+#include <google/protobuf/io/zero_copy_stream.h>
+#include <google/protobuf/descriptor.pb.h>
+#include <google/protobuf/descriptor.h>
+#include <google/protobuf/stubs/strutil.h>
 
 namespace google {
 namespace protobuf {

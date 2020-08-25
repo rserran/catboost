@@ -28,12 +28,12 @@
 // (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-#include "compiler/cpp/cpp_map_field.h"
-#include "compiler/cpp/cpp_helpers.h"
-#include "io/printer.h"
-#include "wire_format.h"
+#include <google/protobuf/compiler/cpp/cpp_map_field.h>
+#include <google/protobuf/compiler/cpp/cpp_helpers.h>
+#include <google/protobuf/io/printer.h>
+#include <google/protobuf/wire_format.h>
 
-#include "stubs/strutil.h"
+#include <google/protobuf/stubs/strutil.h>
 
 namespace google {
 namespace protobuf {

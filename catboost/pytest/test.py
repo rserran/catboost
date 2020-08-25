@@ -39,7 +39,7 @@ PREDICTION_TYPES = ['Probability', 'RawFormulaVal', 'Class']
 BINCLASS_LOSSES = ['Logloss', 'CrossEntropy']
 MULTICLASS_LOSSES = ['MultiClass', 'MultiClassOneVsAll']
 CLASSIFICATION_LOSSES = BINCLASS_LOSSES + MULTICLASS_LOSSES
-REGRESSION_LOSSES = ['MAE', 'MAPE', 'Poisson', 'Quantile', 'RMSE', 'LogLinQuantile', 'Lq']
+REGRESSION_LOSSES = ['MAE', 'MAPE', 'Poisson', 'Quantile', 'RMSE', 'RMSEWithUncertainty', 'LogLinQuantile', 'Lq']
 PAIRWISE_LOSSES = ['PairLogit', 'PairLogitPairwise']
 GROUPWISE_LOSSES = ['YetiRank', 'YetiRankPairwise', 'QueryRMSE', 'QuerySoftMax']
 RANKING_LOSSES = PAIRWISE_LOSSES + GROUPWISE_LOSSES
@@ -49,7 +49,7 @@ SAMPLING_UNIT_TYPES = ['Object', 'Group']
 
 OVERFITTING_DETECTOR_TYPE = ['IncToDec', 'Iter']
 
-LOSS_FUNCTIONS = ['RMSE', 'Logloss', 'MAE', 'CrossEntropy', 'Quantile', 'LogLinQuantile',
+LOSS_FUNCTIONS = ['RMSE', 'RMSEWithUncertainty', 'Logloss', 'MAE', 'CrossEntropy', 'Quantile', 'LogLinQuantile',
                   'Poisson', 'MAPE', 'MultiClass', 'MultiClassOneVsAll']
 
 LEAF_ESTIMATION_METHOD = ['Gradient', 'Newton']
@@ -2964,7 +2964,7 @@ def test_regularization(boosting_type, grow_policy, dev_score_calc_obj_block_siz
     return [local_canonical_file(output_eval_path)]
 
 
-REG_LOSS_FUNCTIONS = ['RMSE', 'MAE', 'Lq:q=1', 'Lq:q=1.5', 'Lq:q=3', 'Quantile', 'LogLinQuantile', 'Poisson', 'MAPE',
+REG_LOSS_FUNCTIONS = ['RMSE', 'RMSEWithUncertainty', 'MAE', 'Lq:q=1', 'Lq:q=1.5', 'Lq:q=3', 'Quantile', 'LogLinQuantile', 'Poisson', 'MAPE',
                       'Huber:delta=1.0']
 
 
@@ -7312,7 +7312,7 @@ def test_convert_model_to_json(pool):
     assert (compare_evals_with_precision(output_eval_path, formula_predict_path_json))
 
 
-LOSS_FUNCTIONS_NO_MAPE = ['RMSE', 'Logloss', 'MAE', 'CrossEntropy', 'Quantile', 'LogLinQuantile', 'Poisson']
+LOSS_FUNCTIONS_NO_MAPE = ['RMSE', 'RMSEWithUncertainty', 'Logloss', 'MAE', 'CrossEntropy', 'Quantile', 'LogLinQuantile', 'Poisson']
 
 
 @pytest.mark.parametrize('loss_function', LOSS_FUNCTIONS_NO_MAPE)
@@ -8648,6 +8648,77 @@ def test_shrink_model_with_text_features(grow_policy):
     assert filecmp.cmp(test_eval_path, calc_eval_path)
 
     return [local_canonical_file(learn_error_path), local_canonical_file(test_error_path)]
+
+
+@pytest.mark.parametrize('virtual_ensembles_count', ['1', '10'])
+@pytest.mark.parametrize('prediction_type', ['TotalUncertainty', 'VirtEnsembles'])
+@pytest.mark.parametrize('loss_function', ['RMSE', 'RMSEWithUncertainty'])
+def test_uncertainty_prediction(virtual_ensembles_count, prediction_type, loss_function):
+    output_model_path = yatest.common.test_output_path('model.bin')
+    train_path = data_file('querywise', 'train')
+    test_path = data_file('querywise', 'test')
+    cd_path = data_file('querywise', 'train.cd')
+    cmd = (
+        '--use-best-model', 'false',
+        '-f', train_path,
+        '-t', test_path,
+        '--loss-function', loss_function,
+        '--column-description', cd_path,
+        '--posterior-sampling', 'true',
+        '-i', '200',
+        '-T', '4',
+        '-m', output_model_path,
+    )
+    execute_catboost_fit('CPU', cmd)
+
+    formula_predict_path = yatest.common.test_output_path('predict_test.eval')
+    calc_cmd = (
+        CATBOOST_PATH,
+        'calc',
+        '--input-path', test_path,
+        '--column-description', cd_path,
+        '-m', output_model_path,
+        '--output-path', formula_predict_path,
+        '--virtual-ensembles-count', virtual_ensembles_count,
+        '--prediction-type', prediction_type
+    )
+    yatest.common.execute(calc_cmd)
+    return local_canonical_file(formula_predict_path)
+
+
+@pytest.mark.parametrize('loss_function', ['RMSE', 'RMSEWithUncertainty'])
+def test_uncertainty_prediction_requirements(loss_function):
+    output_model_path = yatest.common.test_output_path('model.bin')
+    train_path = data_file('querywise', 'train')
+    test_path = data_file('querywise', 'test')
+    cd_path = data_file('querywise', 'train.cd')
+    cmd = (
+        '--use-best-model', 'false',
+        '-f', train_path,
+        '-t', test_path,
+        '--loss-function', loss_function,
+        '--column-description', cd_path,
+        '-i', '200',
+        '-T', '4',
+        '-m', output_model_path,
+    )
+    execute_catboost_fit('CPU', cmd)
+
+    formula_predict_path = yatest.common.test_output_path('predict_test.eval')
+    calc_cmd = (
+        CATBOOST_PATH,
+        'calc',
+        '--input-path', test_path,
+        '--column-description', cd_path,
+        '-m', output_model_path,
+        '--output-path', formula_predict_path,
+        '--prediction-type', 'VirtEnsembles'
+    )
+    try:
+        yatest.common.execute(calc_cmd)
+    except:
+        return
+    assert False
 
 
 DICTIONARIES_OPTIONS = [

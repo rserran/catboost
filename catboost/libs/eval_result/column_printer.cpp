@@ -21,12 +21,13 @@ namespace NCB {
         const TExternalLabelsHelper& visibleLabelsHelper,
         TMaybe<std::pair<size_t, size_t>> evalParameters)
         : PredictionType(predictionType)
-        ,VisibleLabelsHelper(visibleLabelsHelper) {
+        , VisibleLabelsHelper(visibleLabelsHelper) {
         int begin = 0;
         const bool isMultiTarget = targetDimension > 1;
         const bool callMakeExternalApprox
             = VisibleLabelsHelper.IsInitialized()
-                && (VisibleLabelsHelper.GetExternalApproxDimension() > 1);
+                && (VisibleLabelsHelper.GetExternalApproxDimension() > 1)
+                && !IsUncertaintyPredictionType(predictionType);
         for (const auto& raws : rawValues) {
             const auto& approx = callMakeExternalApprox ? MakeExternalApprox(raws, VisibleLabelsHelper) : raws;
             Approxes.push_back(PrepareEval(predictionType, lossFunctionName, approx, executor));
@@ -36,6 +37,7 @@ namespace NCB {
                 isMultiTarget,
                 predictionType,
                 VisibleLabelsHelper,
+                lossFunctionName,
                 begin,
                 evalParameters.Get()
             );
@@ -80,17 +82,60 @@ namespace NCB {
         bool isMultiTarget,
         EPredictionType predictionType,
         const TExternalLabelsHelper& visibleLabelsHelper,
+        const TString& lossFunctionName,
         ui32 startTreeIndex,
         std::pair<size_t, size_t>* evalParameters) {
 
         const ui32 classCount = (predictionType == EPredictionType::Class) ? 1 : approxDimension;
         TVector<TString> headers;
         headers.reserve(classCount);
+        bool isUncertainty = IsUncertaintyPredictionType(predictionType);
+        bool isRMSEWithUncertainty = FromString<ELossFunction>(lossFunctionName) == ELossFunction::RMSEWithUncertainty;
+        if (isUncertainty) {
+            TVector<TString> uncertaintyHeaders;
+            if (predictionType == EPredictionType::VirtEnsembles) {
+                uncertaintyHeaders = {"ApproxRawFormulaVal"};
+                if (isRMSEWithUncertainty) {
+                    uncertaintyHeaders.push_back("Var");
+                }
+            } else {
+                uncertaintyHeaders = { "Mean", "VarMean"};
+                if (isRMSEWithUncertainty) {
+                    uncertaintyHeaders.push_back("KU"); // KnowledgeUncertainty
+                }
+            }
+            size_t ensemblesCount = approxDimension / (isRMSEWithUncertainty ? 2 : 1);
+            if (predictionType == EPredictionType::TotalUncertainty) {
+                ensemblesCount = 1;
+            }
+            for (ui32 classId = 0; classId < ensemblesCount; ++classId) {
+                for (const auto &name: uncertaintyHeaders) {
+                    TStringBuilder str;
+                    str << predictionType << ":" << name;
+                    if (ensemblesCount > 1) {
+                        str << ":vEnsemble=" << classId;
+                    }
+                    headers.push_back(str);
+                }
+
+            }
+            return headers;
+        }
+
         for (ui32 classId = 0; classId < classCount; ++classId) {
             TStringBuilder str;
             str << predictionType;
             if (classCount > 1) {
-                str << (isMultiTarget ?  ":Dim=" : ":Class=")  << visibleLabelsHelper.GetVisibleClassNameFromClass(classId);
+                if (FromString<ELossFunction>(lossFunctionName) == ELossFunction::RMSEWithUncertainty) {
+                    if (classId == 0) {
+                        str << "Mean";
+                    } else {
+                        str << (predictionType == EPredictionType::RMSEWithUncertainty ? "Std" : "Log(Std)");
+                    }
+                } else {
+                    str << (isMultiTarget ? ":Dim=" : ":Class=")
+                        << visibleLabelsHelper.GetVisibleClassNameFromClass(classId);
+                }
             }
             if (evalParameters && (evalParameters->first != evalParameters->second)) {
                 str << ":TreesCount=[" << startTreeIndex << "," <<

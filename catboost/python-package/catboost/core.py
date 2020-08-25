@@ -1203,8 +1203,7 @@ class _CatBoostBase(object):
         if '_init_params' not in dict(self.__dict__.items()):
             self._init_params = {}
         if '__model' in state:
-            self._deserialize_model(state['__model'])
-            self._set_trained_model_attributes()
+            self._load_from_string(state['__model'])
             del state['__model']
         if '_test_eval' in state:
             self._set_test_evals([state['_test_eval']])
@@ -1253,6 +1252,7 @@ class _CatBoostBase(object):
         setattr(self, '_random_seed', self._object._get_random_seed())
         setattr(self, '_learning_rate', self._object._get_learning_rate())
         setattr(self, '_tree_count', self._object._get_tree_count())
+        setattr(self, '_n_features_in', self._object._get_n_features_in())
 
     def _train(self, train_pool, test_pool, params, allow_clear_pool, init_model):
         self._object._train(train_pool, test_pool, params, allow_clear_pool, init_model._object if init_model else None)
@@ -1290,6 +1290,9 @@ class _CatBoostBase(object):
 
     def get_best_iteration(self):
         return self._object._get_best_iteration()
+
+    def get_n_features_in(self):
+        return self._object._get_n_features_in()
 
     def _get_float_feature_indices(self):
         return self._object._get_float_feature_indices()
@@ -1342,6 +1345,9 @@ class _CatBoostBase(object):
             self._object._save_model(output_file, format, params_string, pool)
 
     def _load_model(self, model_file, format):
+        if not isinstance(model_file, STRING_TYPES):
+            raise CatBoostError("Invalid fname type={}: must be str().".format(type(model_file)))
+
         self._object._load_model(model_file, format)
         self._set_trained_model_attributes()
         for key, value in iteritems(self._get_params()):
@@ -1351,7 +1357,16 @@ class _CatBoostBase(object):
         return self._object._serialize_model()
 
     def _deserialize_model(self, dump_model_str):
+        assert isinstance(dump_model_str, bytes), "Not bytes passed as argument"
         self._object._deserialize_model(dump_model_str)
+
+    def _load_from_string(self, dump_model_str):
+        self._deserialize_model(dump_model_str)
+        self._set_trained_model_attributes()
+
+    def _load_from_stream(self, stream):
+        self._object._load_from_stream(stream)
+        self._set_trained_model_attributes()
 
     def _sum_models(self, models_base, weights=None, ctr_merge_policy='IntersectingCountersAverage'):
         if weights is None:
@@ -1403,6 +1418,10 @@ class _CatBoostBase(object):
     @property
     def learning_rate_(self):
         return getattr(self, '_learning_rate') if self.is_fitted() else None
+
+    @property
+    def n_features_in_(self):
+        return getattr(self, '_n_features_in') if self.is_fitted() else None
 
     @property
     def feature_names_(self):
@@ -1518,7 +1537,10 @@ class _CatBoostBase(object):
         return self._object._get_scale_and_bias()
 
     def set_scale_and_bias(self, scale, bias):
-        self._object._set_scale_and_bias(scale, bias)
+        if isinstance(bias, FLOAT_TYPES):
+            self._object._set_scale_and_bias(scale, [bias])
+        else:
+            self._object._set_scale_and_bias(scale, bias)
 
 
 def _cast_value_to_list_of_strings(params, key):
@@ -1937,7 +1959,7 @@ class CatBoost(_CatBoostBase):
     def _validate_prediction_type(self, prediction_type):
         if not isinstance(prediction_type, STRING_TYPES):
             raise CatBoostError("Invalid prediction_type type={}: must be str().".format(type(prediction_type)))
-        if prediction_type not in ('Class', 'RawFormulaVal', 'Probability', 'LogProbability', 'Exponent'):
+        if prediction_type not in ('Class', 'RawFormulaVal', 'Probability', 'LogProbability', 'Exponent', 'RMSEWithUncertainty'):
             raise CatBoostError("Invalid value of prediction_type={}: must be Class, RawFormulaVal, Probability, LogProbability, Exponent.".format(prediction_type))
 
     def _predict(self, data, prediction_type, ntree_start, ntree_end, thread_count, verbose, parent_method_name):
@@ -1967,6 +1989,9 @@ class CatBoost(_CatBoostBase):
             - 'RawFormulaVal' : return raw value.
             - 'Class' : return class label.
             - 'Probability' : return probability for every class.
+            - 'Exponent' : return Exponent of raw formula value.
+            - 'RMSEWithUncertainty': return standard deviation for RMSEWithUncertainty loss function
+              (logarithm of the standard deviation is returned by default).
 
         ntree_start: int, optional (default=0)
             Model is applied on the interval [ntree_start, ntree_end) (zero-based indexing).
@@ -2624,18 +2649,24 @@ class CatBoost(_CatBoostBase):
             )
         self._save_model(fname, format, export_parameters, pool)
 
-    def load_model(self, fname, format='cbm'):
+    def load_model(self, fname=None, format='cbm', stream=None, blob=None):
         """
-        Load model from a file.
+        Load model from a file, stream or blob.
 
         Parameters
         ----------
         fname : string
             Input file name.
         """
-        if not isinstance(fname, STRING_TYPES):
-            raise CatBoostError("Invalid fname type={}: must be str().".format(type(fname)))
-        self._load_model(fname, format)
+        if (fname is None) + (stream is None) + (blob is None) != 2:
+            raise CatBoostError("Exactly one of fname/stream/blob arguments mustn't be None")
+
+        if fname is not None:
+            self._load_model(fname, format)
+        elif stream is not None:
+            self._load_from_stream(stream)
+        elif blob is not None:
+            self._load_from_string(blob)
         return self
 
     def get_param(self, key):
@@ -4766,6 +4797,8 @@ class CatBoostRegressor(CatBoost):
             if loss_function and isinstance(loss_function, str):
                 if loss_function.startswith('Poisson') or loss_function.startswith('Tweedie'):
                     prediction_type = 'Exponent'
+                if loss_function == 'RMSEWithUncertainty':
+                    prediction_type = 'RMSEWithUncertainty'
         return self._predict(data, prediction_type, ntree_start, ntree_end, thread_count, verbose, 'predict')
 
     def staged_predict(self, data, prediction_type='RawFormulaVal', ntree_start=0, ntree_end=0, eval_period=1, thread_count=-1, verbose=None):

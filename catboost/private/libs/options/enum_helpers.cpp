@@ -137,6 +137,9 @@ MakeRegister(LossInfos,
     Registree(MultiRMSE,
         EMetricAttribute::IsMultiRegression
     ),
+    Registree(RMSEWithUncertainty,
+        EMetricAttribute::IsRegression
+    ),
     Registree(RMSE,
         EMetricAttribute::IsRegression
     ),
@@ -431,6 +434,7 @@ bool IsCvStratifiedObjective(ELossFunction loss) {
 
 static const TVector<ELossFunction> RegressionObjectives = {
     ELossFunction::RMSE,
+    ELossFunction::RMSEWithUncertainty,
     ELossFunction::MAE,
     ELossFunction::Quantile,
     ELossFunction::LogLinQuantile,
@@ -640,9 +644,7 @@ bool AreZeroWeightsAfterBootstrap(EBootstrapType type) {
 
 bool IsEmbeddingFeatureEstimator(EFeatureCalcerType estimatorType) {
     return (
-        estimatorType == EFeatureCalcerType::CosDistanceWithClassCenter ||
-        estimatorType == EFeatureCalcerType::GaussianHomoscedasticModel ||
-        estimatorType == EFeatureCalcerType::GaussianHeteroscedasticModel
+        estimatorType == EFeatureCalcerType::LDA
     );
 }
 
@@ -695,5 +697,12 @@ bool IsInternalFeatureImportanceType(EFstrType type) {
     return (
         type == EFstrType::InternalFeatureImportance ||
         type == EFstrType::InternalInteraction
+    );
+}
+
+bool IsUncertaintyPredictionType(EPredictionType type) {
+    return (
+        type == EPredictionType::TotalUncertainty ||
+        type == EPredictionType::VirtEnsembles
     );
 }

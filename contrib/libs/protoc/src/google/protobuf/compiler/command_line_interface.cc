@@ -32,10 +32,10 @@
 //  Based on original Protocol Buffers design by
 //  Sanjay Ghemawat, Jeff Dean, and others.
 
-#include "compiler/command_line_interface.h"
+#include <google/protobuf/compiler/command_line_interface.h>
 
 
-#include "stubs/platform_macros.h"
+#include <google/protobuf/stubs/platform_macros.h>
 
 #include <stdio.h>
 #include <sys/types.h>
@@ -56,40 +56,40 @@
 
 #include <memory>
 #ifndef _SHARED_PTR_H
-#include "stubs/shared_ptr.h"
+#include <google/protobuf/stubs/shared_ptr.h>
 #endif
 
 #ifdef __APPLE__
 #include <mach-o/dyld.h>
 #endif
 
-#include "stubs/common.h"
-#include <contrib/libs/protobuf/stubs/logging.h>
-#include "stubs/stringprintf.h"
-#include "compiler/importer.h"
-#include "compiler/code_generator.h"
-#include "compiler/plugin.pb.h"
-#include "compiler/subprocess.h"
-#include "compiler/zip_writer.h"
-#include "compiler/plugin.pb.h"
-#include "compiler/code_generator.h"
-#include "compiler/importer.h"
-#include "io/coded_stream.h"
-#include "io/printer.h"
-#include "io/zero_copy_stream_impl.h"
-#include "descriptor.h"
-#include "dynamic_message.h"
-#include "text_format.h"
-#include "dynamic_message.h"
-#include "io/coded_stream.h"
-#include "io/zero_copy_stream_impl.h"
-#include "io/printer.h"
-#include "stubs/io_win32.h"
-#include <contrib/libs/protobuf/stubs/logging.h>
-#include "stubs/strutil.h"
-#include "stubs/substitute.h"
-#include "stubs/map_util.h"
-#include "stubs/stl_util.h"
+#include <google/protobuf/stubs/common.h>
+#include <google/protobuf/stubs/logging.h>
+#include <google/protobuf/stubs/stringprintf.h>
+#include <google/protobuf/compiler/importer.h>
+#include <google/protobuf/compiler/code_generator.h>
+#include <google/protobuf/compiler/plugin.pb.h>
+#include <google/protobuf/compiler/subprocess.h>
+#include <google/protobuf/compiler/zip_writer.h>
+#include <google/protobuf/compiler/plugin.pb.h>
+#include <google/protobuf/compiler/code_generator.h>
+#include <google/protobuf/compiler/importer.h>
+#include <google/protobuf/io/coded_stream.h>
+#include <google/protobuf/io/printer.h>
+#include <google/protobuf/io/zero_copy_stream_impl.h>
+#include <google/protobuf/descriptor.h>
+#include <google/protobuf/dynamic_message.h>
+#include <google/protobuf/text_format.h>
+#include <google/protobuf/dynamic_message.h>
+#include <google/protobuf/io/coded_stream.h>
+#include <google/protobuf/io/zero_copy_stream_impl.h>
+#include <google/protobuf/io/printer.h>
+#include <google/protobuf/stubs/io_win32.h>
+#include <google/protobuf/stubs/logging.h>
+#include <google/protobuf/stubs/strutil.h>
+#include <google/protobuf/stubs/substitute.h>
+#include <google/protobuf/stubs/map_util.h>
+#include <google/protobuf/stubs/stl_util.h>
 
 
 namespace google {

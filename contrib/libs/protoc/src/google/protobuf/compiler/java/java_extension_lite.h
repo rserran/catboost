@@ -33,8 +33,8 @@
 
 #include <map>
 
-#include "stubs/common.h"
-#include "compiler/java/java_extension.h"
+#include <google/protobuf/stubs/common.h>
+#include <google/protobuf/compiler/java/java_extension.h>
 
 namespace google {
 namespace protobuf {

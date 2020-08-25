@@ -3,15 +3,11 @@
 
 
 
-IF (USE_PREBUILT_TOOLS AND VALID_HOST_PLATFORM_FOR_COMMON_PREBUILT_TOOLS)
-    PREBUILT_PROGRAM()
+IF (USE_PREBUILT_TOOLS)
+    INCLUDE(${ARCADIA_ROOT}/build/prebuilt/contrib/tools/protoc/plugins/grpc_cpp/ya.make.prebuilt)
+ENDIF()
 
-    PEERDIR(build/external_resources/arcadia_grpc_cpp)
-
-    PRIMARY_OUTPUT(${ARCADIA_GRPC_CPP_RESOURCE_GLOBAL}/grpc_cpp${MODULE_SUFFIX})
-
-    END()
-ELSE()
+IF (NOT PREBUILT)
     PROGRAM()
 
     LICENSE(Apache-2.0)
@@ -42,6 +38,9 @@ ELSE()
     SRCS(
         cpp_plugin.cc
     )
+
+
+    INCLUDE(${ARCADIA_ROOT}/build/prebuilt/contrib/tools/protoc/plugins/grpc_cpp/ya.make.induced_deps)
 
     END()
 ENDIF()

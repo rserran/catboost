@@ -572,7 +572,7 @@ static void CalcExactLeafDeltas(
     Y_ASSERT(leafCount == leafDeltas->size());
     for (size_t i = 0; i < leafCount; i++) {
         double& leafDelta = (*leafDeltas)[i];
-        leafDelta = *NCB::CalcOptimumConstApprox(lossDescription, leafSamples[i], leafWeights[i]);
+        leafDelta = *NCB::CalcOneDimensionalOptimumConstApprox(lossDescription, leafSamples[i], leafWeights[i]);
     }
 }
 
@@ -642,12 +642,21 @@ static void CalcApproxDeltaSimple(
             ctx->Params.ObliviousTreeOptions->L2Reg,
             fold.GetSumWeight(),
             fold.GetLearnSampleCount());
-        AddLangevinNoiseToLeafDerivativesSum(
-            ctx->Params.BoostingOptions->DiffusionTemperature,
-            ctx->Params.BoostingOptions->LearningRate,
-            scaledL2Regularizer,
-            randomSeed,
-            &leafDers);
+        if (estimationMethod == ELeavesEstimation::Gradient) {
+            AddLangevinNoiseToLeafDerivativesSum(
+                ctx->Params.BoostingOptions->DiffusionTemperature,
+                ctx->Params.BoostingOptions->LearningRate,
+                scaledL2Regularizer,
+                randomSeed,
+                &leafDers);
+        } else if (estimationMethod == ELeavesEstimation::Newton) {
+            AddLangevinNoiseToLeafNewtonSum(
+                ctx->Params.BoostingOptions->DiffusionTemperature,
+                ctx->Params.BoostingOptions->LearningRate,
+                scaledL2Regularizer,
+                randomSeed,
+                &leafDers);
+        }
         if (treeHasMonotonicConstraints) {
             CalcMonotonicLeafDeltasSimple(
                 leafDers,

@@ -35,14 +35,14 @@
 
 #include <memory>
 #ifndef _SHARED_PTR_H
-#include "stubs/shared_ptr.h"
+#include <google/protobuf/stubs/shared_ptr.h>
 #endif
 
-#include "stubs/common.h"
-#include <contrib/libs/protobuf/stubs/logging.h>
-#include "descriptor.h"
-#include "dynamic_message.h"
-#include "message.h"
+#include <google/protobuf/stubs/common.h>
+#include <google/protobuf/stubs/logging.h>
+#include <google/protobuf/descriptor.h>
+#include <google/protobuf/dynamic_message.h>
+#include <google/protobuf/message.h>
 #include "pyext/descriptor.h"
 #include "pyext/descriptor_pool.h"
 #include "pyext/message.h"

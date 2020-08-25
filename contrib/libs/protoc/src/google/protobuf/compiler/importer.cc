@@ -41,16 +41,16 @@
 #include <algorithm>
 #include <memory>
 #ifndef _SHARED_PTR_H
-#include "stubs/shared_ptr.h"
+#include <google/protobuf/stubs/shared_ptr.h>
 #endif
 
-#include "compiler/importer.h"
+#include <google/protobuf/compiler/importer.h>
 
-#include "compiler/parser.h"
-#include "io/tokenizer.h"
-#include "io/zero_copy_stream_impl.h"
-#include "stubs/io_win32.h"
-#include "stubs/strutil.h"
+#include <google/protobuf/compiler/parser.h>
+#include <google/protobuf/io/tokenizer.h>
+#include <google/protobuf/io/zero_copy_stream_impl.h>
+#include <google/protobuf/stubs/io_win32.h>
+#include <google/protobuf/stubs/strutil.h>
 
 #ifdef _WIN32
 #include <ctype.h>

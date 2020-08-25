@@ -13,7 +13,6 @@
 #include "pfound.h"
 #include "precision_recall_at_k.h"
 #include "description_utils.h"
-#include "enums.h"
 
 #include <catboost/libs/helpers/dispatch_generic_lambda.h>
 #include <catboost/libs/helpers/exception.h>
@@ -21,6 +20,7 @@
 #include <catboost/libs/helpers/vector_helpers.h>
 #include <catboost/libs/logging/logging.h>
 #include <catboost/private/libs/options/enum_helpers.h>
+#include <catboost/private/libs/options/enums.h>
 #include <catboost/private/libs/options/loss_description.h>
 
 #include <library/cpp/fast_exp/fast_exp.h>
@@ -226,7 +226,7 @@ namespace {
 } // anonymous namespace
 
 TVector<THolder<IMetric>> TCrossEntropyMetric::Create(const TMetricConfig& config) {
-    return AsVector(MakeHolder<TCrossEntropyMetric>(config.metric, config.params));
+    return AsVector(MakeHolder<TCrossEntropyMetric>(config.Metric, config.Params));
 }
 
 TCrossEntropyMetric::TCrossEntropyMetric(ELossFunction lossFunction, const TLossParams& params)
@@ -427,7 +427,7 @@ namespace {
 
 // static
 TVector<THolder<IMetric>> TMultiRMSEMetric::Create(const TMetricConfig& config) {
-    return AsVector(MakeHolder<TMultiRMSEMetric>(config.params));
+    return AsVector(MakeHolder<TMultiRMSEMetric>(config.Params));
 }
 
 TMetricHolder TMultiRMSEMetric::EvalSingleThread(
@@ -438,9 +438,9 @@ TMetricHolder TMultiRMSEMetric::EvalSingleThread(
     int begin,
     int end
 ) const {
-    const auto evalImpl = [&](bool useWeights, bool hasDelta) {
-        const auto realApprox = [&](int dim, int idx) { return approx[dim][idx] + (hasDelta ? approxDelta[dim][idx] : 0); };
-        const auto realWeight = [&](int idx) { return useWeights ? weight[idx] : 1; };
+    const auto evalImpl = [=](bool useWeights, bool hasDelta) {
+        const auto realApprox = [=](int dim, int idx) { return approx[dim][idx] + (hasDelta ? approxDelta[dim][idx] : 0); };
+        const auto realWeight = [=](int idx) { return useWeights ? weight[idx] : 1; };
 
         TMetricHolder error(2);
         for (auto dim : xrange(target.size())) {
@@ -462,6 +462,79 @@ double TMultiRMSEMetric::GetFinalError(const TMetricHolder& error) const {
 }
 
 void TMultiRMSEMetric::GetBestValue(EMetricBestValue* valueType, float* /*bestValue*/) const {
+    *valueType = EMetricBestValue::Min;
+}
+
+/* RMSEWithUncertainty */
+namespace {
+    class TRMSEWithUncertaintyMetric final: public TAdditiveMultiRegressionMetric {
+    public:
+        explicit TRMSEWithUncertaintyMetric(
+            ELossFunction lossFunction,
+            const TLossParams& descriptionParams);
+
+        static TVector<THolder<IMetric>> Create(const TMetricConfig& config);
+
+        TMetricHolder EvalSingleThread(
+            TConstArrayRef<TVector<double>> approx,
+            TConstArrayRef<TVector<double>> approxDelta,
+            TConstArrayRef<TConstArrayRef<float>> target,
+            TConstArrayRef<float> weight,
+            int begin,
+            int end
+        ) const override;
+        void GetBestValue(EMetricBestValue* valueType, float* bestValue) const override;
+        double GetFinalError(const TMetricHolder& error) const override;
+
+    };
+}
+
+TRMSEWithUncertaintyMetric::TRMSEWithUncertaintyMetric(
+    ELossFunction lossFunction,
+    const TLossParams& descriptionParams)
+    : TAdditiveMultiRegressionMetric(lossFunction, descriptionParams)
+{}
+
+TVector<THolder<IMetric>> TRMSEWithUncertaintyMetric::Create(const TMetricConfig& config) {
+    return AsVector(MakeHolder<TRMSEWithUncertaintyMetric>(config.Metric, config.Params));
+}
+
+TMetricHolder TRMSEWithUncertaintyMetric::EvalSingleThread(
+    TConstArrayRef<TVector<double>> approx,
+    TConstArrayRef<TVector<double>> approxDelta,
+    TConstArrayRef<TConstArrayRef<float>> target,
+    TConstArrayRef<float> weights,
+    int begin,
+    int end
+) const {
+    Y_ASSERT(target.size() == 1);
+    const auto evalImpl = [=](bool useWeights, bool hasDelta) {
+        const auto realApprox = [=](int dim, int idx) { return approx[dim][idx] + (hasDelta ? approxDelta[dim][idx] : 0); };
+        const auto realWeight = [=](int idx) { return useWeights ? weights[idx] : 1; };
+
+        TMetricHolder error(2);
+        double stats0 = 0;
+        double stats1 = 0;
+        for (auto i : xrange(begin, end)) {
+            double weight = realWeight(i);
+            double expSum = -2 * realApprox(1, i);
+            FastExpInplace(&expSum, /*count*/ 1);
+            stats0 += weight * (0.39908993417 + realApprox(1, i) + 0.5 * expSum * Sqr(realApprox(0, i) - target[0][i]));
+            stats1 += weight;
+        }
+        error.Stats[0] += stats0;
+        error.Stats[1] += stats1;
+        return error;
+    };
+
+    return DispatchGenericLambda(evalImpl, !weights.empty(), !approxDelta.empty());
+}
+
+double TRMSEWithUncertaintyMetric::GetFinalError(const TMetricHolder& error) const {
+    return error.Stats[1] == 0 ? 0 : error.Stats[0] / error.Stats[1];
+}
+
+void TRMSEWithUncertaintyMetric::GetBestValue(EMetricBestValue* valueType, float* /*bestValue*/) const {
     *valueType = EMetricBestValue::Min;
 }
 
@@ -490,7 +563,7 @@ namespace {
 }
 
 TVector<THolder<IMetric>> TRMSEMetric::Create(const TMetricConfig& config) {
-    return AsVector(MakeHolder<TRMSEMetric>(config.params));
+    return AsVector(MakeHolder<TRMSEMetric>(config.Params));
 }
 
 TMetricHolder TRMSEMetric::EvalSingleThread(
@@ -503,7 +576,6 @@ TMetricHolder TRMSEMetric::EvalSingleThread(
     int begin,
     int end
 ) const {
-    CB_ENSURE(approx.size() == 1, "Metric RMSE supports only single-dimensional data");
     Y_ASSERT(!isExpApprox);
 
     const auto impl = [=] (auto hasDelta, auto hasWeight, TConstArrayRef<double> approx, TConstArrayRef<double> approxDelta) {
@@ -573,9 +645,9 @@ namespace {
 // static
 TVector<THolder<IMetric>> TLqMetric::Create(const TMetricConfig& config) {
     CB_ENSURE(config.GetParamsMap().contains("q"), "Metric " << ELossFunction::Lq << " requires q as parameter");
-    config.validParams->insert("q");
+    config.ValidParams->insert("q");
     return AsVector(MakeHolder<TLqMetric>(FromString<float>(config.GetParamsMap().at("q")),
-                                          config.params));
+                                          config.Params));
 }
 
 TMetricHolder TLqMetric::EvalSingleThread(
@@ -655,17 +727,17 @@ namespace {
 
 // static.
 TVector<THolder<IMetric>> TQuantileMetric::Create(const TMetricConfig& config) {
-    switch (config.metric) {
+    switch (config.Metric) {
         case ELossFunction::MAE:
-            return AsVector(MakeHolder<TQuantileMetric>(config.metric, config.params, MaeAlpha, MaeDelta));
+            return AsVector(MakeHolder<TQuantileMetric>(config.Metric, config.Params, MaeAlpha, MaeDelta));
             break;
         case ELossFunction::Quantile: {
             double alpha = NCatboostOptions::GetParamOrDefault(config.GetParamsMap(), "alpha", 0.5);
             double delta = NCatboostOptions::GetParamOrDefault(config.GetParamsMap(), "delta", 1e-6);
 
-            config.validParams->insert("alpha");
-            config.validParams->insert("delta");
-            return AsVector(MakeHolder<TQuantileMetric>(config.metric, config.params, alpha, delta));
+            config.ValidParams->insert("alpha");
+            config.ValidParams->insert("delta");
+            return AsVector(MakeHolder<TQuantileMetric>(config.Metric, config.Params, alpha, delta));
             break;
         }
         default:
@@ -782,9 +854,9 @@ namespace {
 // static.
 TVector<THolder<IMetric>> TExpectileMetric::Create(const TMetricConfig& config) {
     auto it = config.GetParamsMap().find("alpha");
-    config.validParams->insert("alpha");
+    config.ValidParams->insert("alpha");
     return AsVector(MakeHolder<TExpectileMetric>(
-        config.params,
+        config.Params,
         it != config.GetParamsMap().end() ? FromString<float>(it->second) : DefaultAlpha));
 }
 
@@ -869,8 +941,8 @@ namespace {
 // static.
 TVector<THolder<IMetric>> TLogLinQuantileMetric::Create(const TMetricConfig& config) {
     auto it = config.GetParamsMap().find("alpha");
-    config.validParams->insert("alpha");
-    return AsVector(MakeHolder<TLogLinQuantileMetric>(config.params,
+    config.ValidParams->insert("alpha");
+    return AsVector(MakeHolder<TLogLinQuantileMetric>(config.Params,
         it != config.GetParamsMap().end() ? FromString<float>(it->second) : DefaultAlpha));
 }
 
@@ -966,7 +1038,7 @@ namespace {
 
 // static.
 TVector<THolder<IMetric>> TMAPEMetric::Create(const TMetricConfig& config) {
-    return AsVector(MakeHolder<TMAPEMetric>(config.params));
+    return AsVector(MakeHolder<TMAPEMetric>(config.Params));
 }
 
 TMetricHolder TMAPEMetric::EvalSingleThread(
@@ -1040,8 +1112,8 @@ namespace {
 
 TVector<THolder<IMetric>> TNumErrorsMetric::Create(const TMetricConfig& config) {
     CB_ENSURE(config.GetParamsMap().contains("greater_than"), "Metric " << ELossFunction::NumErrors << " requires greater_than as parameter");
-    config.validParams->insert("greater_than");
-    return AsVector(MakeHolder<TNumErrorsMetric>(config.params,
+    config.ValidParams->insert("greater_than");
+    return AsVector(MakeHolder<TNumErrorsMetric>(config.Params,
                                                  FromString<double>(config.GetParamsMap().at("greater_than"))));
 }
 
@@ -1101,7 +1173,7 @@ namespace {
 
 // static
 TVector<THolder<IMetric>> TPoissonMetric::Create(const TMetricConfig& config) {
-    return AsVector(MakeHolder<TPoissonMetric>(config.params));
+    return AsVector(MakeHolder<TPoissonMetric>(config.Params));
 }
 
 TMetricHolder TPoissonMetric::EvalSingleThread(
@@ -1199,8 +1271,8 @@ namespace {
 // static
 TVector<THolder<IMetric>> TTweedieMetric::Create(const TMetricConfig& config) {
     CB_ENSURE(config.GetParamsMap().contains("variance_power"), "Metric " << ELossFunction::Tweedie << " requires variance_power as parameter");
-    config.validParams->insert("variance_power");
-    return AsVector(MakeHolder<TTweedieMetric>(config.params,
+    config.ValidParams->insert("variance_power");
+    return AsVector(MakeHolder<TTweedieMetric>(config.Params,
                                                FromString<float>(config.GetParamsMap().at("variance_power"))));
 }
 
@@ -1276,7 +1348,7 @@ namespace {
 
 // static.
 TVector<THolder<IMetric>> TMSLEMetric::Create(const TMetricConfig& config) {
-    return AsVector(MakeHolder<TMSLEMetric>(config.params));
+    return AsVector(MakeHolder<TMSLEMetric>(config.Params));
 }
 
 TMetricHolder TMSLEMetric::EvalSingleThread(
@@ -1350,7 +1422,7 @@ namespace {
 
 // static.
 TVector<THolder<IMetric>> TMedianAbsoluteErrorMetric::Create(const TMetricConfig& config) {
-    return AsVector(MakeHolder<TMedianAbsoluteErrorMetric>(config.params));
+    return AsVector(MakeHolder<TMedianAbsoluteErrorMetric>(config.Params));
 }
 
 TMetricHolder TMedianAbsoluteErrorMetric::Eval(
@@ -1425,7 +1497,7 @@ namespace {
 
 // static.
 TVector<THolder<IMetric>> TSMAPEMetric::Create(const TMetricConfig& config) {
-    return AsVector(MakeHolder<TSMAPEMetric>(config.params));
+    return AsVector(MakeHolder<TSMAPEMetric>(config.Params));
 }
 
 TMetricHolder TSMAPEMetric::EvalSingleThread(
@@ -1492,7 +1564,7 @@ namespace {
 
 // static.
 TVector<THolder<IMetric>> TLLPMetric::Create(const TMetricConfig& config) {
-    return AsVector(MakeHolder<TLLPMetric>(config.params));
+    return AsVector(MakeHolder<TLLPMetric>(config.Params));
 }
 
 TMetricHolder TLLPMetric::EvalSingleThread(
@@ -1548,7 +1620,7 @@ namespace {
 }
 
 TVector<THolder<IMetric>> TMultiClassMetric::Create(const TMetricConfig& config) {
-    return AsVector(MakeHolder<TMultiClassMetric>(config.params));
+    return AsVector(MakeHolder<TMultiClassMetric>(config.Params));
 }
 
 static void GetMultiDimensionalApprox(int idx, const TConstArrayRef<TConstArrayRef<double>> approx, const TConstArrayRef<TConstArrayRef<double>> approxDelta, TArrayRef<double> evaluatedApprox) {
@@ -1640,7 +1712,7 @@ namespace {
 
 // static
 TVector<THolder<IMetric>> TMultiClassOneVsAllMetric::Create(const TMetricConfig& config) {
-    return AsVector(MakeHolder<TMultiClassOneVsAllMetric>(config.params));
+    return AsVector(MakeHolder<TMultiClassOneVsAllMetric>(config.Params));
 }
 
 TMetricHolder TMultiClassOneVsAllMetric::EvalSingleThread(
@@ -1708,8 +1780,8 @@ namespace {
 }
 
 TVector<THolder<IMetric>> TPairLogitMetric::Create(const TMetricConfig& config) {
-    config.validParams->insert("max_pairs");
-    return AsVector(MakeHolder<TPairLogitMetric>(config.params));
+    config.ValidParams->insert("max_pairs");
+    return AsVector(MakeHolder<TPairLogitMetric>(config.Params));
 }
 
 TMetricHolder TPairLogitMetric::EvalSingleThread(
@@ -1832,7 +1904,7 @@ namespace {
 }
 
 TVector<THolder<IMetric>> TQueryRMSEMetric::Create(const TMetricConfig& config) {
-    return AsVector(MakeHolder<TQueryRMSEMetric>(config.params));
+    return AsVector(MakeHolder<TQueryRMSEMetric>(config.Params));
 }
 
 TMetricHolder TQueryRMSEMetric::EvalSingleThread(
@@ -1950,9 +2022,9 @@ TVector<THolder<IMetric>> TPFoundMetric::Create(const TMetricConfig& config) {
     auto itDecay = config.GetParamsMap().find("decay");
     const int topSize = itTopSize != config.GetParamsMap().end() ? FromString<int>(itTopSize->second) : DefaultTopSize;
     const double decay = itDecay != config.GetParamsMap().end() ? FromString<double>(itDecay->second) : DefaultDecay;
-    config.validParams->insert("top");
-    config.validParams->insert("decay");
-    return AsVector(MakeHolder<TPFoundMetric>(config.params, topSize, decay));
+    config.ValidParams->insert("top");
+    config.ValidParams->insert("decay");
+    return AsVector(MakeHolder<TPFoundMetric>(config.Params, topSize, decay));
 }
 
 TPFoundMetric::TPFoundMetric(const TLossParams& params, int topSize, double decay)
@@ -2067,12 +2139,12 @@ TVector<THolder<IMetric>> TDcgMetric::Create(const TMetricConfig& config) {
     if (itDenominator != config.GetParamsMap().end()) {
         denominator = FromString<ENdcgDenominatorType>(itDenominator->second);
     }
-    config.validParams->insert("top");
-    config.validParams->insert("type");
-    config.validParams->insert("denominator");
+    config.ValidParams->insert("top");
+    config.ValidParams->insert("type");
+    config.ValidParams->insert("denominator");
 
-    return AsVector(MakeHolder<TDcgMetric>(config.metric, config.params, topSize, type,
-                                           config.metric == ELossFunction::NDCG, denominator));
+    return AsVector(MakeHolder<TDcgMetric>(config.Metric, config.Params, topSize, type,
+                                           config.Metric == ELossFunction::NDCG, denominator));
 }
 
 TString TDcgMetric::GetDescription() const {
@@ -2191,9 +2263,9 @@ namespace {
 
 // static
 TVector<THolder<IMetric>> TQuerySoftMaxMetric::Create(const TMetricConfig& config) {
-    config.validParams->insert("lambda");
-    config.validParams->insert("beta");
-    return AsVector(MakeHolder<TQuerySoftMaxMetric>(config.params));
+    config.ValidParams->insert("lambda");
+    config.ValidParams->insert("beta");
+    return AsVector(MakeHolder<TQuerySoftMaxMetric>(config.Params));
 }
 
 TMetricHolder TQuerySoftMaxMetric::EvalSingleThread(
@@ -2427,7 +2499,7 @@ TMetricHolder TR2ImplMetric::EvalSingleThread(
 }
 
 TVector<THolder<IMetric>> TR2Metric::Create(const TMetricConfig& config) {
-    return AsVector(MakeHolder<TR2Metric>(config.params));
+    return AsVector(MakeHolder<TR2Metric>(config.Params));
 }
 
 TMetricHolder TR2Metric::Eval(
@@ -2547,12 +2619,12 @@ namespace {
 }
 
 TVector<THolder<IMetric>> TAUCMetric::Create(const TMetricConfig& config) {
-    config.validParams->insert("type");
-    EAucType aucType = config.approxDimension == 1 ? EAucType::Classic : EAucType::Mu;
+    config.ValidParams->insert("type");
+    EAucType aucType = config.ApproxDimension == 1 ? EAucType::Classic : EAucType::Mu;
     if (config.GetParamsMap().contains("type")) {
         const TString name = config.GetParamsMap().at("type");
         aucType = FromString<EAucType>(name);
-        if (config.approxDimension == 1) {
+        if (config.ApproxDimension == 1) {
             CB_ENSURE(aucType == EAucType::Classic || aucType == EAucType::Ranking,
                       "AUC type \"" << aucType << "\" isn't a singleclass AUC type");
         } else {
@@ -2562,15 +2634,15 @@ TVector<THolder<IMetric>> TAUCMetric::Create(const TMetricConfig& config) {
     }
     switch (aucType) {
         case EAucType::Classic: {
-            return AsVector(MakeHolder<TAUCMetric>(config.params, EAucType::Classic));
+            return AsVector(MakeHolder<TAUCMetric>(config.Params, EAucType::Classic));
             break;
         }
         case EAucType::Ranking: {
-            return AsVector(MakeHolder<TAUCMetric>(config.params, EAucType::Ranking));
+            return AsVector(MakeHolder<TAUCMetric>(config.Params, EAucType::Ranking));
             break;
         }
         case EAucType::Mu: {
-            config.validParams->insert("misclass_cost_matrix");
+            config.ValidParams->insert("misclass_cost_matrix");
             TMaybe<TVector<TVector<double>>> misclassCostMatrix = Nothing();
             if (config.GetParamsMap().contains("misclass_cost_matrix")) {
                 misclassCostMatrix.ConstructInPlace(ConstructSquareMatrix<double>(
@@ -2581,13 +2653,13 @@ TVector<THolder<IMetric>> TAUCMetric::Create(const TMetricConfig& config) {
                     CB_ENSURE((*misclassCostMatrix)[i][i] == 0, "Diagonal elements of the misclass cost matrix should be equal to 0.");
                 }
             }
-            return AsVector(MakeHolder<TAUCMetric>(config.params, misclassCostMatrix));
+            return AsVector(MakeHolder<TAUCMetric>(config.Params, misclassCostMatrix));
             break;
         }
         case EAucType::OneVsAll: {
             TVector<THolder<IMetric>> metrics;
-            for (int i = 0; i < config.approxDimension; ++i) {
-                metrics.push_back(MakeHolder<TAUCMetric>(config.params, i));
+            for (int i = 0; i < config.ApproxDimension; ++i) {
+                metrics.push_back(MakeHolder<TAUCMetric>(config.Params, i));
             }
             return metrics;
             break;
@@ -2599,7 +2671,7 @@ TVector<THolder<IMetric>> TAUCMetric::Create(const TMetricConfig& config) {
 }
 
 THolder<IMetric> MakeBinClassAucMetric(const TLossParams& params) {
-    return MakeHolder<TAUCMetric>(params, EAucType::Classic);
+    return MakeHolder<TAUCMetric>(params, NCatboostOptions::GetAucType(params.GetParamsMap()));
 }
 
 
@@ -2769,13 +2841,13 @@ namespace {
 }
 
 TVector<THolder<IMetric>> TNormalizedGini::Create(const TMetricConfig& config) {
-    if (config.approxDimension == 1) {
-        config.validParams->insert("border");
-        return AsVector(MakeHolder<TNormalizedGini>(config.params));
+    if (config.ApproxDimension == 1) {
+        config.ValidParams->insert("border");
+        return AsVector(MakeHolder<TNormalizedGini>(config.Params));
     }
     TVector<THolder<IMetric>> result;
-    for (int i : xrange(config.approxDimension)) {
-        result.push_back(MakeHolder<TNormalizedGini>(config.params, i));
+    for (int i : xrange(config.ApproxDimension)) {
+        result.push_back(MakeHolder<TNormalizedGini>(config.Params, i));
     }
     return result;
 }
@@ -2863,8 +2935,8 @@ namespace {
 // static.
 TVector<THolder<IMetric>> TFairLossMetric::Create(const TMetricConfig& config) {
     double smoothness = NCatboostOptions::GetParamOrDefault(config.GetParamsMap(), "smoothness", TFairLossMetric::DefaultSmoothness);
-    config.validParams->insert("smoothness");
-    return AsVector(MakeHolder<TFairLossMetric>(config.params, smoothness));
+    config.ValidParams->insert("smoothness");
+    return AsVector(MakeHolder<TFairLossMetric>(config.Params, smoothness));
 }
 
 TMetricHolder TFairLossMetric::EvalSingleThread(
@@ -2929,10 +3001,10 @@ namespace {
 }
 
 TVector<THolder<IMetric>> TBalancedAccuracyMetric::Create(const TMetricConfig& config) {
-    CB_ENSURE(config.approxDimension == 1,
+    CB_ENSURE(config.ApproxDimension == 1,
               "Balanced accuracy is used only for binary classification problems.");
-    config.validParams->insert("border");
-    return AsVector(MakeHolder<TBalancedAccuracyMetric>(config.params,
+    config.ValidParams->insert("border");
+    return AsVector(MakeHolder<TBalancedAccuracyMetric>(config.Params,
                                                         config.GetPredictionBorderOrDefault()));
 }
 
@@ -2994,9 +3066,9 @@ namespace {
 
 // static.
 TVector<THolder<IMetric>> TBalancedErrorRate::Create(const TMetricConfig& config) {
-    CB_ENSURE(config.approxDimension == 1, "Balanced Error Rate is used only for binary classification problems.");
-    config.validParams->insert("border");
-    return AsVector(MakeHolder<TBalancedErrorRate>(config.params,
+    CB_ENSURE(config.ApproxDimension == 1, "Balanced Error Rate is used only for binary classification problems.");
+    config.ValidParams->insert("border");
+    return AsVector(MakeHolder<TBalancedErrorRate>(config.Params,
                                                    config.GetPredictionBorderOrDefault()));
 }
 
@@ -3102,8 +3174,8 @@ namespace {
 }
 
 TVector<THolder<IMetric>> THingeLossMetric::Create(const TMetricConfig& config) {
-    config.validParams->insert("border");
-    return AsVector(MakeHolder<THingeLossMetric>(config.params));
+    config.ValidParams->insert("border");
+    return AsVector(MakeHolder<THingeLossMetric>(config.Params));
 }
 
 TMetricHolder THingeLossMetric::EvalSingleThread(
@@ -3159,9 +3231,9 @@ namespace {
 
 // static.
 TVector<THolder<IMetric>> THammingLossMetric::Create(const TMetricConfig& config) {
-    config.validParams->insert("border");
+    config.ValidParams->insert("border");
     return AsVector(MakeHolder<THammingLossMetric>(
-        config.params, config.GetPredictionBorderOrDefault()));
+        config.Params, config.GetPredictionBorderOrDefault()));
 }
 
 THammingLossMetric::THammingLossMetric(const TLossParams& params,
@@ -3236,7 +3308,7 @@ namespace {
 }
 
 TVector<THolder<IMetric>> TPairAccuracyMetric::Create(const TMetricConfig& config) {
-    return AsVector(MakeHolder<TPairAccuracyMetric>(config.params));
+    return AsVector(MakeHolder<TPairAccuracyMetric>(config.Params));
 }
 
 TMetricHolder TPairAccuracyMetric::EvalSingleThread(
@@ -3308,9 +3380,9 @@ namespace {
 // static.
 TVector<THolder<IMetric>> TPrecisionAtKMetric::Create(const TMetricConfig& config) {
     int topSize = NCatboostOptions::GetParamOrDefault(config.GetParamsMap(), "top", -1);
-    config.validParams->insert("top");
-    config.validParams->insert("border");
-    return AsVector(MakeHolder<TPrecisionAtKMetric>(config.params, topSize));
+    config.ValidParams->insert("top");
+    config.ValidParams->insert("border");
+    return AsVector(MakeHolder<TPrecisionAtKMetric>(config.Params, topSize));
 }
 
 TPrecisionAtKMetric::TPrecisionAtKMetric(const TLossParams& params, int topSize)
@@ -3385,9 +3457,9 @@ namespace {
 
 TVector<THolder<IMetric>> TRecallAtKMetric::Create(const TMetricConfig& config) {
     int topSize = NCatboostOptions::GetParamOrDefault(config.GetParamsMap(), "top", -1);
-    config.validParams->insert("top");
-    config.validParams->insert("border");
-    return AsVector(MakeHolder<TRecallAtKMetric>(config.params, topSize));
+    config.ValidParams->insert("top");
+    config.ValidParams->insert("border");
+    return AsVector(MakeHolder<TRecallAtKMetric>(config.Params, topSize));
 }
 
 TRecallAtKMetric::TRecallAtKMetric(const TLossParams& params, int topSize)
@@ -3463,9 +3535,9 @@ namespace {
 // static.
 TVector<THolder<IMetric>> TMAPKMetric::Create(const TMetricConfig& config) {
     int topSize = NCatboostOptions::GetParamOrDefault(config.GetParamsMap(), "top", -1);
-    config.validParams->insert("top");
-    config.validParams->insert("border");
-    return AsVector(MakeHolder<TMAPKMetric>(config.params, topSize));
+    config.ValidParams->insert("top");
+    config.ValidParams->insert("border");
+    return AsVector(MakeHolder<TMAPKMetric>(config.Params, topSize));
 }
 
 TMAPKMetric::TMAPKMetric(const TLossParams& params, int topSize)
@@ -3568,12 +3640,12 @@ THolder<IMetric> MakeMultiClassPRAUCMetric(const TLossParams& params, int positi
 }
 
 TVector<THolder<IMetric>> TPRAUCMetric::Create(const TMetricConfig& config) {
-    config.validParams->insert("type");
-    EAucType aucType = config.approxDimension == 1 ? EAucType::Classic : EAucType::OneVsAll;
-    if (config.params.GetParamsMap().contains("type")) {
-        const TString name = config.params.GetParamsMap().at("type");
+    config.ValidParams->insert("type");
+    EAucType aucType = config.ApproxDimension == 1 ? EAucType::Classic : EAucType::OneVsAll;
+    if (config.Params.GetParamsMap().contains("type")) {
+        const TString name = config.Params.GetParamsMap().at("type");
         aucType = FromString<EAucType>(name);
-        if (config.approxDimension == 1) {
+        if (config.ApproxDimension == 1) {
             CB_ENSURE(aucType == EAucType::Classic,
                       "PRAUC type \"" << aucType << "\" isn't a singleclass PRAUC type");
         } else {
@@ -3583,12 +3655,12 @@ TVector<THolder<IMetric>> TPRAUCMetric::Create(const TMetricConfig& config) {
     }
     switch (aucType) {
         case EAucType::Classic: {
-            return AsVector(MakeHolder<TPRAUCMetric>(config.params));
+            return AsVector(MakeHolder<TPRAUCMetric>(config.Params));
         }
         case EAucType::OneVsAll: {
             TVector<THolder<IMetric>> metrics;
-            for (int i = 0; i < config.approxDimension; ++i) {
-                metrics.push_back(MakeHolder<TPRAUCMetric>(config.params, i));
+            for (int i = 0; i < config.ApproxDimension; ++i) {
+                metrics.push_back(MakeHolder<TPRAUCMetric>(config.Params, i));
             }
             return metrics;
         }
@@ -3952,8 +4024,8 @@ namespace {
 
 // static.
 TVector<THolder<IMetric>> TUserDefinedPerObjectMetric::Create(const TMetricConfig& config) {
-    config.validParams->insert("alpha");
-    return AsVector(MakeHolder<TUserDefinedPerObjectMetric>(config.params));
+    config.ValidParams->insert("alpha");
+    return AsVector(MakeHolder<TUserDefinedPerObjectMetric>(config.Params));
 }
 
 TUserDefinedPerObjectMetric::TUserDefinedPerObjectMetric(const TLossParams& params)
@@ -4007,8 +4079,8 @@ namespace {
 
 // static.
 TVector<THolder<IMetric>> TUserDefinedQuerywiseMetric::Create(const TMetricConfig& config) {
-    config.validParams->insert("alpha");
-    return AsVector(MakeHolder<TUserDefinedQuerywiseMetric>(config.params));
+    config.ValidParams->insert("alpha");
+    return AsVector(MakeHolder<TUserDefinedQuerywiseMetric>(config.Params));
 }
 
 TUserDefinedQuerywiseMetric::TUserDefinedQuerywiseMetric(const TLossParams& params)
@@ -4077,9 +4149,9 @@ namespace {
 // static.
 TVector<THolder<IMetric>> THuberLossMetric::Create(const TMetricConfig& config) {
     CB_ENSURE(config.GetParamsMap().contains("delta"), "Metric " << ELossFunction::Huber << " requires delta as parameter");
-    config.validParams->insert("delta");
+    config.ValidParams->insert("delta");
     return AsVector(MakeHolder<THuberLossMetric>(
-        config.params, FromString<float>(config.GetParamsMap().at("delta"))));
+        config.Params, FromString<float>(config.GetParamsMap().at("delta"))));
 }
 
 TMetricHolder THuberLossMetric::EvalSingleThread(
@@ -4152,12 +4224,12 @@ namespace {
 TVector<THolder<IMetric>> TFilteredDcgMetric::Create(const TMetricConfig& config) {
     auto type = NCatboostOptions::GetParamOrDefault(config.GetParamsMap(), "type", ENdcgMetricType::Base);
     auto denominator = NCatboostOptions::GetParamOrDefault(config.GetParamsMap(), "denominator", ENdcgDenominatorType::Position);
-    config.validParams->insert("sigma");
-    config.validParams->insert("num_estimations");
-    config.validParams->insert("type");
-    config.validParams->insert("denominator");
+    config.ValidParams->insert("sigma");
+    config.ValidParams->insert("num_estimations");
+    config.ValidParams->insert("type");
+    config.ValidParams->insert("denominator");
     return AsVector(MakeHolder<TFilteredDcgMetric>(
-        config.params,type, denominator));
+        config.Params,type, denominator));
 }
 
 TFilteredDcgMetric::TFilteredDcgMetric(const TLossParams& params,
@@ -4243,8 +4315,8 @@ namespace {
 TVector<THolder<IMetric>> TAverageGain::Create(const TMetricConfig& config) {
     auto it = config.GetParamsMap().find("top");
     CB_ENSURE(it != config.GetParamsMap().end(), "AverageGain metric should have top parameter");
-    config.validParams->insert("top");
-    return AsVector(MakeHolder<TAverageGain>(config.metric, config.params, FromString<float>(it->second)));
+    config.ValidParams->insert("top");
+    return AsVector(MakeHolder<TAverageGain>(config.Metric, config.Params, FromString<float>(it->second)));
 }
 
 TMetricHolder TAverageGain::EvalSingleThread(
@@ -4339,15 +4411,15 @@ namespace {
 
 // static.
 TVector<THolder<IMetric>> TCombinationLoss::Create(const TMetricConfig& config) {
-    CB_ENSURE(config.approxDimension == 1, "Combination loss cannot be used in multi-classification");
+    CB_ENSURE(config.ApproxDimension == 1, "Combination loss cannot be used in multi-classification");
     CB_ENSURE(config.GetParamsMap().size() >= 2, "Combination loss must have 2 or more parameters");
     CB_ENSURE(config.GetParamsMap().size() % 2 == 0, "Combination loss must have even number of parameters, not " << config.GetParamsMap().size());
     const ui32 lossCount = config.GetParamsMap().size() / 2;
     for (ui32 idx : xrange(lossCount)) {
-        config.validParams->insert(GetCombinationLossKey(idx));
-        config.validParams->insert(GetCombinationWeightKey(idx));
+        config.ValidParams->insert(GetCombinationLossKey(idx));
+        config.ValidParams->insert(GetCombinationWeightKey(idx));
     }
-    return AsVector(MakeHolder<TCombinationLoss>(config.params));
+    return AsVector(MakeHolder<TCombinationLoss>(config.Params));
 }
 
 TMetricHolder TCombinationLoss::EvalSingleThread(
@@ -4462,9 +4534,9 @@ namespace {
 // static.
 TVector<THolder<IMetric>> TQueryCrossEntropyMetric::Create(const TMetricConfig& config) {
     auto it = config.GetParamsMap().find("alpha");
-    config.validParams->insert("alpha");
+    config.ValidParams->insert("alpha");
     return AsVector(MakeHolder<TQueryCrossEntropyMetric>(
-        config.params,
+        config.Params,
         it != config.GetParamsMap().end() ? FromString<float>(it->second) : DefaultAlpha));
 }
 
@@ -4580,6 +4652,9 @@ TVector<THolder<IMetric>> CreateMetric(ELossFunction metric, const TLossParams& 
     switch (metric) {
         case ELossFunction::MultiRMSE:
             AppendTemporaryMetricsVector(TMultiRMSEMetric::Create(config), &result);
+            break;
+        case ELossFunction::RMSEWithUncertainty:
+            AppendTemporaryMetricsVector(TRMSEWithUncertaintyMetric::Create(config), &result);
             break;
         case ELossFunction::Logloss:
             AppendTemporaryMetricsVector(TCrossEntropyMetric::Create(config), &result);
@@ -5039,7 +5114,7 @@ void CheckPreprocessedTarget(
     bool allowConstLabel
 ) {
     ELossFunction lossFunction = lossDesciption.GetLossFunction();
-    if (isNonEmptyAndNonConst && (lossFunction != ELossFunction::PairLogit)) {
+    if (isNonEmptyAndNonConst && (lossFunction != ELossFunction::PairLogit) && (lossFunction != ELossFunction::PairLogitPairwise)) {
         auto targetBounds = CalcMinMax(target);
         CB_ENSURE((targetBounds.Min != targetBounds.Max) || allowConstLabel, "All train targets are equal");
     }
