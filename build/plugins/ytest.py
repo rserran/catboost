@@ -277,6 +277,15 @@ def validate_test(unit, kw):
         except ValueError as e:
             errors.append('Incorrect SPLIT_FACTOR value: {}'.format(e))
 
+    unit_path = get_norm_unit_path(unit)
+    if not is_fat and "ya:noretries" in tags and 'ya:yt' not in tags \
+            and not unit_path.startswith("devtools/") \
+            and not unit_path.startswith("infra/kernel/") \
+            and not unit_path.startswith("yt/python/yt") \
+            and not unit_path.startswith("infra/yp_dns_api/tests") \
+            and not unit_path.startswith("yp/tests"):
+        errors.append("Only LARGE tests can have 'ya:noretries' tag")
+
     if errors:
         return None, warnings, errors
 
@@ -399,7 +408,7 @@ def onadd_ytest(unit, *args):
         'FORK-MODE': fork_mode,
         'SPLIT-FACTOR': ''.join(spec_args.get('SPLIT_FACTOR', [])) or unit.get('TEST_SPLIT_FACTOR') or '',
         'SIZE': ''.join(spec_args.get('SIZE', [])) or unit.get('TEST_SIZE_NAME') or '',
-        'TAG': serialize_list(spec_args.get('TAG', []) + get_values_list(unit, 'TEST_TAGS_VALUE')),
+        'TAG': serialize_list(_get_test_tags(unit, spec_args)),
         'REQUIREMENTS': serialize_list(spec_args.get('REQUIREMENTS', []) + get_values_list(unit, 'TEST_REQUIREMENTS_VALUE')),
         'TEST-CWD': unit.get('TEST_CWD_VALUE') or '',
         'FUZZ-DICTS': serialize_list(spec_args.get('FUZZ_DICTS', []) + get_unit_list_variable(unit, 'FUZZ_DICTS_VALUE')),
@@ -456,7 +465,7 @@ def onadd_test(unit, *args):
     split_factor = ''.join(spec_args.get('SPLIT_FACTOR', [])) or ''
     test_size = ''.join(spec_args.get('SIZE', [])) or 'SMALL'
     test_dir = unit.path()
-    tags = spec_args.get('TAG', []) + get_values_list(unit, 'TEST_TAGS_VALUE')
+    tags = _get_test_tags(unit, spec_args)
     requirements = spec_args.get('REQUIREMENTS', []) + get_values_list(unit, 'TEST_REQUIREMENTS_VALUE')
     test_data = spec_args.get("DATA", []) + get_norm_paths(unit, 'TEST_DATA_VALUE')
     python_paths = get_values_list(unit, 'TEST_PYTHON_PATH_VALUE')
@@ -602,7 +611,7 @@ def onadd_pytest_script(unit, *args):
     test_size = unit.get('TEST_SIZE_NAME') or ''
 
     test_files = get_values_list(unit, 'TEST_SRCS_VALUE')
-    tags = get_values_list(unit, 'TEST_TAGS_VALUE')
+    tags = _get_test_tags(unit)
     requirements = get_values_list(unit, 'TEST_REQUIREMENTS_VALUE')
     test_data = get_norm_paths(unit, 'TEST_DATA_VALUE')
     data, data_files = get_canonical_test_resources(unit)
@@ -641,7 +650,7 @@ def add_test_to_dart(unit, test_type, binary_path=None, runner_bin=None):
 
     unit_path = unit.path()
     test_files = get_values_list(unit, 'TEST_SRCS_VALUE')
-    tags = get_values_list(unit, 'TEST_TAGS_VALUE')
+    tags = _get_test_tags(unit)
     requirements = get_values_list(unit, 'TEST_REQUIREMENTS_VALUE')
     test_data = get_norm_paths(unit, 'TEST_DATA_VALUE')
     data, data_files = get_canonical_test_resources(unit)
@@ -729,7 +738,7 @@ def onjava_test(unit, *args):
         'FORK-MODE': unit.get('TEST_FORK_MODE') or '',
         'SPLIT-FACTOR': unit.get('TEST_SPLIT_FACTOR') or '',
         'CUSTOM-DEPENDENCIES': ' '.join(get_values_list(unit, 'TEST_DEPENDS_VALUE')),
-        'TAG': serialize_list(get_values_list(unit, 'TEST_TAGS_VALUE')),
+        'TAG': serialize_list(_get_test_tags(unit)),
         'SIZE': unit.get('TEST_SIZE_NAME') or '',
         'REQUIREMENTS': serialize_list(get_values_list(unit, 'TEST_REQUIREMENTS_VALUE')),
         'TEST-RECIPES': prepare_recipes(unit.get("TEST_RECIPES_VALUE")),
@@ -782,6 +791,17 @@ def onjava_test_deps(unit, *args):
 
     data = dump_test(unit, test_record)
     unit.set_property(['DART_DATA', data])
+
+
+def _get_test_tags(unit, spec_args=None):
+    if spec_args is None:
+        spec_args = {}
+    tags = spec_args.get('TAG', []) + get_values_list(unit, 'TEST_TAGS_VALUE')
+    # DEVTOOLS-7571
+    if unit.get('SKIP_TEST_VALUE') and 'ya:fat' in tags and "ya:not_autocheck" not in tags:
+        tags.append("ya:not_autocheck")
+
+    return tags
 
 
 def _dump_test(

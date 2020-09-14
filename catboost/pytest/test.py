@@ -5123,7 +5123,7 @@ def test_zero_learning_rate():
         execute_catboost_fit('CPU', cmd)
 
 
-def do_test_eval_metrics(metric, metric_period, train, test, cd, loss_function, additional_train_params=()):
+def do_test_eval_metrics(metric, metric_period, train, test, cd, loss_function, additional_train_params=(), additional_eval_params=()):
     output_model_path = yatest.common.test_output_path('model.bin')
     test_error_path = yatest.common.test_output_path('test_error.tsv')
     eval_path = yatest.common.test_output_path('output.tsv')
@@ -5154,7 +5154,7 @@ def do_test_eval_metrics(metric, metric_period, train, test, cd, loss_function, 
         '--block-size', '100',
         '--eval-period', metric_period,
         '--save-stats'
-    )
+    ) + additional_eval_params
     yatest.common.execute(cmd)
 
     first_metrics = np.round(np.loadtxt(test_error_path, skiprows=1)[:, 1], 8)
@@ -8495,6 +8495,24 @@ def test_total_f1_params(average):
     )
 
 
+def test_eval_metrics_with_pairs():
+    do_test_eval_metrics(
+        metric='PairAccuracy',
+        metric_period='1',
+        train=data_file('querywise', 'train'),
+        test=data_file('querywise', 'test'),
+        cd=data_file('querywise', 'train.cd'),
+        loss_function='PairLogit',
+        additional_train_params=(
+            '--learn-pairs', data_file('querywise', 'train.pairs'),
+            '--test-pairs', data_file('querywise', 'test.pairs')
+        ),
+        additional_eval_params=(
+            '--input-pairs', data_file('querywise', 'test.pairs')
+        )
+    )
+
+
 def test_tweedie():
     learn_error_path = yatest.common.test_output_path('learn_error.tsv')
 
@@ -8650,14 +8668,53 @@ def test_shrink_model_with_text_features(grow_policy):
     return [local_canonical_file(learn_error_path), local_canonical_file(test_error_path)]
 
 
+@pytest.mark.parametrize('loss_function', ['RMSE', 'RMSEWithUncertainty', 'Logloss'])
+def test_virtual_ensembles(loss_function):
+    output_model_path = yatest.common.test_output_path('model.bin')
+    train_path = data_file('querywise', 'train') if loss_function in REGRESSION_LOSSES else data_file('adult', 'train_small')
+    test_path = data_file('querywise', 'test') if loss_function in REGRESSION_LOSSES else data_file('adult', 'test_small')
+    cd_path = data_file('querywise', 'train.cd') if loss_function in REGRESSION_LOSSES else data_file('adult', 'train.cd')
+    test_eval_path = yatest.common.test_output_path('test.eval')
+
+    cmd = [
+        '--use-best-model', 'false',
+        '-f', train_path,
+        '-t', test_path,
+        '--loss-function', loss_function,
+        '--column-description', cd_path,
+        '--posterior-sampling', 'true',
+        '--eval-file', test_eval_path,
+        '-i', '20',
+        '-T', '4',
+        '-m', output_model_path,
+    ]
+    if loss_function == 'RMSEWithUncertainty':
+        cmd += ['--prediction-type', 'RMSEWithUncertainty']
+    execute_catboost_fit('CPU', cmd)
+
+    formula_predict_path = yatest.common.test_output_path('predict_test.eval')
+    calc_cmd = (
+        CATBOOST_PATH,
+        'calc',
+        '--input-path', test_path,
+        '--column-description', cd_path,
+        '-m', output_model_path,
+        '--output-path', formula_predict_path,
+        '--virtual-ensembles-count', '1',
+        '--prediction-type', 'VirtEnsembles',
+    )
+    yatest.common.execute(calc_cmd)
+    assert compare_evals(test_eval_path, formula_predict_path, skip_header=True)
+
+
 @pytest.mark.parametrize('virtual_ensembles_count', ['1', '10'])
 @pytest.mark.parametrize('prediction_type', ['TotalUncertainty', 'VirtEnsembles'])
-@pytest.mark.parametrize('loss_function', ['RMSE', 'RMSEWithUncertainty'])
+@pytest.mark.parametrize('loss_function', ['RMSE', 'RMSEWithUncertainty', 'Logloss'])
 def test_uncertainty_prediction(virtual_ensembles_count, prediction_type, loss_function):
     output_model_path = yatest.common.test_output_path('model.bin')
-    train_path = data_file('querywise', 'train')
-    test_path = data_file('querywise', 'test')
-    cd_path = data_file('querywise', 'train.cd')
+    train_path = data_file('querywise', 'train') if loss_function in REGRESSION_LOSSES else data_file('adult', 'train_small')
+    test_path = data_file('querywise', 'test') if loss_function in REGRESSION_LOSSES else data_file('adult', 'test_small')
+    cd_path = data_file('querywise', 'train.cd') if loss_function in REGRESSION_LOSSES else data_file('adult', 'train.cd')
     cmd = (
         '--use-best-model', 'false',
         '-f', train_path,
@@ -8680,9 +8737,25 @@ def test_uncertainty_prediction(virtual_ensembles_count, prediction_type, loss_f
         '-m', output_model_path,
         '--output-path', formula_predict_path,
         '--virtual-ensembles-count', virtual_ensembles_count,
-        '--prediction-type', prediction_type
+        '--prediction-type', prediction_type,
     )
     yatest.common.execute(calc_cmd)
+
+    model = catboost.CatBoost()
+    model.load_model(output_model_path)
+    pool = catboost.Pool(test_path, column_description=cd_path)
+    py_preds = model.virtual_ensembles_predict(
+        pool,
+        prediction_type=prediction_type,
+        virtual_ensembles_count=int(virtual_ensembles_count))
+
+    cli_preds = np.genfromtxt(
+        formula_predict_path,
+        delimiter='\t',
+        dtype=float,
+        skip_header=True)
+    assert(np.allclose(py_preds.reshape(-1,), cli_preds[:, 1:].reshape(-1,), rtol=1e-10))
+
     return local_canonical_file(formula_predict_path)
 
 
@@ -8718,7 +8791,8 @@ def test_uncertainty_prediction_requirements(loss_function):
         yatest.common.execute(calc_cmd)
     except:
         return
-    assert False
+    # assert replaced to warning
+    # assert False
 
 
 DICTIONARIES_OPTIONS = [

@@ -45,7 +45,7 @@ def generate_dart(unit, as_lib=False):
     else:
         docs_dir = module_dir
 
-    build_tool = unit.get('DOCSBUILDER') or 'mkdocs'
+    build_tool = unit.get('DOCSBUILDER')
 
     if build_tool not in ['mkdocs', 'yfm']:
         unit.message(['error', 'Unsupported build tool {}'.format(build_tool)])
@@ -56,7 +56,7 @@ def generate_dart(unit, as_lib=False):
 
     docs_config = os.path.normpath(docs_config)
     if os.path.sep not in docs_config:
-        docs_config = os.path.join(module_dir if build_tool == 'mkdocs' else docs_dir, docs_config)
+        docs_config = os.path.join(module_dir, docs_config)
 
     if not docs_config.startswith(docs_dir + os.path.sep) and not docs_config.startswith(module_dir + os.path.sep) :
         unit.message(['error', 'DOCS_CONFIG value "{}" is outside the project directory and DOCS_DIR'.format(docs_config)])

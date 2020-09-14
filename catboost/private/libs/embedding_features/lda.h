@@ -14,6 +14,10 @@ namespace NCB {
         {}
         void AddVector(const TEmbeddingsArray& embed);
         void Update();
+
+        float TotalSize() {
+            return BaseSize + AdditionalSize;
+        }
     public:
         int Dimension;
         int BaseSize = 0;
@@ -27,21 +31,20 @@ namespace NCB {
     class TLinearDACalcer final : public TEmbeddingFeatureCalcer {
     public:
         explicit TLinearDACalcer(
-            int numClasses,
             int totalDimension,
+            int numClasses,
             int projectionDimension,
             float regularization = 0.01,
             const TGuid& calcerId = CreateGuid()
         )
             : TEmbeddingFeatureCalcer(projectionDimension, calcerId)
-            , NumClasses(numClasses)
             , TotalDimension(totalDimension)
+            , NumClasses(numClasses)
             , ProjectionDimension(projectionDimension)
             , RegParam(regularization)
-            , ClassesDist(totalDimension, numClasses)
-            , TotalDist(totalDimension)
+            , ClassesDist(numClasses, totalDimension)
             , ProjectionMatrix(totalDimension * projectionDimension)
-            , EigenValues(projectionDimension)
+            , EigenValues(TotalDimension)
             , ProjectionCalculationCache(totalDimension * (totalDimension + 2))
         {}
 
@@ -56,12 +59,15 @@ namespace NCB {
         }
 
     private:
-        int NumClasses;
+        void BetweenScatterCalculation(TVector<float>* result);
+
+    private:
         int TotalDimension;
+        int NumClasses;
         int ProjectionDimension;
         float RegParam;
+        int Size = 0;
         TVector<IncrementalCloud> ClassesDist;
-        IncrementalCloud TotalDist;
         TVector<float> ProjectionMatrix;
         TVector<float> EigenValues;
         TVector<float> ProjectionCalculationCache;
@@ -74,5 +80,7 @@ namespace NCB {
     public:
         void Update(ui32 classId, const TEmbeddingsArray& embed, TEmbeddingFeatureCalcer* featureCalcer) override;
         void Flush(TEmbeddingFeatureCalcer* featureCalcer);
+    private:
+        int LastFlush = 0;
     };
 };

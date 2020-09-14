@@ -10,6 +10,7 @@
 #include <catboost/libs/logging/logging.h>
 #include <catboost/libs/model/cpu/evaluator.h>
 #include <catboost/libs/model/scale_and_bias.h>
+#include <catboost/private/libs/options/enum_helpers.h>
 
 #include <util/generic/array_ref.h>
 #include <util/generic/cast.h>
@@ -495,11 +496,10 @@ void ApplyVirtualEnsembles(
     const NCB::TDataProvider& dataset,
     size_t end,
     size_t virtualEnsemblesCount,
-    TVector<TVector<TVector<double>>>* rawValuesPtr,
+    TVector<TVector<double>>* rawValuesPtr,
     NPar::TLocalExecutor* executor
 ) {
     auto& rawValues = *rawValuesPtr;
-    rawValues.resize(1);
     size_t begin = 0;
     TModelCalcerOnPool modelCalcerOnPool(model, dataset.ObjectsData, executor);
     TVector<double> flatApprox;
@@ -510,13 +510,13 @@ void ApplyVirtualEnsembles(
               "Not enough trees in model for " << virtualEnsemblesCount << " virtual Ensembles");
     begin = end - evalPeriod * virtualEnsemblesCount;
     modelCalcerOnPool.ApplyModelMulti(
-        EPredictionType::VirtEnsembles,
+        EPredictionType::InternalRawFormulaVal,
         0,
         begin,
         &flatApprox,
         &baseApprox);
     for (size_t idx = 0; idx < virtualEnsemblesCount; ++idx) {
-        rawValues[0].insert(rawValues[0].end(), baseApprox.begin(), baseApprox.end());
+        rawValues.insert(rawValues.end(), baseApprox.begin(), baseApprox.end());
     }
 
     const float actualShrinkCoef = model.GetActualShrinkCoef();
@@ -526,7 +526,7 @@ void ApplyVirtualEnsembles(
     const float coef = pow(1. - actualShrinkCoef, evalPeriod);
     for (size_t vEnsembleIdx = 0; begin < end; begin += evalPeriod) {
         modelCalcerOnPool.ApplyModelMulti(
-            EPredictionType::VirtEnsembles,
+            EPredictionType::InternalRawFormulaVal,
             begin,
             Min(begin + evalPeriod, end),
             &flatApprox,
@@ -534,10 +534,39 @@ void ApplyVirtualEnsembles(
         size_t shift = vEnsembleIdx * approx.size();
         for (size_t i = 0; i < approx.size(); ++i) {
             for (size_t j = 0; j < approx[0].size(); ++j) {
-                rawValues.back()[shift + i][j] += approx[i][j] * multiplicator;
+                rawValues[shift + i][j] += approx[i][j] * multiplicator;
             }
         }
         vEnsembleIdx++;
         multiplicator *= coef;
     }
+}
+
+TVector<TVector<double>> ApplyUncertaintyPredictions(
+    const TFullModel& model,
+    const NCB::TDataProvider& data,
+    bool verbose,
+    const EPredictionType predictionType,
+    int end,
+    int virtualEnsemblesCount,
+    int threadCount)
+{
+    TSetLoggingVerboseOrSilent inThisScope(verbose);
+
+    CB_ENSURE_INTERNAL(IsUncertaintyPredictionType(predictionType), "Unsupported prediction type " << predictionType);
+
+    int lastTreeIdx = end;
+    FixupTreeEnd(model.GetTreeCount(), 0, &lastTreeIdx);
+    TVector<TVector<double>> approxes;
+
+    NPar::TLocalExecutor executor;
+    executor.RunAdditionalThreads(threadCount - 1);
+    ApplyVirtualEnsembles(
+        model,
+        data,
+        lastTreeIdx,
+        virtualEnsemblesCount,
+        &approxes,
+        &executor);
+    return PrepareEval(predictionType, model.GetLossFunctionName(), approxes,  &executor);
 }

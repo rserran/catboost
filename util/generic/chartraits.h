@@ -4,11 +4,14 @@
 #include "mem_copy.h"
 #include "ptr.h"
 
+#include <contrib/libs/libc_compat/string.h>
+
+#include <util/charset/unidata.h>
 #include <util/charset/wide_specific.h>
-#include <util/system/compat.h>
 #include <util/system/yassert.h>
 #include <util/system/platform.h>
 
+#include <cctype>
 #include <cstring>
 
 // Building blocks of TCharTraits:
@@ -339,9 +342,6 @@ struct THashCharTraits {
 
 // *** Case
 
-// defined in unidata.h
-wchar32 ToLower(wchar32 ch);
-
 template <typename TCharType>
 struct TCaseCharTraits {
     static TCharType ToLower(TCharType c) {
@@ -414,6 +414,3 @@ template <typename TCharType>
 class TCharTraits: public TCharTraitsImpl<TCharType> {
 };
 
-template <class T>
-class TCharTraits<const T>: public TCharTraits<T> {
-};

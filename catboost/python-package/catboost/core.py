@@ -1309,6 +1309,9 @@ class _CatBoostBase(object):
     def _base_predict(self, pool, prediction_type, ntree_start, ntree_end, thread_count, verbose):
         return self._object._base_predict(pool, prediction_type, ntree_start, ntree_end, thread_count, verbose)
 
+    def _base_virtual_ensembles_predict(self, pool, prediction_type, ntree_end, virtual_ensembles_count, thread_count, verbose):
+        return self._object._base_virtual_ensembles_predict(pool, prediction_type, ntree_end, virtual_ensembles_count, thread_count, verbose)
+
     def _staged_predict_iterator(self, pool, prediction_type, ntree_start, ntree_end, eval_period, thread_count, verbose):
         return self._object._staged_predict_iterator(pool, prediction_type, ntree_start, ntree_end, eval_period, thread_count, verbose)
 
@@ -1956,11 +1959,11 @@ class CatBoost(_CatBoostBase):
             )
         return data, is_single_object
 
-    def _validate_prediction_type(self, prediction_type):
+    def _validate_prediction_type(self, prediction_type, valid_prediction_types=('Class', 'RawFormulaVal', 'Probability', 'LogProbability', 'Exponent', 'RMSEWithUncertainty')):
         if not isinstance(prediction_type, STRING_TYPES):
             raise CatBoostError("Invalid prediction_type type={}: must be str().".format(type(prediction_type)))
-        if prediction_type not in ('Class', 'RawFormulaVal', 'Probability', 'LogProbability', 'Exponent', 'RMSEWithUncertainty'):
-            raise CatBoostError("Invalid value of prediction_type={}: must be Class, RawFormulaVal, Probability, LogProbability, Exponent.".format(prediction_type))
+        if prediction_type not in valid_prediction_types:
+            raise CatBoostError("Invalid value of prediction_type={}: must be {}.".format(prediction_type, ', '.join(valid_prediction_types)))
 
     def _predict(self, data, prediction_type, ntree_start, ntree_end, thread_count, verbose, parent_method_name):
         verbose = verbose or self.get_param('verbose')
@@ -2023,6 +2026,73 @@ class CatBoost(_CatBoostBase):
         """
         return self._predict(data, prediction_type, ntree_start, ntree_end, thread_count, verbose, 'predict')
 
+    def _virtual_ensembles_predict(self, data, prediction_type, ntree_end, virtual_ensembles_count, thread_count, verbose, parent_method_name):
+        verbose = verbose or self.get_param('verbose')
+        if verbose is None:
+            verbose = False
+        data, data_is_single_object = self._process_predict_input_data(data, parent_method_name, thread_count)
+        self._validate_prediction_type(prediction_type, ['VirtEnsembles', 'TotalUncertainty'])
+
+        if ntree_end == 0:
+            ntree_end = self.tree_count_
+
+        predictions = self._base_virtual_ensembles_predict(data, prediction_type, ntree_end, virtual_ensembles_count, thread_count, verbose)
+        return predictions[0] if data_is_single_object else predictions
+
+    def virtual_ensembles_predict(self, data, prediction_type='VirtEnsembles', ntree_end=0, virtual_ensembles_count=10, thread_count=-1, verbose=None):
+        """
+        Predict with data.
+
+        Parameters
+        ----------
+        data : catboost.Pool or list of features or list of lists or numpy.ndarray or pandas.DataFrame or pandas.Series
+                or catboost.FeaturesData
+            Data to apply model on.
+            If data is a simple list (not list of lists) or a one-dimensional numpy.ndarray it is interpreted
+            as a list of features for a single object.
+
+        prediction_type : string, optional (default='RawFormulaVal')
+            Can be:
+            - 'VirtEnsembles': return V (virtual_ensembles_count) predictions.
+                k-th virtEnsemle consists of trees [0, T/2] + [T/2 + T/(2V) * k, T/2 + T/(2V) * (k + 1)]  * constant.
+            - 'TotalUncertainty': return mean predict, var (and knowledge uncertainty
+                if model was trained with RMSEWithUncertainty loss function) for virtEnsembles
+
+        ntree_end: int, optional (default=0)
+            Model is applied on the interval [ntree_start, ntree_end) (zero-based indexing).
+            If value equals to 0 this parameter is ignored and ntree_end equal to tree_count_.
+
+        virtual_ensembles_count: int, optional (default=10)
+            virtual ensembles count for 'TotalUncertainty' and 'VirtEnsembles' prediction types.
+
+        thread_count : int (default=-1)
+            The number of threads to use when applying the model.
+            Allows you to optimize the speed of execution. This parameter doesn't affect results.
+            If -1, then the number of threads is set to the number of CPU cores.
+
+        verbose : bool, optional (default=False)
+            If True, writes the evaluation metric measured set to stderr.
+
+        Returns
+        -------
+        prediction :
+            (with V as virtual_ensembles_count and T as trees count,
+            k-th virtEnsemle consists of trees [0, T/2] + [T/2 + T/(2V) * k, T/2 + T/(2V) * (k + 1)]  * constant)
+            If data is for a single object, return 1-dimensional array of predictions with size depends on prediction type,
+            otherwise return 2-dimensional numpy.ndarray with shape (number_of_objects x size depends on prediction type);
+            Returned predictions depends on prediction type:
+            If loss-function was RMSEWithUncertainty:
+                - 'VirtEnsembles': [mean0, var0, mean1, var1, ..., vark-1].
+                - 'TotalUncertainty': [mean_predict, KnowledgeUnc, DataUnc].
+            otherwise for regression:
+                - 'VirtEnsembles':  [mean0, mean1, ...].
+                - 'TotalUncertainty': [mean_predicts, KnowledgeUnc].
+            otherwise for binary classification:
+                - 'VirtEnsembles':  [ApproxRawFormulaVal0, ApproxRawFormulaVal1, ..., ApproxRawFormulaValk-1].
+                - 'TotalUncertainty':  [DataUnc, TotalUnc].
+        """
+        return self._virtual_ensembles_predict(data, prediction_type, ntree_end, virtual_ensembles_count, thread_count, verbose, 'virtual_ensembles_predict')
+
     def _staged_predict(self, data, prediction_type, ntree_start, ntree_end, eval_period, thread_count, verbose, parent_method_name):
         verbose = verbose or self.get_param('verbose')
         if verbose is None:
@@ -2053,6 +2123,8 @@ class CatBoost(_CatBoostBase):
             - 'RawFormulaVal' : return raw formula value.
             - 'Class' : return class label.
             - 'Probability' : return probability for every class.
+            - 'RMSEWithUncertainty': return standard deviation for RMSEWithUncertainty loss function
+              (logarithm of the standard deviation is returned by default).
 
         ntree_start: int, optional (default=0)
             Model is applied on the interval [ntree_start, ntree_end) with the step eval_period (zero-based indexing).
@@ -3268,6 +3340,9 @@ class CatBoost(_CatBoostBase):
                           calc_cv_statistics=True, search_by_train_test_split=True,
                           refit=True, shuffle=True, stratified=None, train_size=0.8, verbose=1, plot=False):
 
+        if refit and self.is_fitted():
+            raise CatBoostError("Model was fitted before hyperparameters tuning. You can't change hyperparameters of fitted model.")
+
         currently_not_supported_params = {
             'ignored_features',
             'input_borders',
@@ -3332,8 +3407,7 @@ class CatBoost(_CatBoostBase):
             )
 
         if refit:
-            if self.is_fitted():
-                raise CatBoostError("Model was fitted before hyperparameters tuning. You can't change hyperparameters of fitted model.")
+            assert not self.is_fitted()
             self.set_params(**cv_result['params'])
             self.fit(X, y, silent=True)
         return cv_result
@@ -3923,6 +3997,13 @@ class CatBoostClassifier(CatBoost):
     diffusion_temperature : float, [default=0]
         Langevin boosting diffusion temperature. CPU only.
 
+    posterior_sampling : bool, [default=False]
+        Set group of parameters for further use Uncertainty prediction:
+            - Langevin = True
+            - Model Shrink Rate = 1/(2N), where N is dataset size
+            - Model Shrink Mode = Constant
+            - Diffusion-temperature = N, where N is dataset size. CPU only.
+
     boost_from_average : bool, [default=True for RMSE, False for other losses]
         Enables to initialize approx values by best constant value for specified loss function.
         Available for RMSE, Logloss, CrossEntropy, Quantile and MAE.
@@ -4090,6 +4171,7 @@ class CatBoostClassifier(CatBoost):
         model_shrink_mode=None,
         langevin=None,
         diffusion_temperature=None,
+        posterior_sampling=None,
         boost_from_average=None,
         text_features=None,
         tokenizers=None,
@@ -4649,6 +4731,7 @@ class CatBoostRegressor(CatBoost):
         model_shrink_mode=None,
         langevin=None,
         diffusion_temperature=None,
+        posterior_sampling=None,
         boost_from_average=None
     ):
         params = {}

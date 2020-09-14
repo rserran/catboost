@@ -65,6 +65,7 @@ ALLOW intranet/pypi/src -> contrib/python/django/django-1.11
 ALLOW intranet/search/core -> contrib/python/django/django-1.11
 ALLOW intranet/search/settings -> contrib/python/django/django-1.11
 ALLOW intranet/sync_tools/tests -> contrib/python/django/django-1.11
+ALLOW intranet/wiki -> contrib/python/django/django-1.11
 ALLOW library/python/django_alive -> contrib/python/django/django-1.11
 ALLOW library/python/django_celery_monitoring -> contrib/python/django/django-1.11
 ALLOW library/python/django_mds -> contrib/python/django/django-1.11
@@ -184,9 +185,13 @@ ALLOW sport/backend/sport -> contrib/python/django/django-1.11
 ALLOW sport/backend/tests/projects/batches -> contrib/python/django/django-1.11
 ALLOW sport/backend/tests -> contrib/python/django/django-1.11
 ALLOW sport/backend -> contrib/python/django/django-1.11
+ALLOW travel/avia/admin -> contrib/python/django/django-1.11
+ALLOW travel/avia/avia_api -> contrib/python/django/django-1.11
+ALLOW travel/avia/avia_stats -> contrib/python/django/django-1.11
 ALLOW travel/avia/backend -> contrib/python/django/django-1.11
 ALLOW travel/avia/library/avia_data -> contrib/python/django/django-1.11
 ALLOW travel/avia/library/common -> contrib/python/django/django-1.11
+ALLOW travel/avia/library/python/django_namedtuples -> contrib/python/django/django-1.11
 ALLOW travel/rasp/admin -> contrib/python/django/django-1.11
 ALLOW travel/rasp/library/python/common -> contrib/python/django/django-1.11
 ALLOW travel/rasp/library/python/entrypoint -> contrib/python/django/django-1.11
@@ -397,3 +402,7 @@ DENY .* -> contrib/python/pymqi
 # https://st.yandex-team.ru/CONTRIB-1839
 ALLOW datalens/backend/dls -> contrib/python/Quart
 DENY .* -> contrib/python/Quart
+
+# https://st.yandex-team.ru/CONTRIB-1954
+ALLOW contrib/python/glom -> contrib/python/face
+DENY .* -> contrib/python/face

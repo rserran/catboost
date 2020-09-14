@@ -62,6 +62,9 @@
         "ninja": {
             "description": "Run ninja"
         },
+        "ytexec": {
+            "description": "Run ytexec"
+        },
         "gdb": {
             "description": "Run gdb"
         },
@@ -272,6 +275,9 @@
         "mockgen": {
             "description": "Run GoMock (go mocking framework)"
         },
+        "swagger": {
+            "description": "Run go-swagger"
+        },
         "dlv": {
             "description": "Debugger for the Go programming language"
         },
@@ -364,6 +370,9 @@
         },
         "btt": {
             "description": "analyse block i/o traces produces by blktrace"
+        },
+        "lz4": {
+            "description": "Compress or decompress .lz4 files"
         },
         "optrace": {
             "description": "optrace records output files written by each process",
@@ -920,6 +929,34 @@
                 "mockgen": {
                     "bottle": "mockgen",
                     "executable": "mockgen"
+                }
+            },
+            "platforms": [
+                {
+                    "host": {
+                        "os": "LINUX"
+                    },
+                    "default": true
+                },
+                {
+                    "host": {
+                        "os": "DARWIN"
+                    },
+                    "default": true
+                },
+                {
+                    "host": {
+                        "os": "WIN"
+                    },
+                    "default": true
+                }
+            ]
+        },
+        "swagger": {
+            "tools": {
+                "swagger": {
+                    "bottle": "swagger",
+                    "executable": "swagger"
                 }
             },
             "platforms": [
@@ -1928,187 +1965,9 @@
                 "c_compiler": "$(CLANG)/bin/clang",
                 "cxx_compiler": "$(CLANG)/bin/clang++",
                 "llvm-symbolizer": "$(CLANG)/bin/llvm-symbolizer",
+                "objcopy": "$(CLANG)/bin/llvm-objcopy",
+                "strip": "$(CLANG)/bin/llvm-strip",
                 "gcc_version": "7.0"
-            }
-        },
-        "clang7_cortex_a53": {
-            "tools": {
-                "c++": {
-                    "bottle": "clang7",
-                    "executable": "c++"
-                },
-                "c++filt": {
-                    "bottle": "clang7",
-                    "executable": "c++filt"
-                },
-                "cc": {
-                    "bottle": "clang7",
-                    "executable": "cc"
-                },
-                "clang-format": {
-                    "bottle": "clang7",
-                    "executable": "clang-format"
-                },
-                "clang-tidy": {
-                    "bottle": "clang7",
-                    "executable": "clang-tidy"
-                },
-                "gcov": {
-                    "bottle": "clang7",
-                    "executable": "gcov"
-                },
-                "llvm-cov": {
-                    "bottle": "clang7",
-                    "executable": "llvm-cov"
-                },
-                "llvm-profdata": {
-                    "bottle": "clang7",
-                    "executable": "llvm-profdata"
-                },
-                "llvm-symbolizer": {
-                    "bottle": "clang7",
-                    "executable": "llvm-symbolizer"
-                },
-                "nm": {
-                    "bottle": "clang7",
-                    "executable": "llvm-nm"
-                },
-                "strip": {
-                    "bottle": "clang7",
-                    "executable": "llvm-strip"
-                },
-                "objcopy": {
-                    "bottle": "clang7",
-                    "executable": "llvm-objcopy"
-                }
-            },
-            "platforms": [
-                {
-                    "host": {
-                        "os": "LINUX"
-                    },
-                    "target": {
-                        "os": "LINUX",
-                        "arch": "armv7a"
-                    },
-                    "default": false
-                },
-                {
-                    "host": {
-                        "os": "LINUX"
-                    },
-                    "target": {
-                        "os": "LINUX",
-                        "arch": "armv8a"
-                    },
-                    "default": false
-                }
-            ],
-            "params": {
-                "type": "clang",
-                "match_root": "CLANG",
-                "werror_mode": "all",
-                "c_compiler": "$(CLANG)/bin/clang",
-                "cxx_compiler": "$(CLANG)/bin/clang++",
-                "llvm-symbolizer": "$(CLANG)/bin/llvm-symbolizer",
-                "gcc_version": "7.0",
-                "triplet_opt": {
-                    "armv8a": "aarch64-arm-linux-gnu",
-                    "armv7a": "arm-linux-gnueabihf"
-                },
-                "arch_opt": [
-                    "-mcpu=cortex-a53"
-                ]
-            }
-        },
-        "clang7_cortex_a35": {
-            "tools": {
-                "c++": {
-                    "bottle": "clang7",
-                    "executable": "c++"
-                },
-                "c++filt": {
-                    "bottle": "clang7",
-                    "executable": "c++filt"
-                },
-                "cc": {
-                    "bottle": "clang7",
-                    "executable": "cc"
-                },
-                "clang-format": {
-                    "bottle": "clang7",
-                    "executable": "clang-format"
-                },
-                "clang-tidy": {
-                    "bottle": "clang7",
-                    "executable": "clang-tidy"
-                },
-                "gcov": {
-                    "bottle": "clang7",
-                    "executable": "gcov"
-                },
-                "llvm-cov": {
-                    "bottle": "clang7",
-                    "executable": "llvm-cov"
-                },
-                "llvm-profdata": {
-                    "bottle": "clang7",
-                    "executable": "llvm-profdata"
-                },
-                "llvm-symbolizer": {
-                    "bottle": "clang7",
-                    "executable": "llvm-symbolizer"
-                },
-                "nm": {
-                    "bottle": "clang7",
-                    "executable": "llvm-nm"
-                },
-                "strip": {
-                    "bottle": "clang7",
-                    "executable": "llvm-strip"
-                },
-                "objcopy": {
-                    "bottle": "clang7",
-                    "executable": "llvm-objcopy"
-                }
-            },
-            "platforms": [
-                {
-                    "host": {
-                        "os": "LINUX"
-                    },
-                    "target": {
-                        "os": "LINUX",
-                        "arch": "armv7a"
-                    },
-                    "default": false
-                },
-                {
-                    "host": {
-                        "os": "LINUX"
-                    },
-                    "target": {
-                        "os": "LINUX",
-                        "arch": "armv8a"
-                    },
-                    "default": false
-                }
-            ],
-            "params": {
-                "type": "clang",
-                "match_root": "CLANG",
-                "werror_mode": "all",
-                "c_compiler": "$(CLANG)/bin/clang",
-                "cxx_compiler": "$(CLANG)/bin/clang++",
-                "llvm-symbolizer": "$(CLANG)/bin/llvm-symbolizer",
-                "gcc_version": "7.0",
-                "triplet_opt": {
-                    "armv8a": "aarch64-arm-linux-gnu",
-                    "armv7a": "arm-linux-gnueabihf"
-                },
-                "arch_opt": [
-                    "-mcpu=cortex-a35"
-                ]
             }
         },
         "clang7-windows": {
@@ -2398,6 +2257,8 @@
                 "c_compiler": "$(CLANG)/bin/clang",
                 "cxx_compiler": "$(CLANG)/bin/clang++",
                 "llvm-symbolizer": "$(CLANG)/bin/llvm-symbolizer",
+                "objcopy": "$(CLANG)/bin/llvm-objcopy",
+                "strip": "$(CLANG)/bin/llvm-strip",
                 "gcc_version": "8.0"
             }
         },
@@ -2691,6 +2552,8 @@
                 "c_compiler": "$(CLANG)/bin/clang",
                 "cxx_compiler": "$(CLANG)/bin/clang++",
                 "llvm-symbolizer": "$(CLANG)/bin/llvm-symbolizer",
+                "objcopy": "$(CLANG)/bin/llvm-objcopy",
+                "strip": "$(CLANG)/bin/llvm-strip",
                 "gcc_version": "10.0"
             }
         },
@@ -2943,6 +2806,8 @@
                 "ar": "$(NDK)/llvm-toolchain/bin/llvm-ar",
                 "c_compiler": "$(NDK)/llvm-toolchain/bin/clang",
                 "cxx_compiler": "$(NDK)/llvm-toolchain/bin/clang++",
+                "objcopy": "$(NDK)/llvm-toolchain/bin/llvm-objcopy",
+                "strip": "$(NDK)/:lvm-toolchain/bin/llvm-strip",
                 "werror_mode": "compiler_specific",
                 "gcc_version": "9.0",
                 "target_opt": [
@@ -2967,6 +2832,22 @@
                 {
                     "host": {
                         "os": "DARWIN"
+                    },
+                    "default": true
+                }
+            ]
+        },
+        "ytexec": {
+            "tools": {
+                "ytexec": {
+                    "bottle": "ytexec",
+                    "executable": "ytexec"
+                }
+            },
+            "platforms": [
+                {
+                    "host": {
+                        "os": "LINUX"
                     },
                     "default": true
                 }
@@ -5340,6 +5221,22 @@
                 }
             ]
         },
+        "lz4": {
+            "tools": {
+                "lz4": {
+                    "bottle": "lz4",
+                    "executable": "lz4"
+                }
+            },
+            "platforms": [
+                {
+                    "host": {
+                        "os": "LINUX"
+                    },
+                    "default": true
+                }
+            ]
+        },
         "blktrace": {
             "tools": {
                 "blkparse": {
@@ -5638,9 +5535,7 @@
         },
         "ymake": {
             "formula": {
-                "sandbox_id": [
-                    741467155
-                ],
+                "sandbox_id": [771288286],
                 "match": "ymake"
             },
             "executable": {
@@ -5663,7 +5558,7 @@
         "arc": {
             "formula": {
                 "sandbox_id": [
-                    751869207
+                    767229727
                 ],
                 "match": "arc"
             },
@@ -5713,6 +5608,21 @@
                 ]
             }
         },
+        "swagger": {
+            "formula": {
+                "sandbox_id": [
+                    768322495,
+                    768322503,
+                    768322516
+                ],
+                "match": "swagger"
+            },
+            "executable": {
+                "swagger": [
+                    "swagger"
+                ]
+            }
+        },
         "delve": {
             "formula": {
                 "sandbox_id": [
@@ -5758,7 +5668,7 @@
         "releaser": {
             "formula": {
                 "sandbox_id": [
-                    702777610
+                    766554665
                 ],
                 "match": "releaser"
             },
@@ -6088,7 +5998,7 @@
         "clang10": {
             "formula": {
                 "sandbox_id": [
-                    729633486
+                    762964796
                 ],
                 "match": "CLANG"
             },
@@ -6565,7 +6475,7 @@
         "gdb": {
             "formula": {
                 "sandbox_id": [
-                    510387094,
+                    756948432,
                     491831556,
                     717207102
                 ],
@@ -6581,6 +6491,18 @@
                     "gdb",
                     "bin",
                     "gdbserver"
+                ]
+            }
+        },
+        "ytexec": {
+            "formula": {
+                "sandbox_id": 767064126,
+                "match": "ytexec"
+            },
+            "executable": {
+                "ytexec": [
+                    "ytexec",
+                    "ytexec"
                 ]
             }
         },
@@ -6633,7 +6555,7 @@
         "yp-util": {
             "formula": {
                 "sandbox_id": [
-                    742726144
+                    768931503
                 ],
                 "match": "yp_util"
             },
@@ -6646,7 +6568,7 @@
         "yp": {
             "formula": {
                 "sandbox_id": [
-                    752743095
+                    768917372
                 ],
                 "match": "yp"
             },
@@ -6659,7 +6581,7 @@
         "yd-migrate": {
             "formula": {
                 "sandbox_id": [
-                    730864285
+                    769874813
                 ],
                 "match": "yd_migrate"
             },
@@ -6672,7 +6594,7 @@
         "dctl": {
             "formula": {
                 "sandbox_id": [
-                    752029088
+                    752028471
                 ],
                 "match": "dctl"
             },
@@ -7042,7 +6964,7 @@
         },
         "horadric": {
             "formula": {
-                "sandbox_id": 755894524,
+                "sandbox_id": 771536743,
                 "match": "horadric"
             },
             "executable": {
@@ -7053,7 +6975,7 @@
         },
         "logbroker": {
             "formula": {
-                "sandbox_id": 755894865,
+                "sandbox_id": 770934226,
                 "match": "logbroker"
             },
             "executable": {
@@ -7064,7 +6986,7 @@
         },
         "zcli": {
             "formula": {
-                "sandbox_id": 756054680,
+                "sandbox_id": 771160398,
                 "match": "zcli"
             },
             "executable": {
@@ -7196,7 +7118,7 @@
         },
         "news": {
             "formula": {
-                "sandbox_id": 755527058,
+                "sandbox_id": 769052425,
                 "match": "news_launcher"
             },
             "executable": {
@@ -7435,6 +7357,22 @@
                 ]
             }
         },
+        "lz4": {
+            "formula": {
+                "sandbox_id": [
+                    756420904
+                ],
+                "match": "infra/kernel/tools/lz4"
+            },
+            "executable": {
+                "lz4": [
+                    "lz4",
+                    "usr",
+                    "bin",
+                    "lz4"
+                ]
+            }
+        },
         "blktrace": {
             "formula": {
                 "sandbox_id": [
@@ -7478,7 +7416,7 @@
         "vmexec": {
             "formula": {
                 "sandbox_id": [
-                    667857814
+                    762363808
                 ],
                 "match": "infra/qemu/vmexec/vmexec"
             },
@@ -7490,7 +7428,7 @@
         },
         "yfm-docs": {
             "formula": {
-                "sandbox_id": 750434041,
+                "sandbox_id": 760784651,
                 "match": "yfm-docs"
             },
             "executable": {
@@ -7512,7 +7450,7 @@
         },
         "sedem": {
             "formula": {
-                "sandbox_id": 741091797,
+                "sandbox_id": 769714374,
                 "match": "SEDEM archive"
             },
             "executable": {
@@ -7554,7 +7492,7 @@
         "black": {
             "formula": {
                 "sandbox_id": [
-                    718136999
+                    761684096
                 ],
                 "match": "black"
             },
@@ -7566,7 +7504,7 @@
         },
         "yadi": {
             "formula": {
-                "sandbox_id": 737277857,
+                "sandbox_id": 771698414,
                 "match": "yadi-arc"
             },
             "executable": {

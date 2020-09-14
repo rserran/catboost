@@ -94,7 +94,9 @@ void NCB::ReadModelAndUpdateParams(
         }
     }
     if (params.IsUncertaintyPrediction) {
-        CB_ENSURE(model.IsPosteriorSamplingModel(), "Uncertainty Prediction allowed only in models with Posterior Sampling");
+        if (model.IsPosteriorSamplingModel()) {
+            CATBOOST_WARNING_LOG <<  "Uncertainty Prediction asked for model fitted without Posterior Sampling option" << Endl;
+        }
         for (auto predictionType : params.PredictionTypes) {
             CB_ENSURE(IsUncertaintyPredictionType(predictionType), "Predciton type " << predictionType << " is incompatible " <<
                 "with Uncertainty Prediction Type");
@@ -130,6 +132,7 @@ static NCB::TEvalResult Apply(
     TVector<TVector<TVector<double>>>& rawValues = resultApprox.GetRawValuesRef();
 
     auto maybeBaseline = dataset.RawTargetData.GetBaseline();
+    rawValues.resize(1);
     if (isUncertaintyPrediction) {
         CB_ENSURE(!maybeBaseline, "Baseline unsupported with uncertainty prediction");
         CB_ENSURE_INTERNAL(begin == 0, "For Uncertainty Prediction application only from first tree is supported");
@@ -138,11 +141,10 @@ static NCB::TEvalResult Apply(
             dataset,
             end,
             virtualEnsemblesCount,
-            &rawValues,
+            &(rawValues[0]),
             executor
         );
     } else {
-        rawValues.resize(1);
         if (maybeBaseline) {
             AssignRank2(*maybeBaseline, &rawValues[0]);
         } else {
