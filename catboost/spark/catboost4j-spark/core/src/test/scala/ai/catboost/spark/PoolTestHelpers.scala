@@ -11,8 +11,6 @@ import org.apache.spark.sql.types._;
 import org.junit.{Assert};
 
 object PoolTestHelpers {
-    ensureNativeLibLoaded
-
     def createSchema(
       schemaDesc: Seq[(String,DataType)],
       featureNames: Seq[String],
@@ -68,6 +66,8 @@ object PoolTestHelpers {
                 rRow.getAs[Vector](fieldIdx).toArray,
                 1e-6
               )
+            case BinaryType =>
+              java.util.Arrays.equals(lRow.getAs[Array[Byte]](fieldIdx), rRow.getAs[Array[Byte]](fieldIdx))
             case _ =>
               Assert.assertEquals(lRow(fieldIdx), rRow(fieldIdx))
           }

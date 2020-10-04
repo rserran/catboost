@@ -5,11 +5,11 @@ import scala.language.experimental.macros
 import scala.reflect.macros.whitebox
 
 @compileTimeOnly("enable macro paradise to expand macro annotations")
-class ParamGetterSetter extends StaticAnnotation {
+private[spark] class ParamGetterSetter extends StaticAnnotation {
   def macroTransform(annottees: Any*): Any = macro ParamGetterSetterMacro.impl
 }
 
-object ParamGetterSetterMacro {
+private[spark] object ParamGetterSetterMacro {
   def impl(c: whitebox.Context)(annottees: c.Expr[Any]*): c.Expr[Any] = {
     import c.universe._
 
@@ -39,6 +39,15 @@ object ParamGetterSetterMacro {
               }
               typeList(0)
             }
+            case tq"OrderedStringMapParam[..$typeList]" => {
+              if (typeList.size != 1) {
+                c.abort(
+                  c.enclosingPosition,
+                  s"OrderedStringMapParam must have one type parameter"
+                )
+              }
+              tq"java.util.LinkedHashMap[String, ${typeList(0)}]"
+            }
             case tq"BooleanParam" => tq"Boolean"
             case tq"DoubleArrayParam" => tq"Array[Double]"
             case tq"DoubleParam" => tq"Double"
@@ -47,6 +56,7 @@ object ParamGetterSetterMacro {
             case tq"IntParam" => tq"Int"
             case tq"LongParam" => tq"Long"
             case tq"StringArrayParam" => tq"Array[String]"
+            case tq"DurationParam" => tq"java.time.Duration"
             case _ => c.abort(
               c.enclosingPosition,
               s"Bad paramType: $paramType"

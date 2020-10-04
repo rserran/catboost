@@ -61,7 +61,7 @@ ALLOW smart_devices/tools/launcher2 -> contrib/restricted/spdlog
 
 ALLOW contrib/libs/webrtc -> contrib/restricted/abseil-cpp
 ALLOW contrib/libs/ortools -> contrib/restricted/abseil-cpp
-ALLOW contrib/libs/tf_1_14 -> contrib/restricted/abseil-cpp
+ALLOW contrib/libs/tf-1.14 -> contrib/restricted/abseil-cpp-tstring
 
 # http-parser is a low-level parser for http bytestream.
 # Consider using high-level alternatives.
@@ -106,7 +106,7 @@ ALLOW orgvisits/library/soc -> contrib/restricted/boost
 ALLOW quasar/backend -> contrib/restricted/boost
 ALLOW regulargeo/research -> contrib/restricted/boost
 ALLOW rem/python/geobase30 -> contrib/restricted/boost
-ALLOW rtline/services/drive/contrib/libs/telemetry -> contrib/restricted/boost
+ALLOW drive/contrib/cpp/telemetry -> contrib/restricted/boost
 ALLOW smart_devices -> contrib/restricted/boost
 ALLOW speechkit -> contrib/restricted/boost
 ALLOW statbox/libstatbox -> contrib/restricted/boost
@@ -136,6 +136,7 @@ ALLOW library/cpp/testing/gmock_in_unittest -> contrib/restricted/googletest
 ALLOW library/cpp/testing/gtest -> contrib/restricted/googletest
 ALLOW library/cpp/testing/gtest_extensions -> contrib/restricted/googletest
 ALLOW library/cpp/testing/gtest_main -> contrib/restricted/googletest
+ALLOW library/cpp/testing/gtest_protobuf -> contrib/restricted/googletest
 ALLOW library/python/testing/gtest/test/gtest -> contrib/restricted/googletest
 # TODO remove this lines after they will switch to library/cpp/testing/gtest
 ALLOW mail -> contrib/restricted/googletest

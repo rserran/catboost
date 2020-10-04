@@ -69,8 +69,8 @@ def validate_choice_requirement(name, val, valid):
         return "Unknown [[imp]]{}[[rst]] requirement: [[imp]]{}[[rst]], choose from [[imp]]{}[[rst]]".format(name, val, ", ".join(valid))
 
 
-def validate_force_sandbox_requirement(name, value, test_size, is_force_sandbox, in_autocheck, is_fuzzing, is_kvm, check_func):
-    if is_force_sandbox or not in_autocheck or is_fuzzing:
+def validate_force_sandbox_requirement(name, value, test_size, is_force_sandbox, in_autocheck, is_fuzzing, is_kvm, is_ytexec_run, check_func):
+    if is_force_sandbox or not in_autocheck or is_fuzzing or is_ytexec_run:
         if value == 'all':
             return
         return validate_numerical_requirement(name, value)
@@ -81,16 +81,16 @@ def validate_force_sandbox_requirement(name, value, test_size, is_force_sandbox,
 
 
 # TODO: Remove is_kvm param when there will be guarantees on RAM
-def validate_requirement(req_name, value, test_size, is_force_sandbox, in_autocheck, is_fuzzing, is_kvm):
+def validate_requirement(req_name, value, test_size, is_force_sandbox, in_autocheck, is_fuzzing, is_kvm, is_ytexec_run):
     req_checks = {
         'container': validate_numerical_requirement,
-        'cpu': lambda n, v: validate_force_sandbox_requirement(n, v, test_size, is_force_sandbox, in_autocheck, is_fuzzing, is_kvm, reqs.check_cpu),
+        'cpu': lambda n, v: validate_force_sandbox_requirement(n, v, test_size, is_force_sandbox, in_autocheck, is_fuzzing, is_kvm, is_ytexec_run, reqs.check_cpu),
         'disk_usage': validate_numerical_requirement,
         'dns': lambda n, v: validate_choice_requirement(n, v, VALID_DNS_REQUIREMENTS),
         'kvm': None,
         'network': lambda n, v: validate_choice_requirement(n, v, VALID_NETWORK_REQUIREMENTS),
-        'ram': lambda n, v: validate_force_sandbox_requirement(n, v, test_size, is_force_sandbox, in_autocheck, is_fuzzing, is_kvm, reqs.check_ram),
-        'ram_disk': lambda n, v: validate_force_sandbox_requirement(n, v, test_size, is_force_sandbox, in_autocheck, is_fuzzing, is_kvm, reqs.check_ram_disk),
+        'ram': lambda n, v: validate_force_sandbox_requirement(n, v, test_size, is_force_sandbox, in_autocheck, is_fuzzing, is_kvm, is_ytexec_run, reqs.check_ram),
+        'ram_disk': lambda n, v: validate_force_sandbox_requirement(n, v, test_size, is_force_sandbox, in_autocheck, is_fuzzing, is_kvm, is_ytexec_run, reqs.check_ram_disk),
         'sb': None,
         'sb_vault': validate_sb_vault,
     }
@@ -132,6 +132,7 @@ def validate_test(unit, kw):
     in_autocheck = "ya:not_autocheck" not in tags and 'ya:manual' not in tags
     is_fat = 'ya:fat' in tags
     is_force_sandbox = 'ya:force_distbuild' not in tags and is_fat
+    is_ytexec_run = 'ya:yt' in tags and 'ya:ytexec' in tags
     is_fuzzing = valid_kw.get("FUZZING", False)
     is_kvm = 'kvm' in requirements_orig
     requirements = {}
@@ -160,7 +161,7 @@ def validate_test(unit, kw):
 
     if not errors:
         for req_name, req_value in requirements.items():
-            error_msg = validate_requirement(req_name, req_value, size, is_force_sandbox, in_autocheck, is_fuzzing, is_kvm)
+            error_msg = validate_requirement(req_name, req_value, size, is_force_sandbox, in_autocheck, is_fuzzing, is_kvm, is_ytexec_run)
             if error_msg:
                 errors += [error_msg]
 
@@ -175,15 +176,20 @@ def validate_test(unit, kw):
                 errors.append("You can set sandbox tags '{}' only for FAT tests without ya:force_distbuild. Remove TAG(ya:force_sandbox) or sandbox tags.".format(sb_tags))
             if 'ya:sandbox_coverage' in tags:
                 errors.append("You can set 'ya:sandbox_coverage' tag only for FAT tests without ya:force_distbuild.")
+            if size != consts.TestSize.Large:
+                errors.append("Only LARGE test may have ya:fat tag")
     else:
         if is_force_sandbox:
             errors.append('ya:force_sandbox can be used with LARGE tests only')
+        if 'ya:nofuse' in tags:
+            errors.append('ya:nofuse can be used with LARGE tests only')
+        if 'ya:privileged' in tags:
+            errors.append("ya:privileged can be used with LARGE tests only")
+        if in_autocheck and size == consts.TestSize.Large:
+            errors.append("LARGE test must have ya:fat tag")
 
     if 'ya:privileged' in tags and 'container' not in requirements:
         errors.append("Only tests with 'container' requirement can have 'ya:privileged' tag")
-
-    if 'ya:privileged' in tags and not is_fat:
-        errors.append("Only fat tests can have 'ya:privileged' tag")
 
     if size not in size_timeout:
         errors.append("Unknown test size: [[imp]]{}[[rst]], choose from [[imp]]{}[[rst]]".format(size.upper(), ", ".join([sz.upper() for sz in size_timeout.keys()])))
@@ -207,12 +213,6 @@ def validate_test(unit, kw):
                 errors.append("Max allowed timeout for test size [[imp]]{}[[rst]] is [[imp]]{} sec[[rst]]{}".format(size.upper(), size_timeout[size], suggested_size))
         except Exception as e:
             errors.append("Error when parsing test timeout: [[bad]]{}[[rst]]".format(e))
-
-        if in_autocheck and size == consts.TestSize.Large and not is_fat:
-            errors.append("LARGE test must have ya:fat tag")
-
-        if is_fat and size != consts.TestSize.Large:
-            errors.append("Only LARGE test may have ya:fat tag")
 
         requiremtens_list = []
         for req_name, req_value in requirements.iteritems():
@@ -750,8 +750,12 @@ def onjava_test(unit, *args):
         'SYSTEM_PROPERTIES': props,
         'TEST-CWD': test_cwd,
         'SKIP_TEST': unit.get('SKIP_TEST_VALUE') or '',
-        'JAVA_CLASSPATH_CMD_TYPE': java_cp_arg_type,
+        'JAVA_CLASSPATH_CMD_TYPE': java_cp_arg_type
     }
+    test_classpath_origins = unit.get('TEST_CLASSPATH_VALUE')
+    if test_classpath_origins:
+        test_record['TEST_CLASSPATH_ORIGINS'] = test_classpath_origins
+        test_record['TEST_CLASSPATH'] = '${TEST_CLASSPATH_MANAGED}'
 
     data = dump_test(unit, test_record)
     if data:

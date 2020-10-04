@@ -30,7 +30,9 @@ SRCDIR(
     contrib/libs/protobuf/python/google
 )
 
-CFLAGS(-DPYTHON_PROTO2_CPP_IMPL_V2)
+CFLAGS(
+    -DPYTHON_PROTO2_CPP_IMPL_V2
+)
 
 PY_SRCS(
     NAMESPACE google

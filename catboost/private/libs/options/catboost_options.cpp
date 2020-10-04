@@ -10,7 +10,6 @@
 #include <util/string/cast.h>
 #include <util/system/info.h>
 #include <util/string/builder.h>
-#include <util/string/vector.h>
 #include <util/generic/hash_set.h>
 
 template <>
@@ -140,14 +139,14 @@ static std::tuple<ui32, ui32, ELeavesEstimation, double> GetEstimationMethodDefa
         }
         case ELossFunction::YetiRank: {
             defaultL2Reg = 0;
-            defaultEstimationMethod = (taskType == ETaskType::GPU) ? ELeavesEstimation::Newton : ELeavesEstimation::Gradient;
+            defaultEstimationMethod = ELeavesEstimation::Newton;
             defaultGradientIterations = 1;
             defaultNewtonIterations = 1;
             break;
         }
         case ELossFunction::YetiRankPairwise: {
             defaultL2Reg = 0;
-            defaultEstimationMethod = (taskType == ETaskType::GPU) ? ELeavesEstimation::Simple : ELeavesEstimation::Gradient;
+            defaultEstimationMethod = (taskType == ETaskType::GPU) ? ELeavesEstimation::Newton : ELeavesEstimation::Gradient;
             defaultGradientIterations = 1;
             defaultNewtonIterations = 1;
             break;
@@ -258,7 +257,7 @@ void NCatboostOptions::TCatBoostOptions::SetLeavesEstimationDefault() {
     if (treeConfig.LeavesEstimationMethod.NotSet()) {
         treeConfig.LeavesEstimationMethod.SetDefault(defaultEstimationMethod);
     } else if (treeConfig.LeavesEstimationMethod != defaultEstimationMethod) {
-        CB_ENSURE((lossFunctionConfig.GetLossFunction() != ELossFunction::YetiRank ||
+        CB_ENSURE((lossFunctionConfig.GetLossFunction() != ELossFunction::YetiRank &&
                    lossFunctionConfig.GetLossFunction() != ELossFunction::YetiRankPairwise),
                   "At the moment, in the YetiRank and YetiRankPairwise mode, changing the leaf_estimation_method parameter is prohibited.");
         if (GetTaskType() == ETaskType::CPU) {
@@ -433,7 +432,8 @@ static void ValidateCtrTargetBinarization(
     if (ctrTargetBinarization->BorderCount > 1) {
         CB_ENSURE(lossFunction == ELossFunction::RMSE || lossFunction == ELossFunction::Quantile ||
                       lossFunction == ELossFunction::LogLinQuantile || lossFunction == ELossFunction::Poisson ||
-                      lossFunction == ELossFunction::MAPE || lossFunction == ELossFunction::MAE || lossFunction == ELossFunction::MultiClass,
+                      lossFunction == ELossFunction::MAPE || lossFunction == ELossFunction::MAE || lossFunction == ELossFunction::MultiClass ||
+                      lossFunction == ELossFunction::MultiRMSE,
                   "Setting TargetBorderCount is not supported for loss function " << lossFunction);
     }
 }

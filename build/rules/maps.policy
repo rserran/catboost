@@ -60,31 +60,11 @@ ALLOW media/road-graph-tool -> maps/libs/succinct_rtree
 ALLOW netsys/tiles-vcdiff/gen-tiles -> maps/renderer
 ALLOW quality/ab_testing/cofe/projects/maps -> maps/analytics
 ALLOW taxi/antifraud/mult_id -> maps/libs/geolib
-ALLOW taxi/graph/external/graph -> maps/analyzer/libs/data
-ALLOW taxi/graph/external/graph -> maps/analyzer/libs/deprecated/shortest_path
-ALLOW taxi/graph/external/graph -> maps/libs/common
-ALLOW taxi/graph/external/graph -> maps/libs/edge_persistent_index
-ALLOW taxi/graph/external/graph -> maps/libs/jams/graph-spatial
-ALLOW taxi/graph/external/graph -> maps/libs/jams/router
-ALLOW taxi/graph/external/graph -> maps/libs/jams/static-graph
-ALLOW taxi/graph/external/graph -> maps/libs/mms
-ALLOW taxi/graph/external/graph -> maps/libs/road_graph
-ALLOW taxi/graph/external/graph -> maps/libs/road_graph/serialization
-ALLOW taxi/graph/external/graph -> maps/libs/snap
-ALLOW taxi/graph/external/graph -> maps/libs/succinct_rtree/serialization
-ALLOW taxi/graph/external/graph -> maps/routing/common
-ALLOW taxi/graph/external/graph -> maps/routing/leptidea-sg
-ALLOW taxi/graph/external/graph -> maps/routing/turn_penalties
-ALLOW taxi/graph/external/graph -> maps/routing/turn_penalties
-ALLOW taxi/graph/external/graph -> maps/tools/easyview/lib
-ALLOW taxi/graph/external/graph/tests/core -> maps/libs/jams/static-graph
 ALLOW taxi/graph/external/graph2/tests/mapmatcher -> maps/libs/mms
 ALLOW taxi/graph/external/graph2/tests/mapmatcher -> maps/libs/mms
 ALLOW taxi/graph/libs/easyview_helpers -> maps/analyzer/libs/common
 ALLOW taxi/graph/libs/easyview_helpers -> maps/tools/easyview/lib
 ALLOW taxi/graph/libs/graph -> maps/analyzer/libs/data
-ALLOW taxi/graph/libs/graph -> maps/analyzer/libs/deprecated/mapmatcher
-ALLOW taxi/graph/libs/graph -> maps/analyzer/libs/deprecated/shortest_path
 ALLOW taxi/graph/libs/graph -> maps/analyzer/libs/graphmatching
 ALLOW taxi/graph/libs/graph -> maps/libs/common
 ALLOW taxi/graph/libs/graph -> maps/libs/edge_persistent_index
@@ -104,8 +84,6 @@ ALLOW taxi/graph/libs/graph -> maps/tools/easyview/lib
 ALLOW taxi/graph/libs/graph-test -> maps/libs/geolib
 ALLOW taxi/graph/libs/mapmatcher -> maps/analyzer/libs/common
 ALLOW taxi/graph/libs/mapmatcher -> maps/analyzer/libs/data
-ALLOW taxi/graph/libs/mapmatcher -> maps/analyzer/libs/deprecated/graphmatching
-ALLOW taxi/graph/libs/mapmatcher -> maps/analyzer/libs/deprecated/shortest_path
 ALLOW taxi/graph/libs/mapmatcher -> maps/analyzer/libs/graphmatching
 ALLOW taxi/graph/libs/mapmatcher -> maps/libs/common
 ALLOW taxi/graph/libs/mapmatcher -> maps/libs/edge_persistent_index
@@ -139,7 +117,6 @@ ALLOW taxi/graph/libs/routing -> maps/libs/road_graph
 ALLOW taxi/graph/libs/routing -> maps/routing/common
 ALLOW taxi/graph/libs/search -> maps/analyzer/libs/common
 ALLOW taxi/graph/libs/shortest_path -> maps/analyzer/libs/data
-ALLOW taxi/graph/libs/shortest_path -> maps/analyzer/libs/deprecated/shortest_path
 ALLOW taxi/graph/libs/shortest_path -> maps/analyzer/libs/shortest_path
 ALLOW taxi/graph/libs/shortest_path -> maps/libs/common
 ALLOW taxi/graph/libs/shortest_path -> maps/libs/mms
@@ -148,16 +125,14 @@ ALLOW taxi/graph/libs/shortest_path -> maps/routing/leptidea-sg
 ALLOW taxi/graph/libs/shortest_path -> maps/routing/turn_penalties
 ALLOW taxi/graph/libs/shortest_path -> maps/routing/turn_penalties
 ALLOW taxi/graph/libs/tests/graph -> maps/libs/jams/static-graph
-ALLOW taxi/graph/libs/tests/mapmatcher -> maps/analyzer/libs/deprecated/mapmatcher
-ALLOW taxi/graph/libs/tests/mapmatcher -> maps/analyzer/libs/deprecated/track_generator
+ALLOW taxi/graph/libs/tests/mapmatcher -> maps/analyzer/libs/track_generator
 ALLOW taxi/graph/libs/tests/mapmatcher -> maps/libs/mms
 ALLOW taxi/graph/libs/tests/nearest_edges -> maps/libs/jams/static-graph
 ALLOW taxi/graph/libs/tests/routing -> maps/libs/road_graph
 ALLOW taxi/graph/tools/bench-nearest-edges -> maps/libs/jams/static-graph
 ALLOW taxi/graph/tools/bench-nearest-edges -> maps/libs/road_graph
 ALLOW taxi/graph/tools/find-one-way-gates -> maps/tools/easyview/lib
-ALLOW taxi/graph/tools/generate-graph-tracks -> maps/analyzer/libs/deprecated/mapmatcher
-ALLOW taxi/graph/tools/generate-graph-tracks -> maps/analyzer/libs/deprecated/track_generator
+ALLOW taxi/graph/tools/generate-graph-tracks -> maps/analyzer/libs/track_generator
 ALLOW taxi/graph/tools/generate-graph-tracks -> maps/libs/mms
 ALLOW taxi/graph/tools/lib -> maps/libs/road_graph
 ALLOW taxi/tools/dorblu/lib -> maps/libs/common
@@ -174,6 +149,7 @@ ALLOW maps -> maps
 ALLOW sandbox/projects/maps -> maps
 ALLOW sandbox/projects/mapsearch -> maps
 ALLOW sandbox/projects/masstransit -> maps
+ALLOW sprav/altay/panorama -> maps/streetview/libs
 ALLOW yql/udfs/maps -> maps
 
 # Do not allow PEERDIRs into maps unless such PEERDIRs have be explicitly allowed above
