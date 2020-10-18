@@ -18,9 +18,8 @@
 using namespace NCB;
 
 
-void RunWorker(
+void CreateTrainingDataForWorker(
     i32 hostId,
-    i32 nodePort,
     i32 numThreads,
     const TString& plainJsonParamsAsString,
     NCB::TDataProviderPtr trainDataProvider,
@@ -29,6 +28,7 @@ void RunWorker(
     CB_ENSURE(numThreads >= 1, "Non-positive number of threads specified");
 
     auto& localData = NCatboostDistributed::TLocalTensorSearchData::GetRef();
+    localData = NCatboostDistributed::TLocalTensorSearchData();
 
     TDataProviders pools;
     pools.Learn = trainDataProvider;
@@ -70,6 +70,10 @@ void RunWorker(
         localExecutor,
         localData.Rand.Get()
     );
+}
 
+
+void RunWorkerWrapper(i32 numThreads, i32 nodePort) throw (yexception) {
     RunWorker(SafeIntegerCast<ui32>(numThreads), SafeIntegerCast<ui32>(nodePort));
 }
+

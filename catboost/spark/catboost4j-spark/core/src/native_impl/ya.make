@@ -5,6 +5,7 @@ NO_WERROR()
 
 
 SRCS(
+    apply_result_iterator.cpp
     dataset_rows_reader.cpp
     data_provider_builders.cpp
     features_layout.cpp
@@ -46,6 +47,27 @@ IF (ARCH_AARCH64 OR OS_WINDOWS)
     ALLOCATOR(J)
 ELSE()
     ALLOCATOR(LF)
+ENDIF()
+
+STRIP()
+
+
+IF (USE_SYSTEM_JDK)
+    CFLAGS(-I${JAVA_HOME}/include)
+    IF(OS_DARWIN)
+        CFLAGS(-I${JAVA_HOME}/include/darwin)
+    ELSEIF(OS_LINUX)
+        CFLAGS(-I${JAVA_HOME}/include/linux)
+    ELSEIF(OS_WINDOWS)
+        CFLAGS(-I${JAVA_HOME}/include/win32)
+    ENDIF()
+ELSE()
+    IF (NOT CATBOOST_OPENSOURCE OR AUTOCHECK)
+        PEERDIR(contrib/libs/jdk)
+    ELSE()
+        # warning instead of an error to enable configure w/o specifying JAVA_HOME
+        MESSAGE(WARNING System JDK required)
+    ENDIF()
 ENDIF()
 
 END()

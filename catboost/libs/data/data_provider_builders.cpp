@@ -697,7 +697,7 @@ namespace NCB {
                         sparseDataPart.Values.resize(dstIdx);
                     },
                     0,
-                    (int)SparseDataParts.size(),
+                    SafeIntegerCast<int>(SparseDataParts.size()),
                     NPar::TLocalExecutor::WAIT_COMPLETE
                 );
             }
@@ -1399,7 +1399,7 @@ namespace NCB {
         ) override {
             CB_ENSURE(!InProcess, "Attempt to start new processing without finishing the last");
 
-            CB_ENSURE(!poolQuantizationSchema.FeatureIndices.empty(), "No features in quantized pool!");
+            CB_ENSURE(poolQuantizationSchema.HasAvailableFeatures(), "No features in quantized pool!");
 
             TConstArrayRef<NJson::TJsonValue> schemaClassLabels = poolQuantizationSchema.ClassLabels;
 
@@ -1473,7 +1473,9 @@ namespace NCB {
                 // TODO(akhropov): get from quantized pool meta info when it will be available: MLTOOLS-2392.
                 NCatboostOptions::TBinarizationOptions(
                     EBorderSelectionType::GreedyLogSum, // default value
-                    SafeIntegerCast<ui32>(poolQuantizationSchema.Borders[0].size()),
+                    (poolQuantizationSchema.Borders.size() > 0) ?
+                        SafeIntegerCast<ui32>(poolQuantizationSchema.Borders[0].size())
+                        : 32,
                     ENanMode::Forbidden // default value
                 ),
                 TMap<ui32, NCatboostOptions::TBinarizationOptions>()
@@ -1828,8 +1830,8 @@ namespace NCB {
         ) {
             const auto& featuresLayout = *info->GetFeaturesLayout();
             const auto metaInfos = featuresLayout.GetExternalFeaturesMetaInfo();
-            for (size_t i = 0, iEnd = schema.FeatureIndices.size(); i < iEnd; ++i) {
-                const auto flatFeatureIdx = schema.FeatureIndices[i];
+            for (size_t i = 0, iEnd = schema.FloatFeatureIndices.size(); i < iEnd; ++i) {
+                const auto flatFeatureIdx = schema.FloatFeatureIndices[i];
                 const auto nanMode = schema.NanModes[i];
                 const auto& metaInfo = metaInfos[flatFeatureIdx];
                 CB_ENSURE(

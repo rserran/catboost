@@ -374,6 +374,12 @@
         "lz4": {
             "description": "Compress or decompress .lz4 files"
         },
+        "pqos": {
+            "description": "Intel(R) Resource Director Technology monitoring and control tool"
+        },
+        "rdtset": {
+            "description": "Task CPU affinity and Intel(R) Resource Director Technology control tool"
+        },
         "optrace": {
             "description": "optrace records output files written by each process",
             "visible": false
@@ -1974,47 +1980,47 @@
             "name": "clang7",
             "tools": {
                 "c++": {
-                    "bottle": "clang7",
+                    "bottle": "clang7-windows",
                     "executable": "c++"
                 },
                 "c++filt": {
-                    "bottle": "clang7",
+                    "bottle": "clang7-windows",
                     "executable": "c++filt"
                 },
                 "cc": {
-                    "bottle": "clang7",
+                    "bottle": "clang7-windows",
                     "executable": "cc"
                 },
                 "clang-format": {
-                    "bottle": "clang7",
+                    "bottle": "clang7-windows",
                     "executable": "clang-format"
                 },
                 "clang-tidy": {
-                    "bottle": "clang7",
+                    "bottle": "clang7-windows",
                     "executable": "clang-tidy"
                 },
                 "gcov": {
-                    "bottle": "clang7",
+                    "bottle": "clang7-windows",
                     "executable": "gcov"
                 },
                 "llvm-cov": {
-                    "bottle": "clang7",
+                    "bottle": "clang7-windows",
                     "executable": "llvm-cov"
                 },
                 "llvm-profdata": {
-                    "bottle": "clang7",
+                    "bottle": "clang7-windows",
                     "executable": "llvm-profdata"
                 },
                 "llvm-symbolizer": {
-                    "bottle": "clang7",
+                    "bottle": "clang7-windows",
                     "executable": "llvm-symbolizer"
                 },
                 "nm": {
-                    "bottle": "clang7",
+                    "bottle": "clang7-windows",
                     "executable": "nm"
                 },
                 "strip": {
-                    "bottle": "clang7",
+                    "bottle": "clang7-windows",
                     "executable": "strip"
                 }
             },
@@ -2026,7 +2032,18 @@
                     "target": {
                         "os": "WIN",
                         "arch": "x86_64"
-                    }
+                    },
+                    "default": false
+                },
+                {
+                    "host": {
+                        "os": "WIN"
+                    },
+                    "target": {
+                        "os": "WIN",
+                        "arch": "x86_64"
+                    },
+                    "default": false
                 }
             ],
             "params": {
@@ -2808,7 +2825,7 @@
                 "cxx_compiler": "$(NDK)/llvm-toolchain/bin/clang++",
                 "objcopy": "$(NDK)/llvm-toolchain/bin/llvm-objcopy",
                 "strip": "$(NDK)/:lvm-toolchain/bin/llvm-strip",
-                "werror_mode": "compiler_specific",
+                "werror_mode": "all",
                 "gcc_version": "9.0",
                 "target_opt": [
                     "-DANDROID_FAKEID=android_r21b"
@@ -5237,6 +5254,26 @@
                 }
             ]
         },
+        "intel-cmt-cat": {
+            "tools": {
+                "pqos": {
+                    "bottle": "intel-cmt-cat",
+                    "executable": "pqos"
+                },
+                "rdtset": {
+                    "bottle": "intel-cmt-cat",
+                    "executable": "rdtset"
+                }
+            },
+            "platforms": [
+                {
+                    "host": {
+                        "os": "LINUX"
+                    },
+                    "default": true
+                }
+            ]
+        },
         "blktrace": {
             "tools": {
                 "blkparse": {
@@ -5536,7 +5573,7 @@
         "ymake": {
             "formula": {
                 "sandbox_id": [
-                    784831488
+                    795609337
                 ],
                 "match": "ymake"
             },
@@ -5560,7 +5597,7 @@
         "arc": {
             "formula": {
                 "sandbox_id": [
-                    786170519
+                    795529173
                 ],
                 "match": "arc"
             },
@@ -5628,7 +5665,7 @@
         "delve": {
             "formula": {
                 "sandbox_id": [
-                    702942405
+                    790916841
                 ],
                 "match": "delve"
             },
@@ -5679,7 +5716,7 @@
         "tvmknife": {
             "formula": {
                 "sandbox_id": [
-                    772235970
+                    798120452
                 ],
                 "match": "tvmknife"
             },
@@ -5733,7 +5770,7 @@
         },
         "python": {
             "formula": {
-                "sandbox_id": 739011318,
+                "sandbox_id": 786386535,
                 "match": "Python"
             },
             "executable": {
@@ -5884,6 +5921,65 @@
                     433792615,
                     425919040,
                     703744721
+                ],
+                "match": "CLANG"
+            },
+            "executable": {
+                "c++": [
+                    "bin",
+                    "clang++"
+                ],
+                "c++filt": [
+                    "bin",
+                    "c++filt"
+                ],
+                "cc": [
+                    "bin",
+                    "clang"
+                ],
+                "clang-format": [
+                    "bin",
+                    "clang-format"
+                ],
+                "clang-tidy": [
+                    "bin",
+                    "clang-tidy"
+                ],
+                "gcov": [
+                    "bin",
+                    "llvm-gcov"
+                ],
+                "llvm-cov": [
+                    "bin",
+                    "llvm-cov"
+                ],
+                "llvm-profdata": [
+                    "bin",
+                    "llvm-profdata"
+                ],
+                "llvm-symbolizer": [
+                    "bin",
+                    "llvm-symbolizer"
+                ],
+                "llvm-nm": [
+                    "bin",
+                    "llvm-nm"
+                ],
+                "llvm-strip": [
+                    "bin",
+                    "llvm-strip"
+                ],
+                "llvm-objcopy": [
+                    "bin",
+                    "llvm-objcopy"
+                ]
+            }
+        },
+        "clang7-windows": {
+            "formula": {
+                "sandbox_id": [
+                    763586573,
+                    764308081
                 ],
                 "match": "CLANG"
             },
@@ -6297,7 +6393,7 @@
         },
         "yt": {
             "formula": {
-                "sandbox_id": 787148185,
+                "sandbox_id": 796272821,
                 "match": "YT"
             },
             "executable": {
@@ -6494,7 +6590,7 @@
         },
         "ytexec": {
             "formula": {
-                "sandbox_id": 784266628,
+                "sandbox_id": 790929408,
                 "match": "ytexec"
             },
             "executable": {
@@ -6553,7 +6649,7 @@
         "yp-util": {
             "formula": {
                 "sandbox_id": [
-                    781258711
+                    798880508
                 ],
                 "match": "yp_util"
             },
@@ -6566,7 +6662,7 @@
         "yp": {
             "formula": {
                 "sandbox_id": [
-                    781258098
+                    795608186
                 ],
                 "match": "yp"
             },
@@ -6962,7 +7058,7 @@
         },
         "horadric": {
             "formula": {
-                "sandbox_id": 787576825,
+                "sandbox_id": 799327758,
                 "match": "horadric"
             },
             "executable": {
@@ -6973,7 +7069,7 @@
         },
         "logbroker": {
             "formula": {
-                "sandbox_id": 788206160,
+                "sandbox_id": 799327611,
                 "match": "logbroker"
             },
             "executable": {
@@ -6984,7 +7080,7 @@
         },
         "zcli": {
             "formula": {
-                "sandbox_id": 788566122,
+                "sandbox_id": 798986510,
                 "match": "zcli"
             },
             "executable": {
@@ -7105,7 +7201,7 @@
         },
         "apphost": {
             "formula": {
-                "sandbox_id": 786683761,
+                "sandbox_id": 798680401,
                 "match": "app_host_launcher"
             },
             "executable": {
@@ -7116,7 +7212,7 @@
         },
         "news": {
             "formula": {
-                "sandbox_id": 785129591,
+                "sandbox_id": 791885740,
                 "match": "news_launcher"
             },
             "executable": {
@@ -7371,6 +7467,26 @@
                 ]
             }
         },
+        "intel-cmt-cat": {
+            "formula": {
+                "sandbox_id": [
+                    798382448
+                ],
+                "match": "infra/kernel/tools/resctrl"
+            },
+            "executable": {
+                "pqos": [
+                    "intel-cmt-cat",
+                    "bin",
+                    "pqos"
+                ],
+                "rdtset": [
+                    "intel-cmt-cat",
+                    "bin",
+                    "rdtset"
+                ]
+            }
+        },
         "blktrace": {
             "formula": {
                 "sandbox_id": [
@@ -7448,7 +7564,7 @@
         },
         "sedem": {
             "formula": {
-                "sandbox_id": 783593795,
+                "sandbox_id": 796416043,
                 "match": "SEDEM archive"
             },
             "executable": {
@@ -7502,7 +7618,7 @@
         },
         "yadi": {
             "formula": {
-                "sandbox_id": 771698414,
+                "sandbox_id": 795988084,
                 "match": "yadi-arc"
             },
             "executable": {

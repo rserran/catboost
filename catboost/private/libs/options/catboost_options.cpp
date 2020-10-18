@@ -146,7 +146,7 @@ static std::tuple<ui32, ui32, ELeavesEstimation, double> GetEstimationMethodDefa
         }
         case ELossFunction::YetiRankPairwise: {
             defaultL2Reg = 0;
-            defaultEstimationMethod = (taskType == ETaskType::GPU) ? ELeavesEstimation::Newton : ELeavesEstimation::Gradient;
+            defaultEstimationMethod = (taskType == ETaskType::GPU) ? ELeavesEstimation::Simple : ELeavesEstimation::Gradient;
             defaultGradientIterations = 1;
             defaultNewtonIterations = 1;
             break;
@@ -257,9 +257,8 @@ void NCatboostOptions::TCatBoostOptions::SetLeavesEstimationDefault() {
     if (treeConfig.LeavesEstimationMethod.NotSet()) {
         treeConfig.LeavesEstimationMethod.SetDefault(defaultEstimationMethod);
     } else if (treeConfig.LeavesEstimationMethod != defaultEstimationMethod) {
-        CB_ENSURE((lossFunctionConfig.GetLossFunction() != ELossFunction::YetiRank &&
-                   lossFunctionConfig.GetLossFunction() != ELossFunction::YetiRankPairwise),
-                  "At the moment, in the YetiRank and YetiRankPairwise mode, changing the leaf_estimation_method parameter is prohibited.");
+        CB_ENSURE((lossFunctionConfig.GetLossFunction() != ELossFunction::YetiRank),
+                  "At the moment, in the YetiRank mode, changing the leaf_estimation_method parameter is prohibited.");
         if (GetTaskType() == ETaskType::CPU) {
             CB_ENSURE(lossFunctionConfig.GetLossFunction() != ELossFunction::PairLogitPairwise,
                 "At the moment, in the PairLogitPairwise mode on CPU, changing the leaf_estimation_method parameter is prohibited.");
@@ -567,6 +566,12 @@ void NCatboostOptions::TCatBoostOptions::Validate() const {
                           "if loss-function is Logloss, then class weights should be given for 0 and 1 classes");
                 CB_ENSURE(classesCount == 0 || classesCount == classWeights.size(), "class weights should be specified for each class in range 0, ... , classes_count - 1");
             }
+        }
+        const auto& classLabels = DataProcessingOptions->ClassLabels.Get();
+        if (!classLabels.empty()) {
+            CB_ENSURE(lossFunction != ELossFunction::Logloss || (classLabels.size() == 2),
+                          "if loss-function is Logloss, then class labels should be given for 0 and 1 classes");
+            CB_ENSURE(classesCount == 0 || classesCount == classLabels.size(), "class labels should be specified for each class in range 0, ... , classes_count - 1");
         }
     }
 

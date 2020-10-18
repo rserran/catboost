@@ -340,10 +340,12 @@ public:
         return false;
     }
 
+    // returns true if string started with `prefix`, false otherwise
     inline bool SkipPrefix(const TdSelf& prefix) noexcept {
         return AfterPrefix(prefix, *this);
     }
 
+    // returns true if string ended with `suffix`, false otherwise
     inline bool ChopSuffix(const TdSelf& suffix) noexcept {
         return BeforeSuffix(suffix, *this);
     }

@@ -46,7 +46,7 @@ void TSockTest::TestSock() {
     TSocket s(addr);
     TSocketOutput so(s);
     TSocketInput si(s);
-    const TStringBuf req = AsStringBuf("GET / HTTP/1.1\r\nHost: yandex.ru\r\n\r\n");
+    const TStringBuf req = "GET / HTTP/1.1\r\nHost: yandex.ru\r\n\r\n";
 
     so.Write(req.data(), req.size());
 
@@ -308,7 +308,7 @@ void TPollTest::TestPollInOut() {
 
     int expectedCount = 0;
     for (size_t i = 0; i < connectedSockets.size(); ++i) {
-        pollfd fd = {(i % 5 == 4) ? INVALID_SOCKET : *connectedSockets[i], POLLIN | POLLOUT, 0};
+        pollfd fd = {(i % 5 == 4) ? INVALID_SOCKET : static_cast<SOCKET>(*connectedSockets[i]), POLLIN | POLLOUT, 0};
         fds.push_back(fd);
         if (i % 5 != 4)
             ++expectedCount;

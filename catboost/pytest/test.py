@@ -370,6 +370,27 @@ def test_multiregression_single(boosting_type, n_trees):
     ]
 
 
+@pytest.mark.parametrize('boosting_type', BOOSTING_TYPE)
+@pytest.mark.parametrize('n_trees', [100, 500])
+def test_multiregression_with_cat_features(boosting_type, n_trees):
+    output_model_path = yatest.common.test_output_path('model.bin')
+    output_eval_path = yatest.common.test_output_path('test.eval')
+
+    cmd_fit = (
+        '--loss-function', 'MultiRMSE',
+        '--boosting-type', boosting_type,
+        '-f', data_file('multiregression', 'train'),
+        '-t', data_file('multiregression', 'test'),
+        '--column-description', data_file('multiregression', 'train_with_cat_features.cd'),
+        '-i', '{}'.format(n_trees),
+        '-T', '4',
+        '-m', output_model_path,
+        '--eval-file', output_eval_path,
+        '--use-best-model', 'false',
+    )
+    execute_catboost_fit('CPU', cmd_fit)
+
+
 @pytest.mark.parametrize('boosting_type, grow_policy', BOOSTING_TYPE_WITH_GROW_POLICIES)
 @pytest.mark.parametrize(
     'dev_score_calc_obj_block_size',
@@ -5043,6 +5064,34 @@ def test_dist_train_yetirank():
         test='repeat_same_query_8_times',
         cd='train.cd'
     ), output_file_switch='--test-err-log'))]
+
+
+@pytest.mark.parametrize(
+    'dev_score_calc_obj_block_size',
+    SCORE_CALC_OBJ_BLOCK_SIZES,
+    ids=SCORE_CALC_OBJ_BLOCK_SIZES_IDS
+)
+@pytest.mark.parametrize(
+    'one_hot_max_size',
+    [2, 255],
+    ids=['one_hot_max_size=2', 'one_hot_max_size=255']
+)
+def test_dist_train_with_cat_features(dev_score_calc_obj_block_size, one_hot_max_size):
+    cmd = make_deterministic_train_cmd(
+        loss_function='Logloss',
+        pool='adult',
+        train='train_small',
+        test='test_small',
+        cd='train.cd',
+        dev_score_calc_obj_block_size=dev_score_calc_obj_block_size,
+        other_options=('--one-hot-max-size', str(one_hot_max_size))
+    )
+
+    if one_hot_max_size == 2:
+        with pytest.raises(yatest.common.ExecutionError):
+            run_dist_train(cmd)
+    else:
+        return [local_canonical_file(run_dist_train(cmd))]
 
 
 def test_no_target():

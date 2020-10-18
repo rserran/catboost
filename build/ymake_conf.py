@@ -1229,9 +1229,8 @@ class GnuCompiler(Compiler):
             '-DFAKEID=$CPP_FAKEID', '-DARCADIA_ROOT=${ARCADIA_ROOT}', '-DARCADIA_BUILD_ROOT=${ARCADIA_BUILD_ROOT}',
             '-D_THREAD_SAFE', '-D_PTHREADS', '-D_REENTRANT', '-D_LIBCPP_ENABLE_CXX17_REMOVED_FEATURES',
             '-D_LARGEFILE_SOURCE', '-D__STDC_CONSTANT_MACROS', '-D__STDC_FORMAT_MACROS',
-            '$CL_MACRO_INFO_DISABLE_CACHE__NO_UID__'
         ]
-        self.c_flags = ['$CL_DEBUG_INFO_DISABLE_CACHE__NO_UID__']
+        self.c_flags = ['$CL_DEBUG_INFO', '$CL_DEBUG_INFO_DISABLE_CACHE__NO_UID__']
 
         if not self.target.is_android:
             # There is no usable _FILE_OFFSET_BITS=64 support in Androids until API 21. And it's incomplete until at least API 24.
@@ -1324,7 +1323,12 @@ class GnuCompiler(Compiler):
                 else:
                     self.optimize = '-Os'
 
+                # Split all functions and data into separate sections for DCE and ICF linker passes
                 self.c_foptions.extend(['-ffunction-sections', '-fdata-sections'])
+
+                # Generate sections with address significance tables for ICF linker pass
+                if self.tc.is_clang:
+                    self.c_foptions.extend(['-faddrsig'])
             else:
                 self.optimize = '-O3'
 
@@ -1408,9 +1412,26 @@ class GnuCompiler(Compiler):
             }''')
 
         c_builtins = [
-            "-Wno-builtin-macro-redefined", '-D__DATE__=\\""Sep 31 2019\\""', '-D__TIME__=\\"00:00:00\\"',
-            '-D__FILE__=\\""${qe;rootrel:SRC}\\""',
+            "-Wno-builtin-macro-redefined",
+            '-D__DATE__=\\""Sep 31 2019\\""',
+            '-D__TIME__=\\"00:00:00\\"',
         ]
+        compiler_supports_macro_prefix_map = (
+            self.tc.is_clang and self.tc.version_at_least(10) or
+            self.tc.is_gcc and self.tc.version_at_least(8)
+        )
+        if compiler_supports_macro_prefix_map:
+            c_builtins += [
+                # XXX does not support non-normalized paths
+                "-fmacro-prefix-map=${ARCADIA_BUILD_ROOT}/=",
+                "-fmacro-prefix-map=${ARCADIA_ROOT}/=",
+                "-fmacro-prefix-map=$(TOOL_ROOT)/=",
+            ]
+        else:
+            c_builtins += [
+                # XXX this macro substitution breaks __FILE__ in included sources
+                '-D__FILE__=\\""${input;qe;rootrel:SRC}\\""',
+            ]
         c_debug_map = [
             # XXX does not support non-normalized paths
             "-fdebug-prefix-map=${ARCADIA_BUILD_ROOT}=/-B",
@@ -1434,7 +1455,16 @@ class GnuCompiler(Compiler):
             "--replace=$(TOOL_ROOT)=/-T"
         ]
         emit_big('''
-            when ($CONSISTENT_DEBUG == "yes") {{
+            when ($FORCE_CONSISTENT_DEBUG == "yes") {{
+                when ($CLANG == "yes") {{
+                    CL_DEBUG_INFO={c_debug_cl}
+                }}
+                otherwise {{
+                    CL_DEBUG_INFO={c_debug}
+                }}
+                YASM_DEBUG_INFO={yasm_debug}
+            }}
+            elsewhen ($CONSISTENT_DEBUG == "yes") {{
                 when ($CLANG == "yes") {{
                     CL_DEBUG_INFO_DISABLE_CACHE__NO_UID__={c_debug_cl}
                 }}
@@ -1453,7 +1483,10 @@ class GnuCompiler(Compiler):
                 YASM_DEBUG_INFO_DISABLE_CACHE__NO_UID__={yasm_debug_light}
             }}
 
-            when ($CONSISTENT_BUILD == "yes") {{
+            when ($FORCE_CONSISTENT_BUILD == "yes") {{
+                CL_MACRO_INFO={macro}
+            }}
+            elsewhen ($CONSISTENT_BUILD == "yes") {{
                 CL_MACRO_INFO_DISABLE_CACHE__NO_UID__={macro}
             }}
         '''.format(c_debug=' '.join(c_debug_map),
@@ -1492,10 +1525,10 @@ class GnuCompiler(Compiler):
         append('EXTRA_OUTPUT')
 
         style = ['${hide;kv:"p CC"} ${hide;kv:"pc green"}']
-        cxx_args = ['$GCCFILTER', '$YNDEXER_ARGS', '$CXX_COMPILER', '$C_FLAGS_PLATFORM', '$GCC_COMPILE_FLAGS', '$CXXFLAGS', '$EXTRA_OUTPUT', '$SRCFLAGS', '$TOOLCHAIN_ENV', '$YNDEXER_OUTPUT'] + style
-        c_args = ['$GCCFILTER', '$YNDEXER_ARGS', '$C_COMPILER', '$C_FLAGS_PLATFORM', '$GCC_COMPILE_FLAGS', '$CFLAGS', '$CONLYFLAGS', '$EXTRA_OUTPUT', '$SRCFLAGS', '$TOOLCHAIN_ENV', '$YNDEXER_OUTPUT'] + style
+        cxx_args = ['$GCCFILTER', '$YNDEXER_ARGS', '$CXX_COMPILER', '$C_FLAGS_PLATFORM', '$GCC_COMPILE_FLAGS', '$CXXFLAGS', '$CL_MACRO_INFO', '$CL_MACRO_INFO_DISABLE_CACHE__NO_UID__', '$EXTRA_OUTPUT', '$SRCFLAGS', '$TOOLCHAIN_ENV', '$YNDEXER_OUTPUT'] + style
+        c_args = ['$GCCFILTER', '$YNDEXER_ARGS', '$C_COMPILER', '$C_FLAGS_PLATFORM', '$GCC_COMPILE_FLAGS', '$CFLAGS', '$CL_MACRO_INFO', '$CL_MACRO_INFO_DISABLE_CACHE__NO_UID__', '$CONLYFLAGS', '$EXTRA_OUTPUT', '$SRCFLAGS', '$TOOLCHAIN_ENV', '$YNDEXER_OUTPUT'] + style
 
-        ignore_c_args_no_deps = ['$SRCFLAGS', '$YNDEXER_ARGS', '$YNDEXER_OUTPUT', '$EXTRA_OUTPUT', '$EXTRA_COVERAGE_OUTPUT']
+        ignore_c_args_no_deps = ['$SRCFLAGS', '$YNDEXER_ARGS', '$YNDEXER_OUTPUT', '$EXTRA_OUTPUT', '$EXTRA_COVERAGE_OUTPUT', '$CL_MACRO_INFO', '$CL_MACRO_INFO_DISABLE_CACHE__NO_UID__']
         c_args_nodeps = [c if c != '$GCC_COMPILE_FLAGS' else '$EXTRA_C_FLAGS -c -o ${OUTFILE} ${SRC} ${pre=-I:INC}' for c in c_args if c not in ignore_c_args_no_deps]
 
         print 'macro _SRC_cpp(SRC, SRCFLAGS...) {\n .CMD=%s\n}' % ' '.join(cxx_args)
@@ -1648,6 +1681,14 @@ class LD(Linker):
         self.ld_flags = []
 
         if self.build.is_size_optimized:
+            # Enable ICF (identical code folding pass) in safe mode
+            # https://research.google/pubs/pub36912/
+            if self.type == Linker.LLD:
+                self.ld_flags.append('-Wl,-icf=safe')
+
+            # Enable section-level DCE (dead code elimination):
+            # remove whole unused code and data sections
+            # (needs `-ffunction-sections` and `-fdata-sections` to be useful)
             if target.is_macos:
                 self.ld_flags.append('-Wl,-dead_strip')
             elif target.is_linux or target.is_android:
@@ -1659,6 +1700,9 @@ class LD(Linker):
             self.ld_flags.extend(['-ldl', '-lrt', '-Wl,--no-as-needed'])
         elif target.is_android:
             self.ld_flags.extend(['-ldl', '-Wl,--no-as-needed'])
+            if self.type == Linker.LLD and target.android_api < 29:
+                # https://github.com/android/ndk/issues/1196
+                self.ld_flags.append('-Wl,--no-rosegment')
         elif target.is_macos:
             self.ld_flags.append('-Wl,-no_deduplicate')
             if not self.tc.is_clang:
@@ -1885,6 +1929,9 @@ class MSVCToolchainOptions(ToolchainOptions):
 
         self.sdk_version = None
 
+        if build.host.is_windows:
+            self.under_wine = False
+
         if self.ide_msvs:
             bindir = '$(VC_ExecutablePath_x64_x64)\\'
             self.c_compiler = bindir + 'cl.exe'
@@ -2088,6 +2135,39 @@ class MSVCCompiler(MSVC, Compiler):
         flags_c_only = []
 
         if self.tc.use_clang:
+            flags.append('-fcase-insensitive-paths')
+
+            # Some warnings are getting triggered even when NO_COMPILER_WARNINGS is enabled
+            flags.extend((
+                '-Wno-c++11-narrowing',
+                '-Wno-register',
+            ))
+
+            c_warnings.extend((
+                '-Wno-absolute-value',
+                '-Wno-assume',
+                '-Wno-bitwise-op-parentheses',
+                '-Wno-dll-attribute-on-redeclaration',
+                '-Wno-extern-initializer',
+                '-Wno-format',
+                '-Wno-ignored-pragma-optimize',
+                '-Wno-incompatible-pointer-types-discards-qualifiers',
+                '-Wno-inconsistent-dllimport',
+                '-Wno-int-conversion',
+                '-Wno-int-to-void-pointer-cast',
+                '-Wno-invalid-noreturn',
+                '-Wno-logical-op-parentheses',
+                '-Wno-macro-redefined',
+                '-Wno-microsoft-extra-qualification',
+                '-Wno-microsoft-include',
+                '-Wno-parentheses',
+                '-Wno-pragma-pack',
+                '-Wno-return-type',
+                '-Wno-tautological-constant-out-of-range-compare',
+                '-Wno-unknown-argument',
+                '-Wno-unknown-warning-option',
+            ))
+
             cxx_warnings += [
                 '-Woverloaded-virtual', '-Wno-invalid-offsetof', '-Wno-attributes',
                 '-Wno-dynamic-exception-spec',  # IGNIETFERRO-282 some problems with lucid
@@ -2097,6 +2177,8 @@ class MSVCCompiler(MSVC, Compiler):
                 '-Wno-exceptions',
                 '-Wno-inconsistent-missing-override',
                 '-Wno-undefined-var-template',
+                '-Wno-ambiguous-delete',
+                '-Wno-microsoft-unqualified-friend',
             ]
             if self.tc.ide_msvs:
                 cxx_warnings += [
@@ -2178,8 +2260,10 @@ class MSVCCompiler(MSVC, Compiler):
 
         ucrt_include = os.path.join(self.tc.kit_includes, 'ucrt') if not self.tc.ide_msvs else "$(UniversalCRT_IncludePath.Split(';')[0].Replace('\\','/'))"
 
-        append('CFLAGS', '/DY_UCRT_INCLUDE="%s"' % ucrt_include)
-        append('CFLAGS', '/DY_MSVC_INCLUDE="%s"' % vc_include)
+        # clang-cl has '#include_next', and MSVC hasn't. It needs separately specified CRT and VC include directories for libc++ to include second in order standard C and C++ headers.
+        if not self.tc.use_clang:
+            append('CFLAGS', '/DY_UCRT_INCLUDE="%s"' % ucrt_include)
+            append('CFLAGS', '/DY_MSVC_INCLUDE="%s"' % vc_include)
 
         emit_big('''
             when ($NO_WSHADOW == "yes") {
@@ -2193,7 +2277,7 @@ class MSVCCompiler(MSVC, Compiler):
                 OPTIMIZE = /Od
             }''')
 
-        emit('SFDL_FLAG', ['/E', '/C', '/P', '/Fi$SFDL_TMP_OUT'])
+        emit('SFDL_FLAG', ['/E', '/C', '/P', '/TP', '/Fi$SFDL_TMP_OUT'])
         emit('WERROR_FLAG', '/WX')
         emit('WERROR_MODE', self.tc.werror_mode)
 
@@ -2214,7 +2298,7 @@ class MSVCCompiler(MSVC, Compiler):
             }
 
             macro _SRC_c_nodeps(SRC, OUTFILE, INC...) {
-                 .CMD=${TOOLCHAIN_ENV} ${CL_WRAPPER} ${CXX_COMPILER} /c /Fo${OUTFILE} ${SRC} ${EXTRA_C_FLAGS} ${pre=/I :INC} ${CXXFLAGS} ${hide;kv:"soe"} ${hide;kv:"p CC"} ${hide;kv:"pc yellow"}
+                 .CMD=${TOOLCHAIN_ENV} ${CL_WRAPPER} ${C_COMPILER} /c /Fo${OUTFILE} ${SRC} ${EXTRA_C_FLAGS} ${pre=/I :INC} ${CFLAGS} ${hide;kv:"soe"} ${hide;kv:"p CC"} ${hide;kv:"pc yellow"}
             }
 
             macro _SRC_cpp(SRC, SRCFLAGS...) {
@@ -2277,6 +2361,9 @@ class MSVCLinker(MSVC, Linker):
             flags_common += ['/INCREMENTAL']
         else:
             flags_common += ['/INCREMENTAL:NO']
+
+        if self.tc.use_clang:
+            flags_debug_only.append('/STACK:4194304')
 
         # TODO(nslus): DEVTOOLS-1868 remove restriction.
         if not self.tc.under_wine:
@@ -2772,7 +2859,7 @@ class Yasm(object):
         output = '${{output;noext;suf={}:SRC}}'.format('${OBJ_SUF}.o' if self.fmt != 'win' else '${OBJ_SUF}.obj')
         print '''\
 macro _SRC_yasm_impl(SRC, PREINCLUDES[], SRCFLAGS...) {{
-    .CMD={} -f {}$HARDWARE_ARCH {} $YASM_DEBUG_INFO_DISABLE_CACHE__NO_UID__ -D ${{pre=_;suf=_:HARDWARE_TYPE}} -D_YASM_ $ASM_PREFIX_VALUE {} ${{YASM_FLAGS}} ${{pre=-I :_ASM__INCLUDE}} ${{pre=-I :INCLUDE}} ${{SRCFLAGS}} -o {} ${{pre=-P :PREINCLUDES}} ${{input;hide:PREINCLUDES}} ${{input:SRC}} ${{kv;hide:"p AS"}} ${{kv;hide:"pc light-green"}}
+    .CMD={} -f {}$HARDWARE_ARCH {} $YASM_DEBUG_INFO $YASM_DEBUG_INFO_DISABLE_CACHE__NO_UID__ -D ${{pre=_;suf=_:HARDWARE_TYPE}} -D_YASM_ $ASM_PREFIX_VALUE {} ${{YASM_FLAGS}} ${{pre=-I :_ASM__INCLUDE}} ${{pre=-I :INCLUDE}} ${{SRCFLAGS}} -o {} ${{pre=-P :PREINCLUDES}} ${{input;hide:PREINCLUDES}} ${{input:SRC}} ${{kv;hide:"p AS"}} ${{kv;hide:"pc light-green"}}
 
 }}
 '''.format(self.yasm_tool, self.fmt, d_platform, ' '.join(self.flags), output)

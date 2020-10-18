@@ -21,6 +21,8 @@ static constexpr const char* FeatureTypeName() {
         return "Categorical";
     } else if constexpr (std::is_same<TFeature, TTextFeature>::value) {
         return "Text";
+    } else if constexpr (std::is_same<TFeature, TEmbeddingFeature>::value) {
+        return "Embedding";
     } else {
         CB_ENSURE(false, "FeatureTypeName: Unknown feature type");
         return "Unknown";
@@ -103,6 +105,7 @@ namespace NCB {
         const THashSet<ui32>& datasetFloatFeatureFlatIndexes,
         const THashSet<ui32>& datasetCatFeatureFlatIndexes,
         const THashSet<ui32>& datasetTextFeatureFlatIndexes,
+        const THashSet<ui32>& datasetEmbeddingFeatureFlatIndexes,
         THashMap<ui32, ui32>* columnIndexesReorderMap)
     {
         columnIndexesReorderMap->clear();
@@ -119,6 +122,16 @@ namespace NCB {
             model.ModelTrees->GetTextFeatures(),
             &modelFeatureIdSet
         );
+        AddUsedFeatureIdsToSet(
+            model.ModelTrees->GetEmbeddingFeatures(),
+            &modelFeatureIdSet
+        );
+        // we can't remap unnamed features
+        for (const auto& featureId : modelFeatureIdSet) {
+            if (featureId.empty()) {
+                return false;
+            }
+        }
         size_t featureNameIntersection = 0;
         THashMap<TString, ui32> datasetFeatureNamesMap;
 
@@ -155,6 +168,12 @@ namespace NCB {
             datasetTextFeatureFlatIndexes,
             columnIndexesReorderMap
         );
+        CheckFeatureTypes(
+            model.ModelTrees->GetEmbeddingFeatures(),
+            datasetFeatureNamesMap,
+            datasetEmbeddingFeatureFlatIndexes,
+            columnIndexesReorderMap
+        );
         return true;
     }
 
@@ -185,9 +204,16 @@ namespace NCB {
         const auto datasetTextFeatureInternalIdxToExternalIdx =
             datasetFeaturesLayout.GetTextFeatureInternalIdxToExternalIdx();
 
+        const auto datasetEmbeddingFeatureInternalIdxToExternalIdx =
+            datasetFeaturesLayout.GetEmbeddingFeatureInternalIdxToExternalIdx();
+
         THashSet<ui32> datasetTextFeatures(
             datasetTextFeatureInternalIdxToExternalIdx.begin(),
             datasetTextFeatureInternalIdxToExternalIdx.end());
+
+        THashSet<ui32> datasetEmbeddingFeatures(
+            datasetEmbeddingFeatureInternalIdxToExternalIdx.begin(),
+            datasetEmbeddingFeatureInternalIdxToExternalIdx.end());
 
         if (CheckColumnRemappingPossible(
             model,
@@ -195,6 +221,7 @@ namespace NCB {
             datasetFloatFeatures,
             datasetCatFeatures,
             datasetTextFeatures,
+            datasetEmbeddingFeatures,
             columnIndexesReorderMap))
         {
             return;
@@ -221,6 +248,13 @@ namespace NCB {
         CheckFeatureTypesAndNames(
             model.ModelTrees->GetTextFeatures(),
             datasetTextFeatures,
+            datasetFeaturesMetaInfo,
+            columnIndexesReorderMap
+        );
+
+        CheckFeatureTypesAndNames(
+            model.ModelTrees->GetEmbeddingFeatures(),
+            datasetEmbeddingFeatures,
             datasetFeaturesMetaInfo,
             columnIndexesReorderMap
         );

@@ -25,9 +25,6 @@ ALLOW .* -> vendor/github.com/alicebob/miniredis/v2
 # AMQP client with RabbitMQ extensions
 ALLOW .* -> vendor/github.com/streadway/amqp
 
-# Native Go debugger
-ALLOW .* -> vendor/github.com/go-delve/delve/cmd/dlv
-
 # AWS client libraries
 ALLOW .* -> vendor/github.com/aws/aws-sdk-go/aws
 ALLOW .* -> vendor/github.com/aws/aws-sdk-go/service/s3
@@ -40,7 +37,19 @@ ALLOW .* -> vendor/github.com/BurntSushi/toml
 ALLOW .* -> vendor/github.com/c2h5oh/datasize
 
 # etcd client
-ALLOW .* -> vendor/github.com/coreos/etcd
+DENY .* -> vendor/github.com/coreos/etcd/clientv3/naming
+ALLOW .* -> vendor/github.com/coreos/etcd/mvcc
+ALLOW .* -> vendor/github.com/coreos/etcd/etcdserver/stats
+ALLOW .* -> vendor/github.com/coreos/etcd/etcdserver/api
+ALLOW .* -> vendor/github.com/coreos/etcd/wal
+ALLOW .* -> vendor/github.com/coreos/etcd/raft
+ALLOW .* -> vendor/github.com/coreos/etcd/rafthttp
+ALLOW .* -> vendor/github.com/coreos/etcd/snap
+ALLOW .* -> vendor/github.com/coreos/etcd/clientv3
+ALLOW .* -> vendor/github.com/coreos/etcd/pkg/fileutil
+ALLOW .* -> vendor/github.com/coreos/etcd/pkg/stringutil
+ALLOW .* -> vendor/github.com/coreos/etcd/pkg/transport
+ALLOW .* -> vendor/github.com/coreos/etcd/pkg/types
 
 # logging to systemd
 ALLOW .* -> vendor/github.com/coreos/go-systemd/journal
@@ -161,6 +170,7 @@ ALLOW .* -> vendor/github.com/go-swagger/go-swagger/cmd/swagger
 
 # redis client
 ALLOW .* -> vendor/github.com/go-redis/redis/v7
+ALLOW .* -> vendor/github.com/go-redis/redis/v8
 
 # library for accessing the GitHub API v3
 ALLOW .* -> vendor/github.com/google/go-github/v31/github
@@ -280,7 +290,13 @@ ALLOW .* -> vendor/google.golang.org/protobuf
 ALLOW .* -> vendor/google.golang.org/grpc
 
 # Go generated proto packages
-ALLOW .* -> vendor/google.golang.org/genproto
+ALLOW .* -> vendor/google.golang.org/genproto/protobuf
+ALLOW .* -> vendor/google.golang.org/genproto/googleapis/api
+ALLOW .* -> vendor/google.golang.org/genproto/googleapis/api
+ALLOW .* -> vendor/google.golang.org/genproto/googleapis/rpc
+ALLOW .* -> vendor/google.golang.org/genproto/googleapis/iam
+ALLOW .* -> vendor/google.golang.org/genproto/googleapis/logging
+ALLOW .* -> vendor/google.golang.org/genproto/googleapis/type
 
 # Usefull GRPC interceptors
 ALLOW .* -> vendor/github.com/grpc-ecosystem/go-grpc-middleware
@@ -494,6 +510,17 @@ ALLOW .* -> vendor/github.com/minio/sha256-simd
 
 # CONTRIB-1979 command line editor with history
 ALLOW .* -> vendor/github.com/peterh/liner
+
+#
+# Tools
+#
+
+# Native Go debugger
+ALLOW vendor -> vendor/github.com/go-delve/delve/cmd/dlv
+
+# gRPCurl
+ALLOW vendor -> vendor/github.com/fullstorydev/grpcurl/cmd/grpcurl
+
 
 #
 # Temporary exceptions.
