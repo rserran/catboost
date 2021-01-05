@@ -1,5 +1,6 @@
 # coding: utf-8
 
+import base64
 import re
 import sys
 import os
@@ -7,6 +8,7 @@ import logging
 import fnmatch
 import json
 import time
+import traceback
 import collections
 import py
 import pytest
@@ -30,6 +32,12 @@ try:
 except ImportError:
     # fallback for pytest script mode
     import yatest_tools as tools
+
+try:
+    from library.python import filelock
+except ImportError:
+    filelock = None
+
 
 import yatest_lib.tools
 
@@ -122,7 +130,7 @@ def setup_logging(log_path, level=logging.DEBUG, *other_logs):
     root_logger = logging.getLogger()
     for i in range(len(root_logger.handlers) - 1, -1, -1):
         if isinstance(root_logger.handlers[i], YaTestLoggingFileHandler):
-            root_logger.handlers.pop(i)
+            root_logger.handlers.pop(i).close()
     root_logger.setLevel(level)
     for log_file in logs:
         file_handler = YaTestLoggingFileHandler(log_file)
@@ -141,7 +149,7 @@ def pytest_addoption(parser):
     parser.addoption("--python-path", action="store", dest="python_path", default="", help="path the canonical python binary")
     parser.addoption("--valgrind-path", action="store", dest="valgrind_path", default="", help="path the canonical valgring binary")
     parser.addoption("--test-filter", action="append", dest="test_filter", default=None, help="test filter")
-    parser.addoption("--test-file-filter", action="append", dest="test_file_filter", default=None, help="test file filter")
+    parser.addoption("--test-file-filter", action="store", dest="test_file_filter", default=None, help="test file filter")
     parser.addoption("--test-param", action="append", dest="test_params", default=None, help="test parameters")
     parser.addoption("--test-log-level", action="store", dest="test_log_level", choices=["critical", "error", "warning", "info", "debug"], default="debug", help="test log level")
     parser.addoption("--mode", action="store", choices=[RunMode.List, RunMode.Run], dest="mode", default=RunMode.Run, help="testing mode")
@@ -228,15 +236,26 @@ def pytest_configure(config):
     if config.option.root_dir:
         config.rootdir = config.invocation_dir = py.path.local(config.option.root_dir)
 
-    # Arcadia paths from the test DEPENDS section of CMakeLists.txt
-    sys.path.insert(0, os.path.join(config.option.source_root, config.option.project_path))
-    sys.path.extend([os.path.join(config.option.source_root, d) for d in config.option.dep_roots])
-    sys.path.extend([os.path.join(config.option.build_root, d) for d in config.option.dep_roots])
-
+    extra_sys_path = []
+    # Arcadia paths from the test DEPENDS section of ya.make
+    extra_sys_path.append(os.path.join(config.option.source_root, config.option.project_path))
     # Build root is required for correct import of protobufs, because imports are related to the root
     # (like import devtools.dummy_arcadia.protos.lib.my_proto_pb2)
-    sys.path.append(config.option.build_root)
-    os.environ["PYTHONPATH"] = os.pathsep.join(os.environ.get("PYTHONPATH", "").split(os.pathsep) + sys.path)
+    extra_sys_path.append(config.option.build_root)
+
+    for path in config.option.dep_roots:
+        if os.path.isabs(path):
+            extra_sys_path.append(path)
+        else:
+            extra_sys_path.append(os.path.join(config.option.source_root, path))
+
+    sys_path_set = set(sys.path)
+    for path in extra_sys_path:
+        if path not in sys_path_set:
+            sys.path.append(path)
+            sys_path_set.add(path)
+
+    os.environ["PYTHONPATH"] = os.pathsep.join(sys.path)
 
     if not config.option.collectonly:
         if config.option.ya_trace_path:
@@ -256,16 +275,17 @@ def pytest_configure(config):
         faulthandler.register(signal.SIGQUIT, chain=True)
 
     if hasattr(signal, "SIGUSR2"):
-        signal.signal(signal.SIGUSR2, _smooth_shutdown)
+        signal.signal(signal.SIGUSR2, _graceful_shutdown)
 
 
-def _smooth_shutdown(*args):
+def _graceful_shutdown(*args):
     try:
         import library.python.coverage
         library.python.coverage.stop_coverage_tracing()
     except ImportError:
         pass
-    pytest.exit("Smooth shutdown requested")
+    traceback.print_stack(file=sys.stderr)
+    pytest.exit("Graceful shutdown requested")
 
 
 def _get_rusage():
@@ -509,12 +529,13 @@ def pytest_runtest_makereport(item, call):
 
     def logreport(report, result, call):
         test_item = TestItem(report, result, pytest.config.option.test_suffix)
+        if not pytest.config.suite_metrics:
+            pytest.config.suite_metrics["pytest_startup_duration"] = call.start - context.Ctx["YA_PYTEST_START_TIMESTAMP"]
+            pytest.config.ya_trace_reporter.dump_suite_metrics()
+
         pytest.config.ya_trace_reporter.on_log_report(test_item)
         if report.when == "call":
             _collect_test_rusage(item)
-            if not pytest.config.suite_metrics:
-                pytest.config.suite_metrics["pytest_startup_duration"] = call.start - context.Ctx["YA_PYTEST_START_TIMESTAMP"]
-                pytest.config.ya_trace_reporter.dump_suite_metrics()
             pytest.config.ya_trace_reporter.on_finish_test_case(test_item)
         elif report.when == "setup":
             pytest.config.ya_trace_reporter.on_start_test_class(test_item)
@@ -740,26 +761,36 @@ class DeselectedTestItem(CustomTestItem):
 class TraceReportGenerator(object):
 
     def __init__(self, out_file_path):
-        self.File = open(out_file_path, 'w')
+        self._filename = out_file_path
+        self._file = open(out_file_path, 'w')
         self._test_messages = {}
         self._test_duration = {}
+        # Some machinery to avoid data corruption due sloppy fork()
+        self._current_test = (None, None)
+        self._pid = os.getpid()
+        self._wreckage_filename = out_file_path + '.wreckage'
 
     def on_start_test_class(self, test_item):
         pytest.config.ya.set_test_item_node_id(test_item.nodeid)
-        self.trace('test-started', {'class': test_item.class_name.decode('utf-8') if sys.version_info[0] < 3 else test_item.class_name})
+        class_name = test_item.class_name.decode('utf-8') if sys.version_info[0] < 3 else test_item.class_name
+        self._current_test = (class_name, None)
+        self.trace('test-started', {'class': class_name})
 
     def on_finish_test_class(self, test_item):
         pytest.config.ya.set_test_item_node_id(test_item.nodeid)
         self.trace('test-finished', {'class': test_item.class_name.decode('utf-8') if sys.version_info[0] < 3 else test_item.class_name})
 
     def on_start_test_case(self, test_item):
+        class_name = yatest_lib.tools.to_utf8(test_item.class_name)
+        subtest_name = yatest_lib.tools.to_utf8(test_item.test_name)
         message = {
-            'class': yatest_lib.tools.to_utf8(test_item.class_name),
-            'subtest': yatest_lib.tools.to_utf8(test_item.test_name)
+            'class': class_name,
+            'subtest': subtest_name,
         }
         if test_item.nodeid in pytest.config.test_logs:
             message['logs'] = pytest.config.test_logs[test_item.nodeid]
         pytest.config.ya.set_test_item_node_id(test_item.nodeid)
+        self._current_test = (class_name, subtest_name)
         self.trace('subtest-started', message)
 
     def on_finish_test_case(self, test_item, duration_only=False):
@@ -817,15 +848,73 @@ class TraceReportGenerator(object):
             return ""
         return msg + "[[rst]]"
 
-    def trace(self, name, value):
+    def _dump_trace(self, name, value):
         event = {
             'timestamp': time.time(),
             'value': value,
             'name': name
         }
+
         data = to_str(json.dumps(event, ensure_ascii=False))
-        self.File.write(data + '\n')
-        self.File.flush()
+        self._file.write(data + '\n')
+        self._file.flush()
+
+    def _check_sloppy_fork(self, name, value):
+        if self._pid == os.getpid():
+            return
+
+        yatest_logger.error("Skip tracing to avoid data corruption, name = %s, value = %s", name, value)
+
+        try:
+            # Lock wreckage tracefile to avoid race if multiple tests use fork sloppily
+            if filelock:
+                lock = filelock.FileLock(self._wreckage_filename + '.lock')
+                lock.acquire()
+
+            with open(self._wreckage_filename, 'a') as afile:
+                self._file = afile
+
+                parts = [
+                    "It looks like you have leaked process - it could corrupt internal test machinery files.",
+                    "Usually it happens when you casually use fork() without os._exit(),",
+                    "which results in two pytest processes running at the same time.",
+                    "Pid of the original pytest's process is {}, however current process has {} pid.".format(self._pid, os.getpid()),
+                ]
+                if self._current_test[1]:
+                    parts.append("Most likely the problem is in '{}' test.".format(self._current_test))
+                else:
+                    parts.append("Most likely new process was created before any test was launched (during the import stage?).")
+
+                if value.get('comment'):
+                    comment = value.get('comment', '').strip()
+                    # multiline comment
+                    newline_required = '\n' if '\n' in comment else ''
+                    parts.append("Debug info: name = '{}' comment:{}{}".format(name, newline_required, comment))
+                else:
+                    val_str = json.dumps(value, ensure_ascii=False).encode('utf-8')
+                    parts.append("Debug info: name = '{}' value = '{}'".format(name, base64.b64encode(val_str)))
+
+                msg = "[[bad]]{}".format('\n'.join(parts))
+                class_name, subtest_name = self._current_test
+                if subtest_name:
+                    data = {
+                        'class': class_name,
+                        'subtest': subtest_name,
+                        'status': 'fail',
+                        'comment': msg,
+                    }
+                    # overwrite original status
+                    self._dump_trace('subtest-finished', data)
+                else:
+                    self._dump_trace('suite_event', {"errors": [('fail', msg)]})
+        except Exception as e:
+            yatest_logger.exception(e)
+        finally:
+            os._exit(38)
+
+    def trace(self, name, value):
+        self._check_sloppy_fork(name, value)
+        self._dump_trace(name, value)
 
 
 class DryTraceReportGenerator(TraceReportGenerator):
@@ -973,14 +1062,25 @@ class Ya(object):
         return root
 
     def _detect_output_root(self):
-        for p in [
-            # if run from kept test working dir
-            tools.TESTING_OUT_DIR_NAME,
-            # if run from source dir
-            os.path.join("test-results", os.path.basename(os.path.splitext(sys.argv[0])[0]), tools.TESTING_OUT_DIR_NAME),
-        ]:
-            if os.path.exists(p):
-                return p
+
+        # if run from kept test working dir
+        if os.path.exists(tools.TESTING_OUT_DIR_NAME):
+            return tools.TESTING_OUT_DIR_NAME
+
+        # if run from source dir
+        if sys.version_info.major == 3:
+            test_results_dir = "py3test"
+        else:
+            test_results_dir = "pytest"
+
+        test_results_output_path = os.path.join("test-results", test_results_dir, tools.TESTING_OUT_DIR_NAME)
+        if os.path.exists(test_results_output_path):
+            return test_results_output_path
+
+        if os.path.exists(os.path.dirname(test_results_output_path)):
+            os.mkdir(test_results_output_path)
+            return test_results_output_path
+
         return None
 
     def set_test_item_node_id(self, node_id):

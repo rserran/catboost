@@ -26,7 +26,7 @@ namespace NCB {
 }
 
 namespace NPar {
-    class TLocalExecutor;
+    class ILocalExecutor;
 }
 
 
@@ -36,7 +36,7 @@ namespace NPar {
 // (optionally - if scoreCalcer is non-null) calculates scores.
 void CalcStatsAndScores(
     const NCB::TQuantizedForCPUObjectsDataProvider& objectsDataProvider,
-    const std::tuple<const TOnlineCTRHash&, const TOnlineCTRHash&>& allCtrs,
+    const std::tuple<const TOnlineCtrBase&, const TOnlineCtrBase&>& allCtrs,
     const TCalcScoreFold& fold,
     const TCalcScoreFold& prevLevelData,
 
@@ -49,7 +49,7 @@ void CalcStatsAndScores(
     bool useTreeLevelCaching,
     const TVector<int>& currTreeMonotonicConstraints,
     const TMap<ui32, int>& monotonicConstraints,
-    NPar::TLocalExecutor* localExecutor,
+    NPar::ILocalExecutor* localExecutor,
     TBucketStatsCache* statsFromPrevTree,
     TStats3D* stats3d, // can be nullptr (and if PairwiseScoring must be), if so - don't return this data
 

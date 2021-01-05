@@ -72,6 +72,16 @@ TEXT_FEATURE_ESTIMATORS = [
     'BoW,NaiveBayes,BM25'
 ]
 
+ROTTEN_TOMATOES_WITH_EMBEDDINGS_TRAIN_FILE = data_file('rotten_tomatoes_small_with_embeddings', 'train')
+ROTTEN_TOMATOES_WITH_EMBEDDINGS_CD_BINCLASS_FILE = data_file(
+    'rotten_tomatoes_small_with_embeddings',
+    'cd_binclass'
+)
+ROTTEN_TOMATOES_ONLY_EMBEDDINGS_CD_BINCLASS_FILE = data_file(
+    'rotten_tomatoes_small_with_embeddings',
+    'cd_binclass_only_embeddings'
+)
+
 
 def diff_tool(threshold=None):
     return get_limited_precision_dsv_diff_tool(threshold, True)
@@ -113,7 +123,8 @@ def test_dist_train_multiregression(dev_score_calc_obj_block_size):
         train='train',
         test='test',
         cd='train.cd',
-        dev_score_calc_obj_block_size=dev_score_calc_obj_block_size)))]
+        dev_score_calc_obj_block_size=dev_score_calc_obj_block_size,
+        other_options=('--boost-from-average', '0'))))]
 
 
 @pytest.mark.parametrize(
@@ -128,7 +139,8 @@ def test_dist_train_multiregression_single(dev_score_calc_obj_block_size):
         train='train',
         test='test',
         cd='train_single.cd',
-        dev_score_calc_obj_block_size=dev_score_calc_obj_block_size)))]
+        dev_score_calc_obj_block_size=dev_score_calc_obj_block_size,
+        other_options=('--boost-from-average', '0'))))]
 
 
 @pytest.mark.parametrize('boosting_type, grow_policy', BOOSTING_TYPE_WITH_GROW_POLICIES)
@@ -1124,6 +1136,43 @@ def test_pairwise_reproducibility(loss_function):
     eval_4 = yatest.common.test_output_path('test_4.eval')
     run_catboost(4, model_4, eval_4)
     assert filecmp.cmp(eval_1, eval_4)
+
+
+def test_pairs_vs_grouped_pairs():
+    output_model_path = yatest.common.test_output_path('model.bin')
+
+    def run_catboost(learn_pairs_path_with_scheme, test_pairs_path_with_scheme, eval_path):
+        cmd = [
+            '--loss-function', 'PairLogit',
+            '--eval-metric', 'PairAccuracy',
+            '-f', data_file('querywise', 'train'),
+            '-t', data_file('querywise', 'test'),
+            '--column-description', data_file('querywise', 'train.cd'),
+            '--learn-pairs', learn_pairs_path_with_scheme,
+            '--test-pairs', test_pairs_path_with_scheme,
+            '-i', '20',
+            '-T', '4',
+            '-m', output_model_path,
+            '--eval-file', eval_path,
+            '--use-best-model', 'false',
+        ]
+        execute_catboost_fit('CPU', cmd)
+
+    eval_path_ungrouped = yatest.common.test_output_path('test_eval_ungrouped')
+    run_catboost(
+        data_file('querywise', 'train.pairs'),
+        data_file('querywise', 'test.pairs'),
+        eval_path_ungrouped
+    )
+
+    eval_path_grouped = yatest.common.test_output_path('test_eval_grouped')
+    run_catboost(
+        'dsv-grouped://' + data_file('querywise', 'train.grouped_pairs'),
+        'dsv-grouped://' + data_file('querywise', 'test.grouped_pairs'),
+        eval_path_grouped
+    )
+
+    assert filecmp.cmp(eval_path_ungrouped, eval_path_grouped)
 
 
 @pytest.mark.parametrize('boosting_type', BOOSTING_TYPE)
@@ -2469,6 +2518,60 @@ def test_fstr(fstr_type, boosting_type, grow_policy):
         grow_policy=grow_policy,
         normalize=False,
         additional_train_params=(('--max-ctr-complexity', '1') if fstr_type == 'ShapValues' else ())
+    )
+
+
+@pytest.mark.parametrize('fstr_type', ['PredictionValuesChange', 'InternalFeatureImportance', 'InternalInteraction', 'Interaction'])
+@pytest.mark.parametrize('boosting_type, grow_policy', BOOSTING_TYPE_WITH_GROW_POLICIES)
+def test_fstr_with_text_features(fstr_type, boosting_type, grow_policy):
+    pool = 'rotten_tomatoes'
+
+    separator_type = 'ByDelimiter'
+    feature_estimators = 'BoW,NaiveBayes,BM25'
+    tokenizers = [{'tokenizer_id': separator_type, 'separator_type': separator_type, 'token_types': ['Word']}]
+    dictionaries = [{'dictionary_id': 'Word'}, {'dictionary_id': 'Bigram', 'gram_order': '2'}]
+    dicts = {'BoW': ['Bigram', 'Word'], 'NaiveBayes': ['Word'], 'BM25': ['Word']}
+    feature_processing = [{'feature_calcers': [calcer], 'dictionaries_names': dicts[calcer], 'tokenizers_names': [separator_type]} for calcer in feature_estimators.split(',')]
+
+    text_processing = {'feature_processing': {'default': feature_processing}, 'dictionaries': dictionaries, 'tokenizers': tokenizers}
+
+    return do_test_fstr(
+        fstr_type,
+        loss_function='Logloss',
+        input_path=data_file(pool, 'train'),
+        cd_path=data_file(pool, 'cd_binclass'),
+        boosting_type=boosting_type,
+        grow_policy=grow_policy,
+        normalize=False,
+        additional_train_params=('--text-processing', json.dumps(text_processing)) +
+                                (('--max-ctr-complexity', '1') if fstr_type == 'ShapValues' else ())
+    )
+
+
+@pytest.mark.parametrize('fstr_type', ['LossFunctionChange', 'ShapValues'])
+@pytest.mark.parametrize('boosting_type, grow_policy', BOOSTING_TYPE_WITH_GROW_POLICIES)
+def test_fstr_with_text_features_shap(fstr_type, boosting_type, grow_policy):
+    pool = 'rotten_tomatoes'
+
+    separator_type = 'ByDelimiter'
+    feature_estimators = 'NaiveBayes'
+    tokenizers = [{'tokenizer_id': separator_type, 'separator_type': separator_type, 'token_types': ['Word']}]
+    dictionaries = [{'dictionary_id': 'Word'}, {'dictionary_id': 'Bigram', 'gram_order': '2'}]
+    dicts = {'BoW': ['Bigram', 'Word'], 'NaiveBayes': ['Word'], 'BM25': ['Word']}
+    feature_processing = [{'feature_calcers': [calcer], 'dictionaries_names': dicts[calcer], 'tokenizers_names': [separator_type]} for calcer in feature_estimators.split(',')]
+
+    text_processing = {'feature_processing': {'default': feature_processing}, 'dictionaries': dictionaries, 'tokenizers': tokenizers}
+
+    return do_test_fstr(
+        fstr_type,
+        loss_function='Logloss',
+        input_path=data_file(pool, 'train'),
+        cd_path=data_file(pool, 'cd_binclass'),
+        boosting_type=boosting_type,
+        grow_policy=grow_policy,
+        normalize=False,
+        additional_train_params=('--random-strength', '0', '--text-processing', json.dumps(text_processing)) +
+            (('--max-ctr-complexity', '1') if fstr_type == 'ShapValues' else ())
     )
 
 
@@ -7505,8 +7608,6 @@ def test_apply_output_column_by_idx():
     execute_catboost_fit('CPU', cmd)
 
     column_names = [
-        'User_ID',
-        'Product_ID',
         'Gender',
         'Age',
         'Occupation',
@@ -7516,10 +7617,10 @@ def test_apply_output_column_by_idx():
         'Product_Category_1',
         'Product_Category_2',
         'Product_Category_3',
-        'Purchase'
     ]
-    output_columns = ','.join(['#{}:{}'.format(idx, name) for idx, name in enumerate(column_names)])
-    output_columns = 'RawFormulaVal,' + output_columns
+    output_columns = ['#{}:{}'.format(idx, name) for idx, name in enumerate(column_names)]
+    output_columns = ['RawFormulaVal'] + ['GroupId', 'SampleId'] + output_columns + ['Label']
+    output_columns = ','.join(output_columns)
 
     cmd = (
         CATBOOST_PATH, 'calc',
@@ -7533,8 +7634,10 @@ def test_apply_output_column_by_idx():
     yatest.common.execute(cmd)
 
     with open(output_eval_path, 'r') as f:
+        f.readline()
         eval_lines = f.readlines()
     with open(test, 'r') as f:
+        f.readline()
         test_lines = f.readlines()
 
     assert len(eval_lines) == len(test_lines)
@@ -8621,7 +8724,11 @@ def test_fit_binclass_with_text_features(boosting_type, separator_type, feature_
     apply_catboost(output_model_path, test_file, cd_file, calc_eval_path, output_columns=['RawFormulaVal'])
     assert filecmp.cmp(test_eval_path, calc_eval_path)
 
-    return [local_canonical_file(learn_error_path), local_canonical_file(test_error_path)]
+    return [
+        local_canonical_file(learn_error_path),
+        local_canonical_file(test_error_path),
+        local_canonical_file(test_eval_path)
+    ]
 
 
 @pytest.mark.parametrize('separator_type', SEPARATOR_TYPES)
@@ -8666,8 +8773,11 @@ def test_fit_multiclass_with_text_features(separator_type, feature_estimators, l
 
     apply_catboost(output_model_path, test_file, cd_file, calc_eval_path, output_columns=['RawFormulaVal'])
     assert filecmp.cmp(test_eval_path, calc_eval_path)
-
-    return [local_canonical_file(learn_error_path), local_canonical_file(test_error_path)]
+    return [
+        local_canonical_file(learn_error_path),
+        local_canonical_file(test_error_path),
+        local_canonical_file(test_eval_path)
+    ]
 
 
 @pytest.mark.parametrize('grow_policy', GROW_POLICIES)
@@ -8966,6 +9076,45 @@ def test_fit_with_per_feature_text_options(boosting_type):
     execute_catboost_fit('CPU', cmd)
 
     apply_catboost(output_model_path, test_file, cd_file, calc_eval_path, output_columns=['RawFormulaVal'])
+    assert filecmp.cmp(test_eval_path, calc_eval_path)
+
+    return [local_canonical_file(learn_error_path), local_canonical_file(test_error_path)]
+
+
+@pytest.mark.parametrize('boosting_type', BOOSTING_TYPE)
+def test_embeddings_train(boosting_type):
+    output_model_path = yatest.common.test_output_path('model.bin')
+    learn_error_path = yatest.common.test_output_path('learn.tsv')
+    test_error_path = yatest.common.test_output_path('test.tsv')
+
+    test_eval_path = yatest.common.test_output_path('test.eval')
+    calc_eval_path = yatest.common.test_output_path('calc.eval')
+
+    cmd = (
+        '--loss-function', 'Logloss',
+        '--eval-metric', 'AUC',
+        '-f', ROTTEN_TOMATOES_WITH_EMBEDDINGS_TRAIN_FILE,
+        '-t', ROTTEN_TOMATOES_WITH_EMBEDDINGS_TRAIN_FILE,
+        '--column-description', ROTTEN_TOMATOES_ONLY_EMBEDDINGS_CD_BINCLASS_FILE,
+        '--boosting-type', boosting_type,
+        '-i', '20',
+        '-T', '4',
+        '-m', output_model_path,
+        '--learn-err-log', learn_error_path,
+        '--test-err-log', test_error_path,
+        '--eval-file', test_eval_path,
+        '--output-columns', 'RawFormulaVal',
+        '--use-best-model', 'false',
+    )
+    execute_catboost_fit('CPU', cmd)
+
+    apply_catboost(
+        output_model_path,
+        ROTTEN_TOMATOES_WITH_EMBEDDINGS_TRAIN_FILE,
+        ROTTEN_TOMATOES_ONLY_EMBEDDINGS_CD_BINCLASS_FILE,
+        calc_eval_path,
+        output_columns=['RawFormulaVal']
+    )
     assert filecmp.cmp(test_eval_path, calc_eval_path)
 
     return [local_canonical_file(learn_error_path), local_canonical_file(test_error_path)]

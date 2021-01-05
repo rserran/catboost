@@ -104,6 +104,7 @@ bool THttp2Options::RedirectionNotError = false;
 bool THttp2Options::AnyResponseIsNotError = false;
 bool THttp2Options::TcpKeepAlive = false;
 i32 THttp2Options::LimitRequestsPerConnection = -1;
+bool THttp2Options::QuickAck = false;
 
 bool THttp2Options::Set(TStringBuf name, TStringBuf value) {
 #define HTTP2_TRY_SET(optType, optName)       \
@@ -114,7 +115,7 @@ bool THttp2Options::Set(TStringBuf name, TStringBuf value) {
     HTTP2_TRY_SET(TDuration, ConnectTimeout)
     else HTTP2_TRY_SET(TDuration, InputDeadline)
     else HTTP2_TRY_SET(TDuration, OutputDeadline)
-    else HTTP2_TRY_SET(TDuration, SymptomSlowConnect) else HTTP2_TRY_SET(size_t, InputBufferSize) else HTTP2_TRY_SET(bool, KeepInputBufferForCachedConnections) else HTTP2_TRY_SET(size_t, AsioThreads) else HTTP2_TRY_SET(size_t, AsioServerThreads) else HTTP2_TRY_SET(bool, EnsureSendingCompleteByAck) else HTTP2_TRY_SET(int, Backlog) else HTTP2_TRY_SET(TDuration, ServerInputDeadline) else HTTP2_TRY_SET(TDuration, ServerOutputDeadline) else HTTP2_TRY_SET(TDuration, ServerInputDeadlineKeepAliveMax) else HTTP2_TRY_SET(TDuration, ServerInputDeadlineKeepAliveMin) else HTTP2_TRY_SET(bool, ServerUseDirectWrite) else HTTP2_TRY_SET(bool, UseResponseAsErrorMessage) else HTTP2_TRY_SET(bool, FullHeadersAsErrorMessage) else HTTP2_TRY_SET(bool, ErrorDetailsAsResponseBody) else HTTP2_TRY_SET(bool, RedirectionNotError) else HTTP2_TRY_SET(bool, AnyResponseIsNotError) else HTTP2_TRY_SET(bool, TcpKeepAlive) else HTTP2_TRY_SET(i32, LimitRequestsPerConnection) else {
+    else HTTP2_TRY_SET(TDuration, SymptomSlowConnect) else HTTP2_TRY_SET(size_t, InputBufferSize) else HTTP2_TRY_SET(bool, KeepInputBufferForCachedConnections) else HTTP2_TRY_SET(size_t, AsioThreads) else HTTP2_TRY_SET(size_t, AsioServerThreads) else HTTP2_TRY_SET(bool, EnsureSendingCompleteByAck) else HTTP2_TRY_SET(int, Backlog) else HTTP2_TRY_SET(TDuration, ServerInputDeadline) else HTTP2_TRY_SET(TDuration, ServerOutputDeadline) else HTTP2_TRY_SET(TDuration, ServerInputDeadlineKeepAliveMax) else HTTP2_TRY_SET(TDuration, ServerInputDeadlineKeepAliveMin) else HTTP2_TRY_SET(bool, ServerUseDirectWrite) else HTTP2_TRY_SET(bool, UseResponseAsErrorMessage) else HTTP2_TRY_SET(bool, FullHeadersAsErrorMessage) else HTTP2_TRY_SET(bool, ErrorDetailsAsResponseBody) else HTTP2_TRY_SET(bool, RedirectionNotError) else HTTP2_TRY_SET(bool, AnyResponseIsNotError) else HTTP2_TRY_SET(bool, TcpKeepAlive) else HTTP2_TRY_SET(i32, LimitRequestsPerConnection) else HTTP2_TRY_SET(bool, QuickAck) else {
         return false;
     }
     return true;
@@ -215,43 +216,43 @@ namespace {
 
     struct TRequestGet1: public TRequestGet {
         static inline TStringBuf Name() noexcept {
-            return AsStringBuf("http");
+            return TStringBuf("http");
         }
     };
 
     struct TRequestPost1: public TRequestPost {
         static inline TStringBuf Name() noexcept {
-            return AsStringBuf("post");
+            return TStringBuf("post");
         }
     };
 
     struct TRequestFull1: public TRequestFull {
         static inline TStringBuf Name() noexcept {
-            return AsStringBuf("full");
+            return TStringBuf("full");
         }
     };
 
     struct TRequestGet2: public TRequestGet {
         static inline TStringBuf Name() noexcept {
-            return AsStringBuf("http2");
+            return TStringBuf("http2");
         }
     };
 
     struct TRequestPost2: public TRequestPost {
         static inline TStringBuf Name() noexcept {
-            return AsStringBuf("post2");
+            return TStringBuf("post2");
         }
     };
 
     struct TRequestFull2: public TRequestFull {
         static inline TStringBuf Name() noexcept {
-            return AsStringBuf("full2");
+            return TStringBuf("full2");
         }
     };
 
     struct TRequestUnixSocketGet: public TRequestGet {
         static inline TStringBuf Name() noexcept {
-            return AsStringBuf("http+unix");
+            return TStringBuf("http+unix");
         }
 
         static TRequestSettings RequestSettings() {
@@ -263,7 +264,7 @@ namespace {
 
     struct TRequestUnixSocketPost: public TRequestPost {
         static inline TStringBuf Name() noexcept {
-            return AsStringBuf("post+unix");
+            return TStringBuf("post+unix");
         }
 
         static TRequestSettings RequestSettings() {
@@ -275,7 +276,7 @@ namespace {
 
     struct TRequestUnixSocketFull: public TRequestFull {
         static inline TStringBuf Name() noexcept {
-            return AsStringBuf("full+unix");
+            return TStringBuf("full+unix");
         }
 
         static TRequestSettings RequestSettings() {
@@ -768,8 +769,15 @@ namespace {
             DBGOUT("receive:" << TStringBuf(Buff_.Get(), bytes));
             try {
                 if (!Prs_) {
-                    throw yexception() << AsStringBuf("receive some data while not in request");
+                    throw yexception() << TStringBuf("receive some data while not in request");
                 }
+
+#if defined(_linux_)
+                if (THttp2Options::QuickAck) {
+                    SetSockOpt(AS_.Native(), SOL_TCP, TCP_QUICKACK, (int)1);
+                }
+#endif
+
                 DBGOUT("parse:");
                 while (!Prs_->Parse(Buff_.Get(), bytes)) {
                     if (BuffSize_ == bytes) {
@@ -1217,7 +1225,7 @@ namespace {
 
                 THttpHeaders hdrs = rsp->Headers();
                 for (auto h = hdrs.begin(); h < hdrs.end(); h++) {
-                    err << h->ToString() << AsStringBuf("\r\n");
+                    err << h->ToString() << TStringBuf("\r\n");
                 }
 
                 message = err.Str();
@@ -1225,7 +1233,7 @@ namespace {
                 message = rsp->DecodedContent();
             } else {
                 TStringStream err;
-                err << AsStringBuf("request failed(") << rsp->FirstLine() << AsStringBuf(")");
+                err << TStringBuf("request failed(") << rsp->FirstLine() << TStringBuf(")");
                 message = err.Str();
             }
 
@@ -1358,7 +1366,7 @@ namespace {
 
         protected:
             TStringBuf Scheme() const override {
-                return AsStringBuf("http");
+                return TStringBuf("http");
             }
 
             TString RemoteHost() const override {
@@ -1576,7 +1584,7 @@ namespace {
             }
 
             static void PrintHttpVersion(IOutputStream& out, const THttpVersion& ver) {
-                out << AsStringBuf("HTTP/") << ver.Major << AsStringBuf(".") << ver.Minor;
+                out << TStringBuf("HTTP/") << ver.Major << TStringBuf(".") << ver.Minor;
             }
 
             struct TResponseData : TThrRefBase {
@@ -1599,21 +1607,21 @@ namespace {
                     THttpResponseFormatter(TData& theData, const TString& contentEncoding, const THttpVersion& theVer, const TString& theHeaders, int theHttpCode, bool closeConnection) {
                         Header.Reserve(128 + contentEncoding.size() + theHeaders.size());
                         PrintHttpVersion(Header, theVer);
-                        Header << AsStringBuf(" ") << HttpCodeStrEx(theHttpCode);
+                        Header << TStringBuf(" ") << HttpCodeStrEx(theHttpCode);
                         if (Compress(theData, contentEncoding)) {
-                            Header << AsStringBuf("\r\nContent-Encoding: ") << contentEncoding;
+                            Header << TStringBuf("\r\nContent-Encoding: ") << contentEncoding;
                         }
-                        Header << AsStringBuf("\r\nContent-Length: ") << theData.size();
+                        Header << TStringBuf("\r\nContent-Length: ") << theData.size();
                         if (closeConnection) {
-                            Header << AsStringBuf("\r\nConnection: close");
+                            Header << TStringBuf("\r\nConnection: close");
                         } else if (Y_LIKELY(theVer.Major > 1 || theVer.Minor > 0)) {
                             // since HTTP/1.1 Keep-Alive is default behaviour
-                            Header << AsStringBuf("\r\nConnection: Keep-Alive");
+                            Header << TStringBuf("\r\nConnection: Keep-Alive");
                         }
                         if (theHeaders) {
                             Header << theHeaders;
                         }
-                        Header << AsStringBuf("\r\n\r\n");
+                        Header << TStringBuf("\r\n\r\n");
 
                         Body.swap(theData);
 
@@ -1657,7 +1665,7 @@ namespace {
                 public:
                     THttpErrorResponseFormatter(unsigned theHttpCode, const TString& theDescr, const THttpVersion& theVer, bool closeConnection) {
                         PrintHttpVersion(Answer, theVer);
-                        Answer << AsStringBuf(" ") << theHttpCode << AsStringBuf(" ");
+                        Answer << TStringBuf(" ") << theHttpCode << TStringBuf(" ");
                         if (theDescr.size() && !THttp2Options::ErrorDetailsAsResponseBody) {
                             // Reason-Phrase  = *<TEXT, excluding CR, LF>
                             // replace bad chars to '.'
@@ -1679,11 +1687,11 @@ namespace {
                         }
 
                         if (closeConnection) {
-                            Answer << AsStringBuf("\r\nConnection: close");
+                            Answer << TStringBuf("\r\nConnection: close");
                         }
 
                         if (THttp2Options::ErrorDetailsAsResponseBody) {
-                            Answer << AsStringBuf("\r\nContent-Length:") << theDescr.size() << "\r\n\r\n" << theDescr;
+                            Answer << TStringBuf("\r\nContent-Length:") << theDescr.size() << "\r\n\r\n" << theDescr;
                         } else {
                             Answer << AsStringBuf("\r\n"
                                                 "Content-Length:0\r\n\r\n");

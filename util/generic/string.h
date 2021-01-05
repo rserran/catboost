@@ -13,7 +13,6 @@
 #include <util/system/atomic.h>
 
 #include "utility.h"
-#include "chartraits.h"
 #include "bitops.h"
 #include "explicit_type.h"
 #include "reserve.h"
@@ -214,7 +213,7 @@ protected:
     void Clone() {
         const size_t len = length();
 
-        Relink(TTraits::Copy(Allocate(len), Data_, len));
+        Relink(TTraits::copy(Allocate(len), Data_, len));
     }
 
     void TruncNonShared(size_t n) {
@@ -393,7 +392,7 @@ public:
 
         if (n > len) {
             ReserveAndResize(n);
-            TTraits::Assign(Data_ + len, n - len, c);
+            TTraits::assign(Data_ + len, n - len, c);
 
             return *this;
         }
@@ -465,7 +464,7 @@ public:
         pos = Min(pos, len);
         n = Min(n, len - pos);
         Data_ = Allocate(n);
-        TTraits::Copy(Data_, s.Data_ + pos, n);
+        TTraits::copy(Data_, s.Data_ + pos, n);
 #endif
     }
 
@@ -478,7 +477,7 @@ public:
         const size_t len = TBase::StrLen(pc);
 
         Data_ = Allocate(len);
-        TTraits::Copy(Data_, pc, len);
+        TTraits::copy(Data_, pc, len);
 #endif
     }
 
@@ -489,7 +488,7 @@ public:
     {
 #ifndef TSTRING_IS_STD_STRING
         Data_ = Allocate(n);
-        TTraits::Copy(Data_, pc, n);
+        TTraits::copy(Data_, pc, n);
 #endif
     }
 
@@ -500,24 +499,19 @@ public:
     {
 #ifndef TSTRING_IS_STD_STRING
         Data_ = Allocate(n);
-        TTraits::Copy(Data_, pc + pos, n);
+        TTraits::copy(Data_, pc + pos, n);
 #endif
     }
 
-    explicit TBasicString(TExplicitType<TCharType> c) {
 #ifdef TSTRING_IS_STD_STRING
+    explicit TBasicString(TExplicitType<TCharType> c) {
         Storage_.push_back(c);
+    }
 #else
+    explicit TBasicString(TExplicitType<TCharType> c) {
         Data_ = Allocate(1);
         Data_[0] = c;
-#endif
     }
-
-#ifdef TSTRING_IS_STD_STRING
-    explicit TBasicString(TCharType c) {
-        Storage_.push_back(c);
-    }
-#else
     explicit TBasicString(const TCharRef& c) {
         Data_ = Allocate(1);
         Data_[0] = c;
@@ -531,7 +525,7 @@ public:
     {
 #ifndef TSTRING_IS_STD_STRING
         Data_ = Allocate(n);
-        TTraits::Assign(Data_, n, c);
+        TTraits::assign(Data_, n, c);
 #endif
     }
 
@@ -556,7 +550,7 @@ public:
     {
 #ifndef TSTRING_IS_STD_STRING
         Data_ = Allocate(e - b);
-        TTraits::Copy(Data_, b, e - b);
+        TTraits::copy(Data_, b, e - b);
 #endif
     }
 
@@ -569,7 +563,7 @@ public:
     {
 #ifndef TSTRING_IS_STD_STRING
         if (0 != s.size()) {
-            TTraits::Copy(Data_, s.data(), s.size());
+            TTraits::copy(Data_, s.data(), s.size());
         }
 #endif
     }
@@ -582,7 +576,7 @@ public:
     {
 #ifndef TSTRING_IS_STD_STRING
         Data_ = Allocate(s.size());
-        TTraits::Copy(Data_, s.data(), s.size());
+        TTraits::copy(Data_, s.data(), s.size());
 #endif
     }
 
@@ -624,7 +618,7 @@ private:
 
     template <typename... R>
     static void CopyAll(TCharType* p, const TBasicStringBuf<TCharType, TTraits> s, const R&... r) {
-        TTraits::Copy(p, s.data(), s.size());
+        TTraits::copy(p, s.data(), s.size());
         CopyAll(p + s.size(), r...);
     }
 
@@ -703,11 +697,11 @@ public:
 
         if (Y_LIKELY(IsDetached() && (pc + len <= TBase::begin() || pc >= TBase::end()))) {
             ResizeNonShared(len);
-            TTraits::Copy(Data_, pc, len);
+            TTraits::copy(Data_, pc, len);
         } else if (IsDetached() && pc == data() && capacity() >= len) {
             TruncNonShared(len);
         } else {
-            Relink(TTraits::Copy(Allocate(len), pc, len));
+            Relink(TTraits::copy(Allocate(len), pc, len));
         }
 #endif
 
@@ -732,7 +726,7 @@ public:
             Relink(Allocate(len));
         }
 
-        TTraits::Copy(Data_, pc, len);
+        TTraits::copy(Data_, pc, len);
 #endif
 
         return *this;
@@ -825,7 +819,7 @@ public:
             }
         } else {
             const size_t sufficientLen = Max(length(), len);
-            Relink(TTraits::Copy(Allocate(length(), sufficientLen, nullptr), Data_, length()));
+            Relink(TTraits::copy(Allocate(length(), sufficientLen, nullptr), Data_, length()));
         }
 #endif
     }
@@ -921,7 +915,7 @@ public:
         if (IsDetached()) {
             ResizeNonShared(len);
         } else {
-            Relink(TTraits::Copy(Allocate(len), Data_, Min(len, length())));
+            Relink(TTraits::copy(Allocate(len), Data_, Min(len, length())));
         }
 #endif
     }
@@ -934,7 +928,7 @@ public:
         const size_t nlen = olen + len;
 
         ReserveAndResize(nlen);
-        TTraits::Copy(Data_ + olen, pc, len);
+        TTraits::copy(Data_ + olen, pc, len);
 #endif
 
         return *this;
@@ -1024,7 +1018,6 @@ public:
                 static_cast<const TBase&>(*this));
     }
 
-
     /*
      * Following overloads of "operator+" aim to choose the cheapest implementation depending on
      * summand types: lvalues, detached rvalues, shared rvalues.
@@ -1080,6 +1073,10 @@ public:
     friend TBasicString operator+(TBasicString&& s1, TCharType s2) Y_WARN_UNUSED_RESULT {
         s1 += s2;
         return std::move(s1);
+    }
+
+    friend TBasicString operator+ (TExplicitType<TCharType> ch, const TBasicString& s) Y_WARN_UNUSED_RESULT {
+        return Join(TCharType(ch), s);
     }
 
     friend TBasicString operator+(const TBasicString& s1, const TBasicString& s2) Y_WARN_UNUSED_RESULT {
@@ -1284,14 +1281,14 @@ public:
     }
 
     TBasicString& remove(size_t pos = 0) {
-#ifdef TSTRING_IS_STD_STRING
-        Storage_.erase(pos);
-#else
         if (pos < length()) {
+#ifdef TSTRING_IS_STD_STRING
+            Storage_.erase(pos);
+#else
             Detach();
             TruncNonShared(pos);
-        }
 #endif
+        }
 
         return *this;
     }
@@ -1405,8 +1402,8 @@ private:
     // ~~~ main driver
     TBasicString& replace(size_t pos, size_t del, const TCharType* pc, size_t pos1, size_t ins, size_t len1) {
         size_t len = length();
-        // 'pc' can point to a single character that is not null terminated, so in this case TTraits::GetLength must not be called
-        len1 = pc ? (len1 == TBase::npos ? (ins == TBase::npos ? TTraits::GetLength(pc) : TTraits::GetLength(pc, ins + pos1)) : len1) : 0;
+        // 'pc' can point to a single character that is not null terminated, so in this case TTraits::length must not be called
+        len1 = pc ? (len1 == TBase::npos ? (ins == TBase::npos ? TTraits::length(pc) : NStringPrivate::GetStringLengthWithLimit(pc, ins + pos1)) : len1) : 0;
 
         pos = Min(pos, len);
         pos1 = Min(pos1, len1);
@@ -1432,23 +1429,23 @@ private:
             // 1. alias
             // 2. overlapped
             TCharType* temp = Allocate(total);
-            TTraits::Copy(temp, Data_, pos);
-            TTraits::Copy(temp + pos, pc + pos1, ins);
-            TTraits::Copy(temp + pos + ins, Data_ + pos + del, rem);
+            TTraits::copy(temp, Data_, pos);
+            TTraits::copy(temp + pos, pc + pos1, ins);
+            TTraits::copy(temp + pos + ins, Data_ + pos + del, rem);
             Relink(temp);
         } else if (reserve() < total) {
             // realloc (increasing)
             // 3. not enough room
             Data_ = Allocate(total, GetData());
-            TTraits::Move(Data_ + pos + ins, Data_ + pos + del, rem);
-            TTraits::Copy(Data_ + pos, pc + pos1, ins);
+            TTraits::move(Data_ + pos + ins, Data_ + pos + del, rem);
+            TTraits::copy(Data_ + pos, pc + pos1, ins);
         } else {
             // 1. not alias
             // 2. not overlapped
             // 3. enough room
             // 4. not too much room
-            TTraits::Move(Data_ + pos + ins, Data_ + pos + del, rem);
-            TTraits::Copy(Data_ + pos, pc + pos1, ins);
+            TTraits::move(Data_ + pos + ins, Data_ + pos + del, rem);
+            TTraits::copy(Data_ + pos, pc + pos1, ins);
             //GetData()->SetLength(total);
             TruncNonShared(total);
         }
@@ -1458,16 +1455,6 @@ private:
 #endif
 
 public:
-    // ~~~ Reversion ~~~~
-    void reverse() {
-#ifdef TSTRING_IS_STD_STRING
-        TTraits::Reverse(Storage_.data(), length());
-#else
-        Detach();
-        TTraits::Reverse(Data_, length());
-#endif
-    }
-
     void swap(TBasicString& s) noexcept {
 #ifdef TSTRING_IS_STD_STRING
         std::swap(Storage_, s.Storage_);

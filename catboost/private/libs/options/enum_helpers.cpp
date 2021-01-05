@@ -584,6 +584,11 @@ bool IsUserDefined(ELossFunction loss) {
     return GetInfo(loss)->HasFlags(EMetricAttribute::IsUserDefined);
 }
 
+bool IsUserDefined(TStringBuf metricName) {
+    ELossFunction lossType = ParseLossType(metricName);
+    return IsUserDefined(lossType);
+}
+
 bool IsClassificationObjective(const TStringBuf lossDescription) {
     ELossFunction lossType = ParseLossType(lossDescription);
     return IsClassificationObjective(lossType);
@@ -706,4 +711,22 @@ bool IsUncertaintyPredictionType(EPredictionType type) {
         type == EPredictionType::TotalUncertainty ||
         type == EPredictionType::VirtEnsembles
     );
+}
+
+EEstimatedSourceFeatureType FeatureTypeToEstimatedSourceFeatureType(EFeatureType featureType) {
+    if (featureType == EFeatureType::Text) {
+        return EEstimatedSourceFeatureType::Text;
+    } else {
+        CB_ENSURE(featureType == EFeatureType::Embedding);
+        return EEstimatedSourceFeatureType::Embedding;
+    }
+}
+
+EFeatureType EstimatedSourceFeatureTypeToFeatureType(EEstimatedSourceFeatureType featureType) {
+    if (featureType == EEstimatedSourceFeatureType::Text) {
+        return EFeatureType::Text;
+    } else {
+        CB_ENSURE(featureType == EEstimatedSourceFeatureType::Embedding);
+        return EFeatureType::Embedding;
+    }
 }

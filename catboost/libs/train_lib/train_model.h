@@ -2,6 +2,7 @@
 
 #include <catboost/private/libs/algo/learn_context.h>
 #include <catboost/private/libs/algo_helpers/custom_objective_descriptor.h>
+#include <catboost/libs/data/ctrs.h>
 #include <catboost/libs/data/data_provider.h>
 #include <catboost/libs/eval_result/eval_result.h>
 #include <catboost/libs/loggers/catboost_logger_helpers.h>
@@ -76,6 +77,9 @@ public:
         const TMaybe<TCustomObjectiveDescriptor>& objectiveDescriptor,
         const TMaybe<TCustomMetricDescriptor>& evalMetricDescriptor,
         NCB::TTrainingDataProviders trainingData,
+
+        // can be non-empty only if there is single fold
+        TMaybe<NCB::TPrecomputedOnlineCtrData> precomputedSingleOnlineCtrDataForSingleFold,
         const TLabelConverter& labelConverter,
         ITrainingCallbacks* trainingCallbacks,
         TMaybe<TFullModel*> initModel,
@@ -87,7 +91,7 @@ public:
          * that's why this additional parameter is necessary
          */
         NCB::TDataProviders initModelApplyCompatiblePools,
-        NPar::TLocalExecutor* localExecutor,
+        NPar::ILocalExecutor* localExecutor,
         const TMaybe<TRestorableFastRng64*> rand,
         TFullModel* dstModel,
         const TVector<TEvalResult*>& evalResultPtrs,
@@ -100,7 +104,7 @@ public:
         const NCatboostOptions::TOutputFilesOptions& outputOptions,
         NCB::TTrainingDataProviders trainingData,
         const TLabelConverter& labelConverter,
-        NPar::TLocalExecutor* localExecutor
+        NPar::ILocalExecutor* localExecutor
     ) const = 0;
 
     virtual ~IModelTrainer() = default;

@@ -639,13 +639,13 @@ Y_UNIT_TEST_SUITE(StringSplitter) {
 
         TVector<TString> actual1 = { "another", "one,", "and", "another", "one" };
         num = 0;
-        for (TStringBuf elem : StringSplitter(AsStringBuf("another one, and \n\n     another    one")).SplitBySet(" \n").SkipEmpty()) {
+        for (TStringBuf elem : StringSplitter(TStringBuf("another one, and \n\n     another    one")).SplitBySet(" \n").SkipEmpty()) {
             UNIT_ASSERT_VALUES_EQUAL(elem, actual1[num++]);
         }
 
-        TVector<TUtf16String> actual2 = { UTF8ToWide(u8"привет,"), UTF8ToWide(u8"как"), UTF8ToWide(u8"дела") };
+        TVector<TUtf16String> actual2 = { u"привет,", u"как", u"дела" };
         num = 0;
-        for (TWtringBuf elem : StringSplitter(UTF8ToWide(u8"привет, как дела")).Split(wchar16(' '))) {
+        for (TWtringBuf elem : StringSplitter(u"привет, как дела").Split(wchar16(' '))) {
             UNIT_ASSERT_VALUES_EQUAL(elem, actual2[num++]);
         }
 

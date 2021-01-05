@@ -12,6 +12,8 @@ import threading
 import six
 from functools import reduce
 
+import process_command_files as pcf
+
 arc_project_prefix = 'a.yandex-team.ru/'
 std_lib_prefix = 'contrib/go/_std/src/'
 vendor_prefix = 'vendor/'
@@ -104,8 +106,12 @@ def preprocess_args(args):
 
 
 def compare_versions(version1, version2):
-    v1 = tuple(str(int(x)).zfill(8) for x in version1.split('.'))
-    v2 = tuple(str(int(x)).zfill(8) for x in version2.split('.'))
+    def last_index(version):
+        index = version.find('beta')
+        return len(version) if index < 0 else index
+
+    v1 = tuple(x.zfill(8) for x in version1[:last_index(version1)].split('.'))
+    v2 = tuple(x.zfill(8) for x in version2[:last_index(version2)].split('.'))
     if v1 == v2:
         return 0
     return 1 if v1 < v2 else -1
@@ -385,6 +391,10 @@ def do_compile_asm(args):
     cmd += get_trimpath_args(args)
     cmd += ['-I', args.output_root, '-I', os.path.join(args.pkg_root, 'include')]
     cmd += ['-D', 'GOOS_' + args.targ_os, '-D', 'GOARCH_' + args.targ_arch, '-o', args.output]
+    # TODO: This is just a quick fix to start work on 1.16 support
+    if compare_versions('1.16', args.goversion) >= 0:
+        if args.import_path in ('runtime', 'reflect') or args.import_path.startswith('runtime/internal/'):
+            cmd += ['-compiling-runtime']
     if args.asm_flags:
         cmd += args.asm_flags
     cmd += args.asm_srcs
@@ -451,7 +461,7 @@ def do_link_exe(args):
         is_group = args.targ_os == 'linux'
         if is_group:
             cgo_peers.append('-Wl,--start-group')
-        cgo_peers.extend(os.path.join(args.build_root, x) for x in args.cgo_peers)
+        cgo_peers.extend(args.cgo_peers)
         if is_group:
             cgo_peers.append('-Wl,--end-group')
     try:
@@ -711,11 +721,7 @@ def do_link_test(args):
 
 
 if __name__ == '__main__':
-    # Support @response-file notation for windows to reduce cmd length
-    if sys.argv[1].startswith('@'):
-        with open(sys.argv[1][1:]) as afile:
-            args = afile.read().splitlines()
-        sys.argv[:] = [sys.argv[0]] + args + sys.argv[2:]
+    args = pcf.get_args(sys.argv[1:])
 
     parser = argparse.ArgumentParser(prefix_chars='+')
     parser.add_argument('++mode', choices=['dll', 'exe', 'lib', 'test'], required=True)
@@ -757,7 +763,7 @@ if __name__ == '__main__':
     parser.add_argument('++skip-tests', nargs='*', default=None)
     parser.add_argument('++ydx-file', default='')
     parser.add_argument('++debug-root-map', default=None)
-    args = parser.parse_args()
+    args = parser.parse_args(args)
 
     arc_project_prefix = args.arc_project_prefix
     std_lib_prefix = args.std_lib_prefix

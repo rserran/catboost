@@ -36,6 +36,7 @@
 #define GOOGLE_PROTOBUF_COMPILER_CPP_HELPERS_H__
 
 #include <map>
+#include <string>
 #include <google/protobuf/compiler/cpp/cpp_options.h>
 #include <google/protobuf/descriptor.pb.h>
 #include <google/protobuf/descriptor.h>
@@ -76,12 +77,6 @@ string DependentBaseClassTemplateName(const Descriptor* descriptor);
 // Name of the base class: either the dependent base class (for use with
 // proto_h) or google::protobuf::Message.
 string SuperClassName(const Descriptor* descriptor, const Options& options);
-
-// Yandex extension for backward compatibility
-inline string SuperClassName(const Descriptor* descriptor) {
-  return SuperClassName(descriptor, {});  // not sure it works correct, check it!
-}
-// End of Yandex extension
 
 // Returns a string that down-casts from the dependent base class to the
 // derived class.
@@ -302,10 +297,8 @@ bool HasWeakFields(const FileDescriptor* desc);
 
 // Returns true if the "required" restriction check should be ignored for the
 // given field.
-inline static bool ShouldIgnoreRequiredFieldCheck(const FieldDescriptor* field,
-                                                  const Options& options) {
-  (void)field; // Unused
-  (void)options; // Unused
+inline static bool ShouldIgnoreRequiredFieldCheck(const FieldDescriptor* /* field */,
+                                                  const Options& /* options */) {
   return false;
 }
 

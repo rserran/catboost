@@ -1081,12 +1081,10 @@ static void CalcShapValuesForDocumentBlockMulti(
     const TMaybe<TFixedFeatureParams>& fixedFeatureParams,
     size_t start,
     size_t end,
-    NPar::TLocalExecutor* localExecutor,
+    NPar::ILocalExecutor* localExecutor,
     TVector<TVector<TVector<double>>>* shapValuesForAllDocuments,
     ECalcTypeShapValues calcType
 ) {
-    CheckNonZeroApproxForZeroWeightLeaf(model);
-
     const size_t documentCount = end - start;
 
     auto binarizedFeaturesForBlock = MakeQuantizedFeaturesForEvaluator(model, featuresBlockIterator, start, end);
@@ -1097,7 +1095,7 @@ static void CalcShapValuesForDocumentBlockMulti(
     const int oldShapValuesSize = shapValuesForAllDocuments->size();
     shapValuesForAllDocuments->resize(oldShapValuesSize + end - start);
 
-    NPar::TLocalExecutor::TExecRangeParams blockParams(0, documentCount);
+    NPar::ILocalExecutor::TExecRangeParams blockParams(0, documentCount);
     localExecutor->ExecRange([&] (size_t documentIdxInBlock) {
         TVector<TVector<double>>& shapValues = (*shapValuesForAllDocuments)[oldShapValuesSize + documentIdxInBlock];
 
@@ -1123,7 +1121,7 @@ static void CalcShapValuesByLeafForTreeBlock(
     int end,
     bool calcInternalValues,
     const TMaybe<TFixedFeatureParams>& fixedFeatureParams,
-    NPar::TLocalExecutor* localExecutor,
+    NPar::ILocalExecutor* localExecutor,
     TShapPreparedTrees* preparedTrees,
     ECalcTypeShapValues calcType
 ) {
@@ -1131,7 +1129,7 @@ static void CalcShapValuesByLeafForTreeBlock(
     const auto& combinationClassFeatures = preparedTrees->CombinationClassFeatures;
     const bool isOblivious = forest.GetModelTreeData()->GetNonSymmetricStepNodes().empty() && forest.GetModelTreeData()->GetNonSymmetricNodeIdToLeafId().empty();
 
-    NPar::TLocalExecutor::TExecRangeParams blockParams(start, end);
+    NPar::ILocalExecutor::TExecRangeParams blockParams(start, end);
     localExecutor->ExecRange([&] (size_t treeIdx) {
         if (preparedTrees->CalcShapValuesByLeafForAllTrees && isOblivious) {
             const size_t leafCount = (size_t(1) << forest.GetModelTreeData()->GetTreeSizes()[treeIdx]);
@@ -1206,7 +1204,7 @@ void CalcShapValuesByLeaf(
     const TMaybe<TFixedFeatureParams>& fixedFeatureParams,
     int logPeriod,
     bool calcInternalValues,
-    NPar::TLocalExecutor* localExecutor,
+    NPar::ILocalExecutor* localExecutor,
     TShapPreparedTrees* preparedTrees,
     ECalcTypeShapValues calcType
 ) {
@@ -1246,7 +1244,7 @@ void CalcShapValuesInternalForFeature(
     ui32 featuresCount,
     const NCB::TObjectsDataProvider& objectsData,
     TVector<TVector<TVector<double>>>* shapValues, // [docIdx][featureIdx][dim]
-    NPar::TLocalExecutor* localExecutor,
+    NPar::ILocalExecutor* localExecutor,
     ECalcTypeShapValues calcType
 ) {
 
@@ -1263,7 +1261,7 @@ void CalcShapValuesInternalForFeature(
     TVector<NModelEvaluation::TCalcerIndexType> indices(documentBlockSize * forest.GetTreeCount());
 
     for (ui32 startIdx = 0; startIdx < documentCount; startIdx += documentBlockSize) {
-        NPar::TLocalExecutor::TExecRangeParams blockParams(startIdx, startIdx + Min(documentBlockSize, documentCount - startIdx));
+        NPar::ILocalExecutor::TExecRangeParams blockParams(startIdx, startIdx + Min(documentBlockSize, documentCount - startIdx));
         featuresBlockIterator->NextBlock(blockParams.LastId - blockParams.FirstId);
         auto binarizedFeaturesForBlock = MakeQuantizedFeaturesForEvaluator(model, *featuresBlockIterator, blockParams.FirstId, blockParams.LastId);
 
@@ -1387,7 +1385,7 @@ static TVector<TVector<TVector<double>>> CalcShapValuesWithPreparedTrees(
     const TMaybe<TFixedFeatureParams>& fixedFeatureParams,
     int logPeriod,
     TShapPreparedTrees* preparedTrees,
-    NPar::TLocalExecutor* localExecutor,
+    NPar::ILocalExecutor* localExecutor,
     ECalcTypeShapValues calcType
 ) {
     const size_t documentCount = dataset.ObjectsGrouping->GetObjectCount();
@@ -1440,7 +1438,7 @@ TVector<TVector<TVector<double>>> CalcShapValuesMulti(
     const TMaybe<TFixedFeatureParams>& fixedFeatureParams,
     int logPeriod,
     EPreCalcShapValues mode,
-    NPar::TLocalExecutor* localExecutor,
+    NPar::ILocalExecutor* localExecutor,
     ECalcTypeShapValues calcType,
     EExplainableModelOutput modelOutputType
 ) {
@@ -1482,7 +1480,7 @@ TVector<TVector<double>> CalcShapValues(
     const TMaybe<TFixedFeatureParams>& fixedFeatureParams,
     int logPeriod,
     EPreCalcShapValues mode,
-    NPar::TLocalExecutor* localExecutor,
+    NPar::ILocalExecutor* localExecutor,
     ECalcTypeShapValues calcType,
     EExplainableModelOutput modelOutputType
 ) {
@@ -1534,7 +1532,7 @@ TVector<TVector<TVector<double>>> CalcShapValueWithQuantizedData(
     const size_t documentCount,
     int logPeriod,
     TShapPreparedTrees* preparedTrees,
-    NPar::TLocalExecutor* localExecutor,
+    NPar::ILocalExecutor* localExecutor,
     ECalcTypeShapValues calcType
 ) {
     CalcShapValuesByLeaf(
@@ -1551,7 +1549,7 @@ TVector<TVector<TVector<double>>> CalcShapValueWithQuantizedData(
     const int featuresCount = preparedTrees->CombinationClassFeatures.size();
     const size_t documentBlockSize = CB_THREAD_LIMIT;
     for (ui32 startIdx = 0, blockIdx = 0; startIdx < documentCount; startIdx += documentBlockSize, ++blockIdx) {
-        NPar::TLocalExecutor::TExecRangeParams blockParams(startIdx, startIdx + Min(documentBlockSize, documentCount - startIdx));
+        NPar::ILocalExecutor::TExecRangeParams blockParams(startIdx, startIdx + Min(documentBlockSize, documentCount - startIdx));
         auto quantizedFeaturesBlock = quantizedFeatures[blockIdx];
         auto& indicesForBlock = indices[blockIdx];
         localExecutor->ExecRange([&](ui32 documentIdx) {
@@ -1592,7 +1590,7 @@ void CalcAndOutputShapValues(
     const TString& outputPath,
     int logPeriod,
     EPreCalcShapValues mode,
-    NPar::TLocalExecutor* localExecutor,
+    NPar::ILocalExecutor* localExecutor,
     ECalcTypeShapValues calcType
 ) {
     TShapPreparedTrees preparedTrees = PrepareTrees(

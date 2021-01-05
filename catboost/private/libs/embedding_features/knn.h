@@ -11,6 +11,7 @@
 #include <library/cpp/online_hnsw/base/index_writer.h>
 #include <library/cpp/online_hnsw/dense_vectors/index.h>
 
+#include <util/stream/buffer.h>
 #include <util/memory/blob.h>
 
 using TOnlineHnswCloud = NOnlineHnsw::TOnlineHnswDenseVectorIndex<float, NHnsw::TL2SqrDistance<float>>;
@@ -37,24 +38,57 @@ namespace NCB {
         const TVector<float>& GetVector() const {
             return Cloud.GetVector();
         }
+        const TOnlineHnswCloud& GetCloud() const {
+            return Cloud;
+        }
     private:
         TOnlineHnswCloud Cloud;
     };
 
+    struct TL2Distance {
+    public:
+        TL2Distance(size_t dim)
+            : Dim(dim)
+        {}
+        using TResult = float;
+        using TLess = ::TLess<TResult>;
+        TResult operator()(const float* a, const float* b) const {
+            return Dist(a, b, Dim);
+        }
+    private:
+        NHnsw::TL2SqrDistance<float> Dist;
+        size_t Dim;
+    };
+
     class TKNNCloud : public IKNNCloud {
     public:
-        TKNNCloud(TArrayHolder<ui8>&& indexData, TArrayHolder<ui8>&& vectorData,
-                  size_t idxSize, size_t stSize, size_t dim)
+        TKNNCloud(
+            TBlob&& indexData,
+            TVector<float>&& vectorData,
+            size_t size,
+            size_t dim
+        )
             : IndexData(std::move(indexData))
-            , VectorData(std::move(vectorData))
-            , Cloud(TBlob::NoCopy(IndexData.Get(), idxSize),
-                    TBlob::NoCopy(VectorData.Get(), stSize), dim)
-        { }
+            , Dist(dim)
+            , Cloud(IndexData, NOnlineHnsw::TOnlineHnswIndexReader())
+            , Points(std::move(vectorData), dim, size)
+        {
+            CB_ENSURE(vectorData.size() == dim * size);
+        }
         TVector<ui32> GetNearestNeighbors(const float* embed, ui32 knum) const override;
+
+        const TBlob& GetIndexDataBlob() const {
+            return IndexData;
+        }
+
+        const TVector<float>& GetPointsVector() const {
+            return Points.GetVector();
+        }
     private:
-        TArrayHolder<ui8> IndexData;
-        TArrayHolder<ui8> VectorData;
-        THnswCloud Cloud;
+        TBlob IndexData;
+        TL2Distance Dist;
+        NHnsw::THnswIndexBase Cloud;
+        NOnlineHnsw::TDenseVectorExtendableItemStorage<float> Points;
     };
 
     class TKNNCalcer final : public TEmbeddingFeatureCalcer {
@@ -86,7 +120,7 @@ namespace NCB {
 
     protected:
         TEmbeddingFeatureCalcer::TEmbeddingCalcerFbs SaveParametersToFB(flatbuffers::FlatBufferBuilder& builder) const override;
-        void LoadParametersFromFB(const NCatBoostFbs::TEmbeddingCalcer* calcerFbs) override;
+        void LoadParametersFromFB(const NCatBoostFbs::NEmbeddings::TEmbeddingCalcer* calcerFbs) override;
 
         void SaveLargeParameters(IOutputStream*) const override;
         void LoadLargeParameters(IInputStream*) override;

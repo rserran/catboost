@@ -6,8 +6,13 @@
 # CityHash-1.0.2 is a specific version hardwired into ClickHouse public interface
 ALLOW clickhouse -> contrib/restricted/cityhash-1.0.2
 
-# Ryu is a fast enough alternative to double-conversion, but not the fastest.
-ALLOW clickhouse -> contrib/restricted/ryu
+# dragonbox is a specific library for float formatting
+ALLOW clickhouse -> contrib/restricted/dragonbox
+
+# fast_float is a faster alternative to double-conversion for float parsing.
+# ClickHouse uses the best libraries for performance, that's why it changes them with insane speed. 
+# Arcadia is not ready for this, that's why we added this library in restricted.
+ALLOW clickhouse -> contrib/restricted/fast_float
 
 ALLOW contrib/libs/clickhouse -> contrib/restricted/apache-orc
 
@@ -28,7 +33,13 @@ ALLOW smart_devices -> contrib/restricted/alsa-lib
 ALLOW yandex_io -> contrib/restricted/avahi
 
 # GLib is LGPL
+ALLOW contrib/libs/gdk-pixbuf -> contrib/restricted/glib
 ALLOW contrib/libs/harfbuzz/glib -> contrib/restricted/glib
+ALLOW contrib/libs/libcroco -> contrib/restricted/glib
+ALLOW contrib/libs/librsvg -> contrib/restricted/glib
+ALLOW contrib/libs/pango -> contrib/restricted/glib
+ALLOW maps/libs/img -> contrib/restricted/glib
+ALLOW maps/renderer/libs/svgrenderer -> contrib/restricted/glib
 ALLOW market/cataloger -> contrib/restricted/glib
 ALLOW market/idx/feeds/feedparser -> contrib/restricted/glib
 ALLOW metrika/core/libs/statdaemons -> contrib/restricted/glib
@@ -59,19 +70,25 @@ ALLOW crypta/lib/native/log -> contrib/restricted/spdlog
 ALLOW yandex_io -> contrib/restricted/spdlog
 ALLOW smart_devices/tools/launcher2 -> contrib/restricted/spdlog
 
+ALLOW contrib/libs/tcmalloc -> contrib/restricted/abseil-cpp
 ALLOW contrib/libs/webrtc -> contrib/restricted/abseil-cpp
 ALLOW contrib/libs/ortools -> contrib/restricted/abseil-cpp
 ALLOW contrib/libs/tf-1.14 -> contrib/restricted/abseil-cpp-tstring
 
+# cmph is a limited-use library
+ALLOW ads/yacontext -> contrib/restricted/cmph
+ALLOW mssngr/router -> contrib/restricted/cmph
+
 # http-parser is a low-level parser for http bytestream.
 # Consider using high-level alternatives.
 ALLOW contrib/libs/libgit2 -> contrib/restricted/http-parser
-ALLOW contrib/libs/nodejs_8 -> contrib/restricted/http-parser
+ALLOW contrib/libs/nodejs_12 -> contrib/restricted/http-parser
 ALLOW contrib/python/aiohttp -> contrib/restricted/http-parser
 ALLOW contrib/python/http_parser -> contrib/restricted/http-parser
 ALLOW contrib/python/httptools -> contrib/restricted/http-parser
 ALLOW mds -> contrib/restricted/http-parser
 ALLOW passport/python/contrib/bjoern -> contrib/restricted/http-parser
+ALLOW taxi/uservices -> contrib/restricted/http-parser
 ALLOW yt/yt/core/http -> contrib/restricted/http-parser
 ALLOW yweb/robot/fetcher/fetcher/user/http -> contrib/restricted/http-parser
 
@@ -110,6 +127,7 @@ ALLOW drive/contrib/cpp/telemetry -> contrib/restricted/boost
 ALLOW smart_devices -> contrib/restricted/boost
 ALLOW speechkit -> contrib/restricted/boost
 ALLOW statbox/libstatbox -> contrib/restricted/boost
+ALLOW taxi/uservices -> contrib/restricted/boost
 ALLOW tools/idl -> contrib/restricted/boost
 ALLOW voicetech/tools -> contrib/restricted/boost
 ALLOW weather/grid_api/lib -> contrib/restricted/boost
@@ -150,6 +168,9 @@ ALLOW contrib/libs/libosmium -> contrib/restricted/protozero
 
 # ashmem is a limited-use low level library
 ALLOW contrib/libs/android_crazy_linker -> contrib/restricted/ashmem
+
+# allow usage of MIT part
+ALLOW .* -> contrib/restricted/librseq/headeronly
 
 # Default policies:
 

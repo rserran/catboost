@@ -14,10 +14,14 @@ NO_COMPILER_WARNINGS()
 
 NO_LINT()
 
-OPTIMIZE_PY_PROTOS()
+IF (USE_VANILLA_PROTOC)
+    PEERDIR(contrib/libs/protobuf_std)
+ELSE()
+    OPTIMIZE_PY_PROTOS()
+    PEERDIR(contrib/libs/protobuf)
+ENDIF()
 
 PEERDIR(
-    contrib/libs/protobuf
     contrib/python/six
 )
 
@@ -33,6 +37,10 @@ SRCDIR(
 CFLAGS(
     -DPYTHON_PROTO2_CPP_IMPL_V2
 )
+
+IF (Y_PROTOBUF_UTF8_VALIDATION_ENABLED_FOR_PYTHON)
+    CFLAGS(-DY_PROTOBUF_UTF8_VALIDATION_ENABLED_FOR_PYTHON)
+ENDIF()
 
 PY_SRCS(
     NAMESPACE google

@@ -120,7 +120,7 @@ def validate_test(unit, kw):
             errors.append("BOOSTTEST is not allowed here")
     elif valid_kw.get('SCRIPT-REL-PATH') == 'gtest':
         project_path = valid_kw.get('BUILD-FOLDER-PATH', "")
-        if not project_path.startswith(("contrib", "devtools", "mail", "mds")):
+        if not project_path.startswith(("contrib", "devtools", "mail", "mds", "taxi")):
             errors.append("GTEST_UGLY is not allowed here, use GTEST instead")
 
     size_timeout = collections.OrderedDict(sorted(consts.TestSize.DefaultTimeouts.items(), key=lambda t: t[1]))
@@ -420,7 +420,14 @@ def onadd_ytest(unit, *args):
         'TEST_IOS_RUNTIME_TYPE': unit.get('TEST_IOS_RUNTIME_TYPE_VALUE') or '',
         'ANDROID_APK_TEST_ACTIVITY': unit.get('ANDROID_APK_TEST_ACTIVITY_VALUE') or '',
         'TEST_PARTITION': unit.get("TEST_PARTITION") or 'SEQUENTIAL',
+        'GO_BENCH_TIMEOUT': unit.get('GO_BENCH_TIMEOUT') or '',
     }
+
+    if flat_args[1] == "go.bench":
+        if "ya:run_go_benchmark" not in test_record["TAG"]:
+            return
+        else:
+            test_record["TEST-NAME"] += "_bench"
 
     if flat_args[1] == 'fuzz.test' and unit.get('FUZZING') == 'yes':
         test_record['FUZZING'] = '1'
@@ -486,13 +493,7 @@ def onadd_check(unit, *args):
     test_timeout = ''
     fork_mode = ''
 
-    if check_type in ["PEP8", "PYFLAKES", "PY_FLAKES", "PEP8_2", "PYFLAKES_2"]:
-        script_rel_path = "py.lint.pylint"
-        fork_mode = unit.get('TEST_FORK_MODE') or ''
-    elif check_type in ["PEP8_3", "PYFLAKES_3"]:
-        script_rel_path = "py.lint.pylint.3"
-        fork_mode = unit.get('TEST_FORK_MODE') or ''
-    elif check_type in ["flake8.py2", "flake8.py3"]:
+    if check_type in ["flake8.py2", "flake8.py3"]:
         script_rel_path = check_type
         fork_mode = unit.get('TEST_FORK_MODE') or ''
     elif check_type == "JAVA_STYLE":
@@ -701,8 +702,9 @@ def onjava_test(unit, *args):
     path = _common.strip_roots(unit_path)
 
     test_data = get_norm_paths(unit, 'TEST_DATA_VALUE')
-    test_data.append('arcadia/build/scripts/unpacking_jtest_runner.py')
+    test_data.append('arcadia/build/scripts/run_junit.py')
     test_data.append('arcadia/build/scripts/run_testng.py')
+    test_data.append('arcadia/build/scripts/unpacking_jtest_runner.py')
 
     data, data_files = get_canonical_test_resources(unit)
     test_data += data

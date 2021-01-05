@@ -17,7 +17,7 @@
 template <typename Function>
 static TVector<TVector<double>> CalcSomeSoftmax(
     const TVector<TVector<double>>& approx,
-    NPar::TLocalExecutor* executor,
+    NPar::ILocalExecutor* executor,
     Function func)
 {
     TVector<TVector<double>> probabilities = approx;
@@ -52,7 +52,7 @@ static TVector<TVector<double>> CalcSomeSoftmax(
 
 static TVector<TVector<double>> CalcSoftmax(
     const TVector<TVector<double>>& approx,
-    NPar::TLocalExecutor* executor)
+    NPar::ILocalExecutor* executor)
 {
     return CalcSomeSoftmax(
         approx, executor,
@@ -63,7 +63,7 @@ static TVector<TVector<double>> CalcSoftmax(
 
 static TVector<TVector<double>> CalcLogSoftmax(
     const TVector<TVector<double>>& approx,
-    NPar::TLocalExecutor* executor)
+    NPar::ILocalExecutor* executor)
 {
     return CalcSomeSoftmax(
         approx, executor,
@@ -74,7 +74,7 @@ static TVector<TVector<double>> CalcLogSoftmax(
 
 static TVector<int> SelectBestClass(
     const TVector<TVector<double>>& approx,
-    NPar::TLocalExecutor* executor)
+    NPar::ILocalExecutor* executor)
 {
     TVector<int> classApprox;
     classApprox.yresize(approx.front().size());
@@ -108,7 +108,7 @@ static void CalcClassificationUncertainty(
     TVector<double>* dataUncertaintyPtr,
     TVector<double>* totalUncertaintyPtr,
     size_t virtEnsemblesCount,
-    NPar::TLocalExecutor* executor)
+    NPar::ILocalExecutor* executor)
 {
     TVector<double>& dataUncertainty = *dataUncertaintyPtr;
     TVector<double>& totalUncertainty = *totalUncertaintyPtr;
@@ -153,7 +153,7 @@ static void CalcRegressionUncertaitny(
     TVector<double>* knowledgeUncertaintyPtr,
     TVector<double>* dataUncertaintyPtr,
     size_t virtEnsemblesCount,
-    NPar::TLocalExecutor* executor)
+    NPar::ILocalExecutor* executor)
 {
     TVector<double>& meanApprox = *meanApproxPtr;
     TVector<double>& knowledgeUncertainty = *knowledgeUncertaintyPtr;
@@ -207,6 +207,7 @@ static void CalcRegressionUncertaitny(
     }
 }
 
+namespace NCB {
 bool IsMulticlass(const TVector<TVector<double>>& approx) {
     return approx.size() > 1;
 }
@@ -250,7 +251,7 @@ TVector<TVector<double>> PrepareEvalForInternalApprox(
     const EPredictionType predictionType,
     const TFullModel& model,
     const TVector<TVector<double>>& approx,
-    NPar::TLocalExecutor* localExecutor
+    NPar::ILocalExecutor* localExecutor
 ) {
     const TExternalLabelsHelper externalLabelsHelper(model);
     const auto& externalApprox
@@ -273,7 +274,7 @@ TVector<TVector<double>> PrepareEval(const EPredictionType predictionType,
 void PrepareEval(const EPredictionType predictionType,
                  const TString& lossFunctionName,
                  const TVector<TVector<double>>& approx,
-                 NPar::TLocalExecutor* executor,
+                 NPar::ILocalExecutor* executor,
                  TVector<TVector<double>>* result) {
 
     switch (predictionType) {
@@ -377,8 +378,9 @@ void PrepareEval(const EPredictionType predictionType,
 TVector<TVector<double>> PrepareEval(const EPredictionType predictionType,
                                      const TString& lossFunctionName,
                                      const TVector<TVector<double>>& approx,
-                                     NPar::TLocalExecutor* localExecutor) {
+                                     NPar::ILocalExecutor* localExecutor) {
     TVector<TVector<double>> result;
     PrepareEval(predictionType, lossFunctionName, approx, localExecutor, &result);
     return result;
+}
 }

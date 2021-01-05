@@ -1,7 +1,6 @@
 
 
 RECURSE(
-    android_ifaddrs
     base64
     brotli
     clapack
@@ -13,7 +12,6 @@ RECURSE(
     expat
     fastlz
     flatbuffers
-    flatbuffers/samples
     fmath
     gamma_function_apache_math_port
     jdk
@@ -32,7 +30,6 @@ RECURSE(
     openssl/apps
     openssl/dynamic
     protobuf
-    protobuf/java
     protobuf/python
     protobuf/python/test
     pugixml
@@ -42,6 +39,7 @@ RECURSE(
     re2
     snappy
     sqlite3
+    tbb
     tensorboard
     xxhash
     zlib

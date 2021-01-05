@@ -14,7 +14,6 @@
 #include <catboost/libs/data/feature_names_converter.h>
 #include <catboost/libs/data/borders_io.h>
 #include <catboost/libs/data/load_data.h>
-#include <catboost/private/libs/data_util/exists_checker.h>
 #include <catboost/private/libs/distributed/master.h>
 #include <catboost/private/libs/distributed/worker.h>
 #include <catboost/libs/fstr/calc_fstr.h>
@@ -85,7 +84,7 @@ static TDataProviders LoadPools(
     EObjectsOrder objectsOrder,
     TDatasetSubset trainDatasetSubset,
     TVector<NJson::TJsonValue>* classLabels,
-    NPar::TLocalExecutor* const executor,
+    NPar::ILocalExecutor* const executor,
     TProfileInfo* profile
 ) {
     const auto& cvParams = loadOptions.CvParams;
@@ -385,8 +384,8 @@ static void Train(
         profile.StartNextIteration();
 
         if (timer.Passed() > ctx->OutputOptions.GetSnapshotSaveInterval()) {
-            profile.AddOperation("Save snapshot");
             ctx->SaveProgress(onSaveSnapshotCallback);
+            profile.AddOperation("Save snapshot");
             timer.Reset();
         }
 
@@ -711,12 +710,13 @@ namespace {
             const TMaybe<TCustomObjectiveDescriptor>& objectiveDescriptor,
             const TMaybe<TCustomMetricDescriptor>& evalMetricDescriptor,
             TTrainingDataProviders trainingData,
+            TMaybe<TPrecomputedOnlineCtrData> precomputedSingleOnlineCtrDataForSingleFold,
             const TLabelConverter& labelConverter,
             ITrainingCallbacks* trainingCallbacks,
             TMaybe<TFullModel*> initModel,
             THolder<TLearnProgress> initLearnProgress,
             TDataProviders initModelApplyCompatiblePools,
-            NPar::TLocalExecutor* localExecutor,
+            NPar::ILocalExecutor* localExecutor,
             const TMaybe<TRestorableFastRng64*> rand,
             TFullModel* dstModel,
             const TVector<TEvalResult*>& evalResultPtrs,
@@ -775,20 +775,18 @@ namespace {
 
             TMaybe<TVector<double>> startingApprox;
             if (catboostOptions.BoostingOptions->BoostFromAverage.Get()) {
-                // TODO(fedorlebed): add boost from average support for multiregression
                 CB_ENSURE(trainingData.Learn->TargetData->GetTargetDimension() != 0, "Target is required for boosting from average");
-                CB_ENSURE(trainingData.Learn->TargetData->GetTargetDimension() == 1, "Multi-dimensional target boosting from average is unimplemented yet");
 
                 startingApprox = CalcOptimumConstApprox(
                     catboostOptions.LossFunctionDescription,
-                    *trainingData.Learn->TargetData->GetOneDimensionalTarget(),
+                    *trainingData.Learn->TargetData->GetTarget(),
                     GetWeights(*trainingData.Learn->TargetData)
                 );
             } else {
                 if (catboostOptions.LossFunctionDescription->GetLossFunction() == ELossFunction::RMSEWithUncertainty) {
                     startingApprox = CalcOptimumConstApprox(
                         catboostOptions.LossFunctionDescription,
-                        *trainingData.Learn->TargetData->GetOneDimensionalTarget(),
+                        *trainingData.Learn->TargetData->GetTarget(),
                         GetWeights(*trainingData.Learn->TargetData)
                     );
                 }
@@ -799,6 +797,7 @@ namespace {
                 evalMetricDescriptor,
                 outputOptions,
                 trainingData,
+                std::move(precomputedSingleOnlineCtrDataForSingleFold),
                 labelConverter,
                 startingApprox,
                 rand,
@@ -859,7 +858,7 @@ namespace {
             const NCatboostOptions::TOutputFilesOptions& /*outputOptions*/,
             TTrainingDataProviders /*trainingData*/,
             const TLabelConverter& /*labelConverter*/,
-            NPar::TLocalExecutor* /*localExecutor*/) const override {
+            NPar::ILocalExecutor* /*localExecutor*/) const override {
             CB_ENSURE(false, "Model based eval is not implemented for CPU");
         }
     };
@@ -868,27 +867,6 @@ namespace {
 
 TTrainerFactory::TRegistrator<TCPUModelTrainer> CPURegistrator(ETaskType::CPU);
 
-static bool HaveLearnFeaturesInMemory(
-    const NCatboostOptions::TPoolLoadParams* loadOptions,
-    const NCatboostOptions::TCatBoostOptions& catBoostOptions
-) {
-    #if defined(USE_MPI)
-    const bool isGpuDistributed = catBoostOptions.GetTaskType() == ETaskType::GPU;
-    #else
-    const bool isGpuDistributed = false;
-    #endif
-    const bool isCpuDistributed = catBoostOptions.SystemOptions->IsMaster();
-    if (!isCpuDistributed && !isGpuDistributed) {
-        return true;
-    }
-    if (loadOptions == nullptr) {
-        return true;
-    }
-    const auto& learnSetPath = loadOptions->LearnSetPath;
-    const bool isQuantized = learnSetPath.Scheme.find("quantized") != std::string::npos;
-    return !IsSharedFs(learnSetPath) || !isQuantized;
-}
-
 static void TrainModel(
     const NJson::TJsonValue& trainOptionsJson,
     const NCatboostOptions::TOutputFilesOptions& outputOptions,
@@ -896,6 +874,9 @@ static void TrainModel(
     const TMaybe<TCustomObjectiveDescriptor>& objectiveDescriptor,
     const TMaybe<TCustomMetricDescriptor>& evalMetricDescriptor,
     TDataProviders pools,
+
+    // can be non-empty only if there is single fold
+    TMaybe<TPrecomputedOnlineCtrData> precomputedSingleOnlineCtrDataForSingleFold,
     TMaybe<TFullModel*> initModel,
     THolder<TLearnProgress> initLearnProgress,
     const NCatboostOptions::TPoolLoadParams* poolLoadOptions,
@@ -904,7 +885,7 @@ static void TrainModel(
     const TVector<TEvalResult*>& evalResultPtrs,
     TMetricsAndTimeLeftHistory* metricsAndTimeHistory,
     THolder<TLearnProgress>* dstLearnProgress,
-    NPar::TLocalExecutor* const executor)
+    NPar::ILocalExecutor* const executor)
 {
     CB_ENSURE(pools.Learn != nullptr, "Train data must be provided");
     CB_ENSURE(pools.Test.size() == evalResultPtrs.size());
@@ -1039,7 +1020,7 @@ static void TrainModel(
             Nothing(),
         initModel.Defined(),
         !!initLearnProgress,
-        &updatedOutputOptions.UseBestModel,
+        &updatedOutputOptions,
         &catBoostOptions
     );
 
@@ -1064,6 +1045,7 @@ static void TrainModel(
         objectiveDescriptor,
         evalMetricDescriptor,
         std::move(trainingData),
+        std::move(precomputedSingleOnlineCtrDataForSingleFold),
         labelConverter,
         defaultTrainingCallbacks.Get(),
         std::move(initModel),
@@ -1075,6 +1057,10 @@ static void TrainModel(
         evalResultPtrs,
         metricsAndTimeHistory,
         dstLearnProgress);
+
+    if (catBoostOptions.SystemOptions->IsMaster()) {
+        FinalizeMaster(catBoostOptions.SystemOptions);
+    }
 }
 
 
@@ -1162,10 +1148,12 @@ void TrainModel(
         &executor,
         &profile);
 
-    const bool hasTextFeatures = pools.Learn->MetaInfo.FeaturesLayout->GetTextFeatureCount() > 0;
-    if (hasTextFeatures) {
+    const bool hasEmbeddingFeatures = pools.Learn->MetaInfo.FeaturesLayout->GetEmbeddingFeatureCount() > 0;
+    if (hasEmbeddingFeatures) {
         needFstr = false;
     }
+
+    TMaybe<TPrecomputedOnlineCtrData> precomputedSingleOnlineCtrDataForSingleFold;
 
     TVector<TString> outputColumns;
     if (!evalOutputFileName.empty() && !pools.Test.empty()) {
@@ -1215,6 +1203,7 @@ void TrainModel(
         /*objectiveDescriptor*/ Nothing(),
         /*evalMetricDescriptor*/ Nothing(),
         needPoolAfterTrain ? pools : std::move(pools),
+        std::move(precomputedSingleOnlineCtrDataForSingleFold),
         /*initModel*/ Nothing(),
         /*initLearnProgress*/ nullptr,
         &loadOptions,
@@ -1300,7 +1289,7 @@ static void ModelBasedEval(
     const NCatboostOptions::TOutputFilesOptions& outputOptions,
     TQuantizedFeaturesInfoPtr quantizedFeaturesInfo,
     TDataProviders pools,
-    NPar::TLocalExecutor* const executor)
+    NPar::ILocalExecutor* const executor)
 {
     CB_ENSURE(pools.Learn != nullptr, "Train data must be provided");
 
@@ -1393,7 +1382,7 @@ static void ModelBasedEval(
             Nothing(),
         /*continueFromModel*/ false,
         /*continueFromProgress*/ false,
-        &updatedOutputOptions.UseBestModel,
+        &updatedOutputOptions,
         &catBoostOptions
     );
     InitializeEvalMetricIfNotSet(catBoostOptions.MetricOptions->ObjectiveMetric, &catBoostOptions.MetricOptions->EvalMetric);
@@ -1516,6 +1505,7 @@ void TrainModel(
         objectiveDescriptor,
         evalMetricDescriptor,
         std::move(pools),
+        /*precomputedSingleOnlineCtrDataForSingleFold*/ Nothing(),
         std::move(initModel),
         initLearnProgress ? std::move(*initLearnProgress) : THolder<TLearnProgress>(),
         /*poolLoadOptions*/nullptr,

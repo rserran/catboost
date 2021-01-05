@@ -4,6 +4,8 @@
 
 #include <catboost/private/libs/algo/plot.h>
 #include <catboost/private/libs/data_types/groupid.h>
+#include <catboost/private/libs/data_types/pair.h>
+#include <catboost/libs/data/data_provider.h>
 #include <catboost/libs/data/visitor.h>
 #include <catboost/libs/helpers/exception.h>
 #include <catboost/libs/helpers/mem_usage.h>
@@ -15,6 +17,8 @@
 
 #include <library/cpp/json/json_value.h>
 
+#include <util/generic/array_ref.h>
+#include <util/generic/fwd.h>
 #include <util/generic/noncopyable.h>
 
 #include <type_traits>
@@ -156,12 +160,6 @@ NJson::TJsonValue GetTrainingOptions(
     const TMaybe<NCB::TDataMetaInfo>& testDataMetaInfo
 );
 
-NJson::TJsonValue GetPlainJsonWithAllOptions(
-    const TFullModel& model,
-    bool hasCatFeatures,
-    bool hasTextFeatures
-);
-
 class TPythonStreamWrapper : public IInputStream {
 
 public:
@@ -190,7 +188,7 @@ void SetDataFromScipyCsrSparse(
     TConstArrayRef<ui32> indices,
     TConstArrayRef<bool> isCatFeature,
     NCB::IRawObjectsOrderDataVisitor* builderVisitor,
-    NPar::TLocalExecutor* localExecutor
+    NPar::ILocalExecutor* localExecutor
 ) {
     CB_ENSURE_INTERNAL(indptr.size() > 1, "Empty sparse arrays should be processed in Python for speed");
     const auto objCount = indptr.size() - 1;
@@ -240,3 +238,6 @@ void SetDataFromScipyCsrSparse(
         }
     );
 }
+
+size_t GetNumPairs(const NCB::TDataProvider& dataProvider);
+TConstArrayRef<TPair> GetUngroupedPairs(const NCB::TDataProvider& dataProvider);

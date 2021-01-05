@@ -6,6 +6,7 @@
 
 #include <library/cpp/json/writer/json.h>
 #include <library/cpp/json/writer/json_value.h>
+#include <library/cpp/testing/hook/hook.h>
 
 #include <util/datetime/base.h>
 
@@ -149,12 +150,12 @@ private:
             TStringBuilder msgs;
             for (const TString& m : ErrorMessages) {
                 if (msgs) {
-                    msgs << AsStringBuf("\n");
+                    msgs << TStringBuf("\n");
                 }
                 msgs << m;
             }
             if (msgs) {
-                msgs << AsStringBuf("\n");
+                msgs << TStringBuf("\n");
             }
             TraceSubtestFinished(descr->test->unit->name.data(), descr->test->name, "fail", msgs, descr->Context);
             ErrorMessages.clear();
@@ -657,6 +658,7 @@ int NUnitTest::RunMain(int argc, char** argv) {
         Y_VERIFY(!sigaction(SIGUSR2, &sa, nullptr));
     }
 #endif
+    NTesting::THook::CallBeforeInit();
     InitNetworkSubSystem();
 
     try {
@@ -667,6 +669,9 @@ int NUnitTest::RunMain(int argc, char** argv) {
 #ifndef UT_SKIP_EXCEPTIONS
     try {
 #endif
+        NTesting::THook::CallBeforeRun();
+        Y_DEFER { NTesting::THook::CallAfterRun(); };
+
         NPlugin::OnStartMain(argc, argv);
         Y_DEFER { NPlugin::OnStopMain(argc, argv); };
 

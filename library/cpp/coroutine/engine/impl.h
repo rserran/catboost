@@ -226,13 +226,17 @@ public:
         return FailOnError_;
     }
 
-    void ScheduleIoWait(TFdEvent* event) {
+    void RegisterInWaitQueue(NCoro::TContPollEvent* event) {
         WaitQueue_.Register(event);
+    }
+
+    void ScheduleIoWait(TFdEvent* event) {
+        RegisterInWaitQueue(event);
         Poller_.Schedule(event);
     }
 
     void ScheduleIoWait(TTimerEvent* event) noexcept {
-        WaitQueue_.Register(event);
+        RegisterInWaitQueue(event);
     }
 
 private:
@@ -254,7 +258,7 @@ private:
 
     void WaitForIO();
 
-    void ProcessEvents();
+    void Poll(TInstant deadline);
 
 private:
     NCoro::IScheduleCallback* const CallbackPtr_ = nullptr;
@@ -269,6 +273,7 @@ private:
     NCoro::TEventWaitQueue WaitQueue_;
     NCoro::TContPoller Poller_;
     NCoro::TContPoller::TEvents Events_;
+    TInstant LastPoll_;
 
     size_t Allocated_ = 0;
     TCont* Current_ = nullptr;

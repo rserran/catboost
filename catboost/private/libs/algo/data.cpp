@@ -8,8 +8,10 @@
 #include <catboost/libs/helpers/exception.h>
 #include <catboost/libs/helpers/restorable_rng.h>
 #include <catboost/libs/metrics/metric.h>
+#include <catboost/private/libs/data_util/exists_checker.h>
 #include <catboost/private/libs/labels/label_converter.h>
 #include <catboost/private/libs/options/catboost_options.h>
+#include <catboost/private/libs/options/load_options.h>
 #include <catboost/private/libs/options/system_options.h>
 #include <catboost/private/libs/target/data_providers.h>
 #include <catboost/private/libs/feature_estimator/text_feature_estimators.h>
@@ -69,7 +71,7 @@ namespace NCB {
         NCatboostOptions::TCatBoostOptions* params,
         TLabelConverter* labelConverter,
         TMaybe<float>* targetBorder,
-        NPar::TLocalExecutor* localExecutor,
+        NPar::ILocalExecutor* localExecutor,
         TRestorableFastRng64* rand,
         TMaybe<TFullModel*> initModel) {
 
@@ -260,7 +262,7 @@ namespace NCB {
     static TTextDataSetPtr CreateTextDataSet(
         const TQuantizedObjectsDataProvider& dataProvider,
         ui32 tokenizedTextFeatureIdx,
-        NPar::TLocalExecutor* localExecutor
+        NPar::ILocalExecutor* localExecutor
     ) {
         const TTextDigitizers& digitizers = dataProvider.GetQuantizedFeaturesInfo()->GetTextDigitizers();
         auto dictionary = digitizers.GetDigitizer(tokenizedTextFeatureIdx).Dictionary;
@@ -280,7 +282,7 @@ namespace NCB {
     static TEmbeddingDataSetPtr CreateEmbeddingDataSet(
         const TQuantizedObjectsDataProvider& dataProvider,
         ui32 embeddingFeatureIdx,
-        NPar::TLocalExecutor* localExecutor
+        NPar::ILocalExecutor* localExecutor
     ) {
         const TEmbeddingValuesHolder* embeddingColumn = *dataProvider.GetEmbeddingFeature(embeddingFeatureIdx);
 
@@ -318,7 +320,7 @@ namespace NCB {
     static TFeatureEstimatorsPtr CreateEstimators(
         TQuantizedFeaturesInfoPtr quantizedFeaturesInfo,
         TTrainingDataProviders pools,
-        NPar::TLocalExecutor* localExecutor
+        NPar::ILocalExecutor* localExecutor
     ) {
         auto tokenizedFeaturesDescription = quantizedFeaturesInfo->GetTextProcessingOptions().GetTokenizedFeatureDescriptions();
 
@@ -416,7 +418,7 @@ namespace NCB {
         TQuantizedFeaturesInfoPtr quantizedFeaturesInfo, // can be nullptr, then create it
         NCatboostOptions::TCatBoostOptions* params,
         TLabelConverter* labelConverter,
-        NPar::TLocalExecutor* localExecutor,
+        NPar::ILocalExecutor* localExecutor,
         TRestorableFastRng64* rand,
         TMaybe<TFullModel*> initModel) {
 
@@ -498,6 +500,65 @@ namespace NCB {
 
 
         return trainingData;
+    }
+
+    static TIntrusivePtr<TTrainingDataProvider> MakeFeatureSubsetDataProvider(
+        const TVector<ui32>& ignoredFeatures,
+        NCB::TTrainingDataProviderPtr trainingDataProvider
+    ) {
+        TQuantizedObjectsDataProviderPtr newObjects = dynamic_cast<TQuantizedForCPUObjectsDataProvider*>(
+            trainingDataProvider->ObjectsData->GetFeaturesSubset(ignoredFeatures, &NPar::LocalExecutor()).Get());
+        CB_ENSURE(
+            newObjects,
+            "Objects data provider must be TQuantizedForCPUObjectsDataProvider or TQuantizedObjectsDataProvider");
+        TDataMetaInfo newMetaInfo = trainingDataProvider->MetaInfo;
+        newMetaInfo.FeaturesLayout = newObjects->GetFeaturesLayout();
+        return MakeIntrusive<TTrainingDataProvider>(
+            trainingDataProvider->OriginalFeaturesLayout,
+            TDataMetaInfo(newMetaInfo),
+            trainingDataProvider->ObjectsGrouping,
+            newObjects,
+            trainingDataProvider->TargetData);
+    }
+
+    TTrainingDataProviders MakeFeatureSubsetTrainingData(
+        const TVector<ui32>& ignoredFeatures,
+        const NCB::TTrainingDataProviders& trainingData
+    ) {
+        TTrainingDataProviders newTrainingData;
+        newTrainingData.Learn = MakeFeatureSubsetDataProvider(ignoredFeatures, trainingData.Learn);
+        newTrainingData.Test.reserve(trainingData.Test.size());
+        for (const auto& test : trainingData.Test) {
+            newTrainingData.Test.push_back(MakeFeatureSubsetDataProvider(ignoredFeatures, test));
+        }
+
+        newTrainingData.FeatureEstimators = trainingData.FeatureEstimators;
+
+        // TODO(akhropov): correctly support ignoring indices based on source data
+        newTrainingData.EstimatedObjectsData = trainingData.EstimatedObjectsData;
+
+        return newTrainingData;
+    }
+
+    bool HaveLearnFeaturesInMemory(
+        const NCatboostOptions::TPoolLoadParams* loadOptions,
+        const NCatboostOptions::TCatBoostOptions& catBoostOptions
+    ) {
+        #if defined(USE_MPI)
+        const bool isGpuDistributed = catBoostOptions.GetTaskType() == ETaskType::GPU;
+        #else
+        const bool isGpuDistributed = false;
+        #endif
+        const bool isCpuDistributed = catBoostOptions.SystemOptions->IsMaster();
+        if (!isCpuDistributed && !isGpuDistributed) {
+            return true;
+        }
+        if (loadOptions == nullptr) {
+            return true;
+        }
+        const auto& learnSetPath = loadOptions->LearnSetPath;
+        const bool isQuantized = learnSetPath.Scheme.find("quantized") != std::string::npos;
+        return !IsSharedFs(learnSetPath) || !isQuantized;
     }
 
 }

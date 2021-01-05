@@ -11,6 +11,7 @@
 #include <util/generic/fwd.h>
 #include <util/generic/vector.h>
 
+namespace NCB {
 
 TVector<TVector<double>> PrepareEvalForInternalApprox(
     const EPredictionType prediction_type,
@@ -22,7 +23,7 @@ TVector<TVector<double>> PrepareEvalForInternalApprox(
     const EPredictionType prediction_type,
     const TFullModel& model,
     const TVector<TVector<double>>& approx,
-    NPar::TLocalExecutor* executor = nullptr);
+    NPar::ILocalExecutor* executor = nullptr);
 
 bool IsMulticlass(const TVector<TVector<double>>& approx);
 
@@ -39,17 +40,25 @@ void PrepareEval(
     const EPredictionType predictionType,
     const TString& lossFunctionName,
     const TVector<TVector<double>>& approx,
-    NPar::TLocalExecutor* executor,
+    NPar::ILocalExecutor* executor,
     TVector<TVector<double>>* result);
 
 TVector<TVector<double>> PrepareEval(
     const EPredictionType predictionType,
     const TString& lossFunctionName,
     const TVector<TVector<double>>& approx,
-    NPar::TLocalExecutor* executor = nullptr);
+    NPar::ILocalExecutor* executor = nullptr);
 
 TVector<TVector<double>> PrepareEval(
     const EPredictionType predictionType,
     const TString& lossFunctionName,
     const TVector<TVector<double>>& approx,
     int threadCount);
+
+using TColumnPrinterOuputType = TVariant<i64, ui64, double, float, TString>;
+
+template<typename T>
+size_t GetOutputTypeIndex() {
+    return TVariantIndexV<T, TColumnPrinterOuputType>;
+}
+}

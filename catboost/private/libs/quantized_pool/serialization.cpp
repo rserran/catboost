@@ -923,13 +923,13 @@ namespace NCB {
         }
         THolder<TSrcColumn<TDst>> dst(new TSrcColumn<TDst>(columnType));
 
-        auto srcIteratorPtr = featureColumn.GetBlockIterator();
-        IDynamicBlockIterator<TDst>& srcIterator
-            = dynamic_cast<IDynamicBlockIterator<TDst>&>(*srcIteratorPtr);
-
-        while (auto block = srcIterator.Next(QUANTIZED_POOL_COLUMN_DEFAULT_SLICE_COUNT)) {
-            dst->Data.push_back(TVector<TDst>(block.begin(), block.end()));
-        }
+        featureColumn.ForEachBlock(
+            [&dst] (auto blockStartIdx, auto block) {
+                Y_UNUSED(blockStartIdx);
+                dst->Data.push_back(TVector<TDst>(block.begin(), block.end()));
+            },
+            QUANTIZED_POOL_COLUMN_DEFAULT_SLICE_COUNT
+        );
 
         return dst;
     }
@@ -937,7 +937,7 @@ namespace NCB {
 
     static TSrcData BuildSrcDataFromDataProvider(
         TDataProviderPtr dataProvider,
-        NPar::TLocalExecutor* localExecutor
+        NPar::ILocalExecutor* localExecutor
     ) {
         TSrcData srcData;
 
@@ -1022,22 +1022,24 @@ namespace NCB {
                 const auto catFeatureIdx =
                     featuresLayout->GetInternalFeatureIdx<EFeatureType::Categorical>(externalFeatureIdx);
 
-                const auto& srcCatFeaturePerfectHash =
-                    quantizedFeaturesInfo->GetCategoricalFeaturesPerfectHash(catFeatureIdx);
-
-                TMap<ui32, TValueWithCount> dstCatFeaturePerfectHash = srcCatFeaturePerfectHash.Map;
-                if (srcCatFeaturePerfectHash.DefaultMap.Defined()) {
-                    dstCatFeaturePerfectHash.emplace(
-                        srcCatFeaturePerfectHash.DefaultMap->SrcValue,
-                        srcCatFeaturePerfectHash.DefaultMap->DstValueWithCount
-                   );
-                }
+                TMap<ui32, TValueWithCount> dstCatFeaturePerfectHash;
 
                 TMaybeData<const IQuantizedCatValuesHolder*> feature =
                     quantizedObjectsData->GetCatFeature(*catFeatureIdx);
 
                 THolder<TSrcColumnBase> maybeFeatureColumn;
                 if (feature) {
+                    const auto& srcCatFeaturePerfectHash =
+                        quantizedFeaturesInfo->GetCategoricalFeaturesPerfectHash(catFeatureIdx);
+
+                    dstCatFeaturePerfectHash = srcCatFeaturePerfectHash.Map;
+                    if (srcCatFeaturePerfectHash.DefaultMap.Defined()) {
+                        dstCatFeaturePerfectHash.emplace(
+                            srcCatFeaturePerfectHash.DefaultMap->SrcValue,
+                            srcCatFeaturePerfectHash.DefaultMap->DstValueWithCount
+                       );
+                    }
+
                     if (dstCatFeaturePerfectHash.size() > ((size_t)Max<ui16>() + 1)) {
                         maybeFeatureColumn = GenerateSrcColumn<ui32>(**feature);
                     } else if (dstCatFeaturePerfectHash.size() > ((size_t)Max<ui8>() + 1)) {

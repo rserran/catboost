@@ -2,6 +2,8 @@
 
 #include <catboost/private/libs/embedding_features/flatbuffers/embedding_feature_calcers.fbs.h>
 
+#include <util/stream/length.h>
+
 namespace NCB {
 
     TVector<ui32> TKNNUpdatableCloud::GetNearestNeighbors(const float* embed, ui32 knum) const  {
@@ -15,7 +17,9 @@ namespace NCB {
 
     TVector<ui32> TKNNCloud::GetNearestNeighbors(const float* embed, ui32 knum) const  {
         TVector<ui32> result;
-        auto neighbors = Cloud.GetNearestNeighbors<NHnsw::TL2SqrDistance<float>>(embed, knum, 2 * knum);
+        auto neighbors = Cloud.GetNearestNeighbors<NOnlineHnsw::TDenseVectorExtendableItemStorage<float>,
+                                                   TL2Distance>(embed,
+                                                   knum, 300, Points, Dist);
         for (size_t pos = 0; pos < neighbors.size(); ++pos) {
             result.push_back(neighbors[pos].Id);
         }
@@ -50,7 +54,7 @@ namespace NCB {
     }
 
     TEmbeddingFeatureCalcer::TEmbeddingCalcerFbs TKNNCalcer::SaveParametersToFB(flatbuffers::FlatBufferBuilder& builder) const {
-        using namespace NCatBoostFbs;
+        using namespace NCatBoostFbs::NEmbeddings;
 
         const auto& fbLDA = CreateTKNN(
             builder,
@@ -62,7 +66,7 @@ namespace NCB {
         return TEmbeddingCalcerFbs(TAnyEmbeddingCalcer_TKNN, fbLDA.Union());
     }
 
-    void TKNNCalcer::LoadParametersFromFB(const NCatBoostFbs::TEmbeddingCalcer* calcer) {
+    void TKNNCalcer::LoadParametersFromFB(const NCatBoostFbs::NEmbeddings::TEmbeddingCalcer* calcer) {
         auto fbKNN = calcer->FeatureCalcerImpl_as_TKNN();
         TotalDimension = fbKNN->TotalDimension();
         NumClasses = fbKNN->NumClasses();
@@ -72,20 +76,41 @@ namespace NCB {
 
     void TKNNCalcer::SaveLargeParameters(IOutputStream* stream) const {
         ::Save(stream, Targets);
+        if (auto updatableCloud = dynamic_cast<TKNNUpdatableCloud*>(Cloud.Get())) {
+            NOnlineHnsw::TOnlineHnswIndexData indexData = updatableCloud->GetCloud().ConstructIndexData();
+            auto expectedIndexSize = NOnlineHnsw::ExpectedSize(indexData);
+            ::SaveSize(stream, expectedIndexSize);
+            TCountingOutput countingOutput(stream);
+            NOnlineHnsw::WriteIndex(indexData, countingOutput);
+            CB_ENSURE(
+                countingOutput.Counter() == expectedIndexSize,
+                LabeledOutput(countingOutput.Counter(), expectedIndexSize) << " should be equal."
+            );
+            ::Save(stream, updatableCloud->GetVector());
+        } else {
+            const auto staticCloud = dynamic_cast<const TKNNCloud*>(Cloud.Get());
+            CB_ENSURE(staticCloud, "Expected NCB::TKNNCloud pointer");
+            const auto& indexDataBlob = staticCloud->GetIndexDataBlob();
+            ::SaveSize(stream, indexDataBlob.Size());
+            stream->Write(indexDataBlob.Data(), indexDataBlob.Size());
+            ::Save(stream, staticCloud->GetPointsVector());
+        }
     }
 
     void TKNNCalcer::LoadLargeParameters(IInputStream* stream) {
-        Targets.resize(Size);
         ::Load(stream, Targets);
-        ui64 indexSize, storageSize;
-        ::Load(stream, indexSize);
-        TArrayHolder<ui8> indexArray = TArrayHolder<ui8>(new ui8[indexSize]);
-        stream->Load(indexArray.Get(), indexSize);
-        ::Load(stream, storageSize);
-        TArrayHolder<ui8> storageArray = TArrayHolder<ui8>(new ui8[storageSize]);
-        stream->Load(storageArray.Get(), storageSize);
-        auto cloudPtr = MakeHolder<TKNNCloud>(std::move(indexArray), std::move(storageArray),
-                                              indexSize, storageSize, TotalDimension);
+        size_t indexSize = ::LoadSize(stream);
+        TLengthLimitedInput indexArrayStream(stream, indexSize);
+        auto indexArray = TBlob::FromStream(indexArrayStream);
+        CB_ENSURE(indexArray.Size() == indexSize);
+        TVector<float> points(TotalDimension * Size);
+        ::Load(stream, points);
+        Cloud = MakeHolder<TKNNCloud>(
+            std::move(indexArray),
+            std::move(points),
+            Size,
+            TotalDimension
+        );
     }
 
     TEmbeddingFeatureCalcerFactory::TRegistrator<TKNNCalcer> KNNRegistrator(EFeatureCalcerType::KNN);

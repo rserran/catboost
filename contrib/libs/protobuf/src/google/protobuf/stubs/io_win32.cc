@@ -62,6 +62,7 @@
 #include <cassert>
 #include <memory>
 #include <sstream>
+#include <string>
 #include <vector>
 
 namespace google {
@@ -70,7 +71,6 @@ namespace internal {
 namespace win32 {
 namespace {
 
-using std::string;
 using std::wstring;
 
 template <typename char_type>
@@ -205,7 +205,7 @@ string normalize(string path) {
   if (!path.empty() && is_separator(path[path.size() - 1])) {
     result << '\\';
   }
-  return result.str();
+  return TProtoStringType{result.str()};
 }
 
 WCHAR* as_wstring(const string& s) {

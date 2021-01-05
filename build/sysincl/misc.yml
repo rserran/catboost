@@ -123,6 +123,10 @@
   includes:
     - xray/xray_interface.h: contrib/libs/clang10-rt/include/xray/xray_interface.h
 
+- source_filter: "^contrib/libs/clang11-rt"
+  includes:
+    - xray/xray_interface.h: contrib/libs/clang11-rt/include/xray/xray_interface.h
+
 - source_filter: "^contrib/libs/llvm"
   includes:
     - plugin-api.h # GNU linker plugin API.
@@ -209,9 +213,9 @@
   includes:
     - util.h:        contrib/libs/libgit2/src/util.h
 
-- source_filter: "^contrib/libs/nodejs_8"
+- source_filter: "^contrib/libs/nodejs_12"
   includes:
-    - util.h:        contrib/libs/nodejs_8/src/util.h
+    - util.h:        contrib/libs/nodejs_12/src/util.h
 
 - source_filter: "^contrib/libs/numa"
   includes:
@@ -235,6 +239,10 @@
     - atomic.h
     - fstream.h
     - ../include/fenv.h
+
+- source_filter: "^contrib/restricted/boost/boost/stacktrace/detail"
+  includes:
+    - backtrace.h: contrib/libs/backtrace/backtrace.h
 
 # windows sdk includes that we do not want to apply for whole arcadia
 - source_filter: "^contrib"
@@ -532,4 +540,3 @@
     - cmqxc.h
     - cmqcfc.h
     - cmqbc.h
-

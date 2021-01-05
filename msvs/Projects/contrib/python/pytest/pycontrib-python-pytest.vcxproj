@@ -411,7 +411,7 @@ if %errorlevel% neq 0 goto :VCEnd</Command>
       <Command Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">setlocal
 cd /d $(SolutionDir)$(Configuration)\contrib\python\pytest
 if %errorlevel% neq 0 goto :cmEnd
-"python" "$(SolutionDir)../build/scripts/fs_tools.py" "cat" "$(SolutionDir)$(Configuration)/contrib/python/pytest/join_abbace8b28b790dfa6f92ecfdf.yasm" "$(SolutionDir)$(Configuration)/contrib/python/pytest/_e7090036d1ab619355b2141f64.yasm" "$(SolutionDir)$(Configuration)/contrib/python/pytest/_fe4f3fa463de5bd760ddfe701c.yasm" "$(SolutionDir)$(Configuration)/contrib/python/pytest/_f9beb69086d7bd17e322cdfdc9.yasm" "$(SolutionDir)$(Configuration)/contrib/python/pytest/_c931f56d0b9173b6a5353c1149.yasm" "$(SolutionDir)$(Configuration)/contrib/python/pytest/_8cdf891fcffcb6345aff388d1b.yasm" "$(SolutionDir)$(Configuration)/contrib/python/pytest/_26560050b78813e91d3a306035.yasm"
+"python" "$(SolutionDir)../build/scripts/fs_tools.py" "cat" "$(SolutionDir)$(Configuration)/contrib/python/pytest/join_abbace8b28b790dfa6f92ecfdf.yasm" "--ya-start-command-file" "$(SolutionDir)$(Configuration)/contrib/python/pytest/_e7090036d1ab619355b2141f64.yasm" "$(SolutionDir)$(Configuration)/contrib/python/pytest/_fe4f3fa463de5bd760ddfe701c.yasm" "$(SolutionDir)$(Configuration)/contrib/python/pytest/_f9beb69086d7bd17e322cdfdc9.yasm" "$(SolutionDir)$(Configuration)/contrib/python/pytest/_c931f56d0b9173b6a5353c1149.yasm" "$(SolutionDir)$(Configuration)/contrib/python/pytest/_8cdf891fcffcb6345aff388d1b.yasm" "$(SolutionDir)$(Configuration)/contrib/python/pytest/_26560050b78813e91d3a306035.yasm" "--ya-end-command-file"
 if %errorlevel% neq 0 goto :cmEnd
 :cmEnd
 endlocal &amp; call :cmErrorLevel %errorlevel% &amp; goto :cmDone
@@ -422,7 +422,7 @@ if %errorlevel% neq 0 goto :VCEnd</Command>
       <Command Condition="'$(Configuration)|$(Platform)'=='Release|x64'">setlocal
 cd /d $(SolutionDir)$(Configuration)\contrib\python\pytest
 if %errorlevel% neq 0 goto :cmEnd
-"python" "$(SolutionDir)../build/scripts/fs_tools.py" "cat" "$(SolutionDir)$(Configuration)/contrib/python/pytest/join_abbace8b28b790dfa6f92ecfdf.yasm" "$(SolutionDir)$(Configuration)/contrib/python/pytest/_e7090036d1ab619355b2141f64.yasm" "$(SolutionDir)$(Configuration)/contrib/python/pytest/_fe4f3fa463de5bd760ddfe701c.yasm" "$(SolutionDir)$(Configuration)/contrib/python/pytest/_f9beb69086d7bd17e322cdfdc9.yasm" "$(SolutionDir)$(Configuration)/contrib/python/pytest/_c931f56d0b9173b6a5353c1149.yasm" "$(SolutionDir)$(Configuration)/contrib/python/pytest/_8cdf891fcffcb6345aff388d1b.yasm" "$(SolutionDir)$(Configuration)/contrib/python/pytest/_26560050b78813e91d3a306035.yasm"
+"python" "$(SolutionDir)../build/scripts/fs_tools.py" "cat" "$(SolutionDir)$(Configuration)/contrib/python/pytest/join_abbace8b28b790dfa6f92ecfdf.yasm" "--ya-start-command-file" "$(SolutionDir)$(Configuration)/contrib/python/pytest/_e7090036d1ab619355b2141f64.yasm" "$(SolutionDir)$(Configuration)/contrib/python/pytest/_fe4f3fa463de5bd760ddfe701c.yasm" "$(SolutionDir)$(Configuration)/contrib/python/pytest/_f9beb69086d7bd17e322cdfdc9.yasm" "$(SolutionDir)$(Configuration)/contrib/python/pytest/_c931f56d0b9173b6a5353c1149.yasm" "$(SolutionDir)$(Configuration)/contrib/python/pytest/_8cdf891fcffcb6345aff388d1b.yasm" "$(SolutionDir)$(Configuration)/contrib/python/pytest/_26560050b78813e91d3a306035.yasm" "--ya-end-command-file"
 if %errorlevel% neq 0 goto :cmEnd
 :cmEnd
 endlocal &amp; call :cmErrorLevel %errorlevel% &amp; goto :cmDone
@@ -438,7 +438,7 @@ if %errorlevel% neq 0 goto :VCEnd</Command>
       <Command Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">setlocal
 cd /d $(SolutionDir)$(Configuration)\contrib\python\pytest
 if %errorlevel% neq 0 goto :cmEnd
-"python" "$(SolutionDir)../build/scripts/gen_join_srcs.py" "$(SolutionDir)$(Configuration)/contrib/python/pytest/join_489a58dfda0bad41d2393268e4.cpp" "contrib/python/pytest/e7090036d1ab619355b2141f64.cpp" "contrib/python/pytest/fe4f3fa463de5bd760ddfe701c.cpp" "contrib/python/pytest/f9beb69086d7bd17e322cdfdc9.cpp" "contrib/python/pytest/c931f56d0b9173b6a5353c1149.cpp" "contrib/python/pytest/8cdf891fcffcb6345aff388d1b.cpp" "contrib/python/pytest/26560050b78813e91d3a306035.cpp"
+"python" "$(SolutionDir)../build/scripts/gen_join_srcs.py" "$(SolutionDir)$(Configuration)/contrib/python/pytest/join_489a58dfda0bad41d2393268e4.cpp" "--ya-start-command-file" "contrib/python/pytest/e7090036d1ab619355b2141f64.cpp" "contrib/python/pytest/fe4f3fa463de5bd760ddfe701c.cpp" "contrib/python/pytest/f9beb69086d7bd17e322cdfdc9.cpp" "contrib/python/pytest/c931f56d0b9173b6a5353c1149.cpp" "contrib/python/pytest/8cdf891fcffcb6345aff388d1b.cpp" "contrib/python/pytest/26560050b78813e91d3a306035.cpp" "--ya-end-command-file"
 if %errorlevel% neq 0 goto :cmEnd
 :cmEnd
 endlocal &amp; call :cmErrorLevel %errorlevel% &amp; goto :cmDone
@@ -449,7 +449,7 @@ if %errorlevel% neq 0 goto :VCEnd</Command>
       <Command Condition="'$(Configuration)|$(Platform)'=='Release|x64'">setlocal
 cd /d $(SolutionDir)$(Configuration)\contrib\python\pytest
 if %errorlevel% neq 0 goto :cmEnd
-"python" "$(SolutionDir)../build/scripts/gen_join_srcs.py" "$(SolutionDir)$(Configuration)/contrib/python/pytest/join_489a58dfda0bad41d2393268e4.cpp" "contrib/python/pytest/e7090036d1ab619355b2141f64.cpp" "contrib/python/pytest/fe4f3fa463de5bd760ddfe701c.cpp" "contrib/python/pytest/f9beb69086d7bd17e322cdfdc9.cpp" "contrib/python/pytest/c931f56d0b9173b6a5353c1149.cpp" "contrib/python/pytest/8cdf891fcffcb6345aff388d1b.cpp" "contrib/python/pytest/26560050b78813e91d3a306035.cpp"
+"python" "$(SolutionDir)../build/scripts/gen_join_srcs.py" "$(SolutionDir)$(Configuration)/contrib/python/pytest/join_489a58dfda0bad41d2393268e4.cpp" "--ya-start-command-file" "contrib/python/pytest/e7090036d1ab619355b2141f64.cpp" "contrib/python/pytest/fe4f3fa463de5bd760ddfe701c.cpp" "contrib/python/pytest/f9beb69086d7bd17e322cdfdc9.cpp" "contrib/python/pytest/c931f56d0b9173b6a5353c1149.cpp" "contrib/python/pytest/8cdf891fcffcb6345aff388d1b.cpp" "contrib/python/pytest/26560050b78813e91d3a306035.cpp" "--ya-end-command-file"
 if %errorlevel% neq 0 goto :cmEnd
 :cmEnd
 endlocal &amp; call :cmErrorLevel %errorlevel% &amp; goto :cmDone
@@ -1026,8 +1026,17 @@ if %errorlevel% neq 0 goto :VCEnd</Command>
     <ProjectReference Include="$(SolutionDir)Projects\contrib\python\attrs\pycontrib-python-attrs.vcxproj">
       <Project>{B19D597D-A363-F744-6165-C68C1835DD61}</Project>
     </ProjectReference>
+    <ProjectReference Include="$(SolutionDir)Projects\contrib\python\configparser\pycontrib-python-configparser.vcxproj">
+      <Project>{6DF26701-68E9-E05A-808F-1840FF373955}</Project>
+    </ProjectReference>
+    <ProjectReference Include="$(SolutionDir)Projects\contrib\python\contextlib2\pycontrib-python-contextlib2.vcxproj">
+      <Project>{76AD5AB3-EDE1-7BAC-90B7-9BA08DC851AD}</Project>
+    </ProjectReference>
     <ProjectReference Include="$(SolutionDir)Projects\contrib\python\funcsigs\pycontrib-python-funcsigs.vcxproj">
       <Project>{7E6B0B75-8CFD-8357-FA3A-F2B353EDA5DF}</Project>
+    </ProjectReference>
+    <ProjectReference Include="$(SolutionDir)Projects\contrib\python\importlib-metadata\pycontrib-python-importlib-metadata.vcxproj">
+      <Project>{7F463C70-BAD7-7EF0-2E4C-848242C99C7E}</Project>
     </ProjectReference>
     <ProjectReference Include="$(SolutionDir)Projects\contrib\python\more-itertools\pycontrib-python-more-itertools.vcxproj">
       <Project>{BC62290A-1F8B-7962-8C00-63BFE8DAE2A0}</Project>

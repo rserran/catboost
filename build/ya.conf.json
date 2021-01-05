@@ -7,10 +7,13 @@
             "description": "Run C++ compiler"
         },
         "clang-format": {
-            "description": "Run Clang Format"
+            "description": "Run Clang-Format source code formatter"
+        },
+        "clang-rename": {
+            "description": "Run Clang-Rename refactoring tool"
         },
         "clang-tidy": {
-            "description": "Run Clang Tidy"
+            "description": "Run Clang-Tidy source code linter"
         },
         "cling": {
             "description": "Run cling"
@@ -103,8 +106,17 @@
         "javac11": {
             "description": "Run javac 11"
         },
+        "java15": {
+            "description": "Run java 15"
+        },
+        "javac15": {
+            "description": "Run javac 15"
+        },
         "jar": {
             "description": "Run jar"
+        },
+        "jar15": {
+            "description": "Run jar from jdk15"
         },
         "jq": {
             "description": "Run jq"
@@ -163,7 +175,7 @@
             "visible": false
         },
         "bloat": {
-            "description": "Run bloat2 tool",
+            "description": "Run bloat tool",
             "visible": false
         },
         "ipython": {
@@ -254,17 +266,17 @@
         "news": {
             "description": "Run news team tools"
         },
-        "go_1.14.6": {
-            "description": "Run go tool (1.14.6)"
+        "go_1.15.4": {
+            "description": "Run go tool (1.15.4)"
         },
-        "gofmt_1.14.6": {
-            "description": "Run gofmt tool (1.14.6)"
+        "gofmt_1.15.4": {
+            "description": "Run gofmt tool (1.15.4)"
         },
         "go": {
-            "description": "Run go tool (1.15.2)"
+            "description": "Run go tool (1.15.6)"
         },
         "gofmt": {
-            "description": "Run gofmt tool (1.15.2)"
+            "description": "Run gofmt tool (1.15.6)"
         },
         "godoc": {
             "description": "Arcadia version of godoc"
@@ -356,6 +368,9 @@
         "lkvm": {
             "description": "kvmtool is a userland tool for creating and controlling KVM guests"
         },
+        "coronerctl": {
+            "description": "yandex-coroner cli, https://a.yandex-team.ru/arc/trunk/arcadia/infra/rsm/coroner/README.md"
+        },
         "blkparse": {
             "description": "produce formatted output of event streams of block devices from blktrace utility"
         },
@@ -401,6 +416,15 @@
         },
         "grpc_cli": {
             "description": "GRPC command-line tool"
+        },
+        "buf": {
+            "description": "Protobuf lint and breaking change detector"
+        },
+        "iceflame": {
+            "description": "Performance data collection and analysis"
+        },
+        "wall-e": {
+            "description": "Client for Wall-E"
         }
     },
     "toolchain": {
@@ -1719,7 +1743,7 @@
                         "os": "LINUX",
                         "arch": "x86_64"
                     },
-                    "default": true
+                    "default": false
                 },
                 {
                     "host": {
@@ -1729,7 +1753,7 @@
                         "os": "LINUX",
                         "arch": "aarch64"
                     },
-                    "default": true
+                    "default": false
                 },
                 {
                     "host": {
@@ -1739,7 +1763,7 @@
                         "os": "LINUX",
                         "arch": "ppc64le"
                     },
-                    "default": true
+                    "default": false
                 },
                 {
                     "host": {
@@ -1749,7 +1773,7 @@
                         "os": "LINUX",
                         "arch": "power9le"
                     },
-                    "default": true
+                    "default": false
                 },
                 {
                     "host": {
@@ -1759,7 +1783,7 @@
                         "os": "DARWIN",
                         "arch": "x86_64"
                     },
-                    "default": true
+                    "default": false
                 },
                 {
                     "host": {
@@ -1769,7 +1793,7 @@
                         "os": "IOS",
                         "arch": "i386"
                     },
-                    "default": true
+                    "default": false
                 },
                 {
                     "host": {
@@ -1779,7 +1803,7 @@
                         "os": "IOS",
                         "arch": "x86_64"
                     },
-                    "default": true
+                    "default": false
                 },
                 {
                     "host": {
@@ -1789,7 +1813,7 @@
                         "os": "IOS",
                         "arch": "armv7"
                     },
-                    "default": true
+                    "default": false
                 },
                 {
                     "host": {
@@ -1799,7 +1823,7 @@
                         "os": "IOS",
                         "arch": "arm64"
                     },
-                    "default": true
+                    "default": false
                 },
                 {
                     "host": {
@@ -1809,7 +1833,7 @@
                         "os": "YOCTO",
                         "arch": "armv7a"
                     },
-                    "default": true
+                    "default": false
                 },
                 {
                     "host": {
@@ -1819,7 +1843,7 @@
                         "os": "LINUX",
                         "arch": "x86_64"
                     },
-                    "default": true
+                    "default": false
                 },
                 {
                     "host": {
@@ -1829,7 +1853,7 @@
                         "os": "LINUX",
                         "arch": "aarch64"
                     },
-                    "default": true
+                    "default": false
                 },
                 {
                     "host": {
@@ -1839,7 +1863,7 @@
                         "os": "LINUX",
                         "arch": "ppc64le"
                     },
-                    "default": true
+                    "default": false
                 },
                 {
                     "host": {
@@ -1849,7 +1873,7 @@
                         "os": "LINUX",
                         "arch": "power9le"
                     },
-                    "default": true
+                    "default": false
                 },
                 {
                     "host": {
@@ -1859,7 +1883,7 @@
                         "os": "DARWIN",
                         "arch": "x86_64"
                     },
-                    "default": true
+                    "default": false
                 },
                 {
                     "host": {
@@ -1869,7 +1893,7 @@
                         "os": "IOS",
                         "arch": "i386"
                     },
-                    "default": true
+                    "default": false
                 },
                 {
                     "host": {
@@ -1879,7 +1903,7 @@
                         "os": "IOS",
                         "arch": "x86_64"
                     },
-                    "default": true
+                    "default": false
                 },
                 {
                     "host": {
@@ -1889,7 +1913,7 @@
                         "os": "IOS",
                         "arch": "armv7"
                     },
-                    "default": true
+                    "default": false
                 },
                 {
                     "host": {
@@ -1899,7 +1923,7 @@
                         "os": "IOS",
                         "arch": "arm64"
                     },
-                    "default": true
+                    "default": false
                 },
                 {
                     "host": {
@@ -1909,7 +1933,7 @@
                         "os": "LINUX",
                         "arch": "armv7ahf_cortex_a35"
                     },
-                    "default": true
+                    "default": false
                 },
                 {
                     "host": {
@@ -1919,7 +1943,7 @@
                         "os": "LINUX",
                         "arch": "armv7ahf_cortex_a53"
                     },
-                    "default": true
+                    "default": false
                 },
                 {
                     "host": {
@@ -1929,7 +1953,7 @@
                         "os": "LINUX",
                         "arch": "armv8a_cortex_a35"
                     },
-                    "default": true
+                    "default": false
                 },
                 {
                     "host": {
@@ -1939,7 +1963,7 @@
                         "os": "LINUX",
                         "arch": "armv8a_cortex_a53"
                     },
-                    "default": true
+                    "default": false
                 },
                 {
                     "host": {
@@ -1950,7 +1974,7 @@
                         "os": "LINUX",
                         "arch": "ppc64le"
                     },
-                    "default": true
+                    "default": false
                 },
                 {
                     "host": {
@@ -1961,7 +1985,7 @@
                         "os": "LINUX",
                         "arch": "power9le"
                     },
-                    "default": true
+                    "default": false
                 }
             ],
             "params": {
@@ -2285,25 +2309,9 @@
                     "bottle": "clang10",
                     "executable": "c++"
                 },
-                "c++filt": {
-                    "bottle": "clang10",
-                    "executable": "c++filt"
-                },
                 "cc": {
                     "bottle": "clang10",
                     "executable": "cc"
-                },
-                "clang-format": {
-                    "bottle": "clang10",
-                    "executable": "clang-format"
-                },
-                "clang-tidy": {
-                    "bottle": "clang10",
-                    "executable": "clang-tidy"
-                },
-                "gcov": {
-                    "bottle": "clang10",
-                    "executable": "gcov"
                 },
                 "llvm-cov": {
                     "bottle": "clang10",
@@ -2574,6 +2582,332 @@
                 "gcc_version": "10.0"
             }
         },
+        "clang11": {
+            "tools": {
+                "c++": {
+                    "bottle": "clang11",
+                    "executable": "c++"
+                },
+                "c++filt": {
+                    "bottle": "clang11",
+                    "executable": "c++filt"
+                },
+                "cc": {
+                    "bottle": "clang11",
+                    "executable": "cc"
+                },
+                "clang-apply-replacements": {
+                    "bottle": "clang11",
+                    "executable": "clang-apply-replacements"
+                },
+                "clang-format": {
+                    "bottle": "clang11",
+                    "executable": "clang-format"
+                },
+                "clang-rename": {
+                    "bottle": "clang11",
+                    "executable": "clang-rename"
+                },
+                "clang-tidy": {
+                    "bottle": "clang11",
+                    "executable": "clang-tidy"
+                },
+                "gcov": {
+                    "bottle": "clang11",
+                    "executable": "llvm-gcov"
+                },
+                "llvm-cov": {
+                    "bottle": "clang11",
+                    "executable": "llvm-cov"
+                },
+                "llvm-profdata": {
+                    "bottle": "clang11",
+                    "executable": "llvm-profdata"
+                },
+                "llvm-symbolizer": {
+                    "bottle": "clang11",
+                    "executable": "llvm-symbolizer"
+                },
+                "nm": {
+                    "bottle": "clang11",
+                    "executable": "llvm-nm"
+                },
+                "strip": {
+                    "bottle": "clang11",
+                    "executable": "llvm-strip"
+                },
+                "objcopy": {
+                    "bottle": "clang11",
+                    "executable": "llvm-objcopy"
+                }
+            },
+            "platforms": [
+                {
+                    "host": {
+                        "os": "LINUX"
+                    },
+                    "target": {
+                        "os": "LINUX",
+                        "arch": "x86_64"
+                    },
+                    "default": true
+                },
+                {
+                    "host": {
+                        "os": "LINUX"
+                    },
+                    "target": {
+                        "os": "LINUX",
+                        "arch": "aarch64"
+                    },
+                    "default": true
+                },
+                {
+                    "host": {
+                        "os": "LINUX"
+                    },
+                    "target": {
+                        "os": "LINUX",
+                        "arch": "ppc64le"
+                    },
+                    "default": true
+                },
+                {
+                    "host": {
+                        "os": "LINUX"
+                    },
+                    "target": {
+                        "os": "LINUX",
+                        "arch": "power9le"
+                    },
+                    "default": true
+                },
+                {
+                    "host": {
+                        "os": "LINUX"
+                    },
+                    "target": {
+                        "os": "DARWIN",
+                        "arch": "x86_64"
+                    },
+                    "default": true
+                },
+                {
+                    "host": {
+                        "os": "LINUX"
+                    },
+                    "target": {
+                        "os": "IOS",
+                        "arch": "i386"
+                    },
+                    "default": true
+                },
+                {
+                    "host": {
+                        "os": "LINUX"
+                    },
+                    "target": {
+                        "os": "IOS",
+                        "arch": "x86_64"
+                    },
+                    "default": true
+                },
+                {
+                    "host": {
+                        "os": "LINUX"
+                    },
+                    "target": {
+                        "os": "IOS",
+                        "arch": "armv7"
+                    },
+                    "default": true
+                },
+                {
+                    "host": {
+                        "os": "LINUX"
+                    },
+                    "target": {
+                        "os": "IOS",
+                        "arch": "arm64"
+                    },
+                    "default": true
+                },
+                {
+                    "host": {
+                        "os": "LINUX"
+                    },
+                    "target": {
+                        "os": "YOCTO",
+                        "arch": "armv7a"
+                    },
+                    "default": true
+                },
+                {
+                    "host": {
+                        "os": "DARWIN"
+                    },
+                    "target": {
+                        "os": "LINUX",
+                        "arch": "x86_64"
+                    },
+                    "default": true
+                },
+                {
+                    "host": {
+                        "os": "DARWIN"
+                    },
+                    "target": {
+                        "os": "LINUX",
+                        "arch": "aarch64"
+                    },
+                    "default": true
+                },
+                {
+                    "host": {
+                        "os": "DARWIN"
+                    },
+                    "target": {
+                        "os": "LINUX",
+                        "arch": "ppc64le"
+                    },
+                    "default": true
+                },
+                {
+                    "host": {
+                        "os": "DARWIN"
+                    },
+                    "target": {
+                        "os": "LINUX",
+                        "arch": "power9le"
+                    },
+                    "default": true
+                },
+                {
+                    "host": {
+                        "os": "DARWIN"
+                    },
+                    "target": {
+                        "os": "DARWIN",
+                        "arch": "x86_64"
+                    },
+                    "default": true
+                },
+                {
+                    "host": {
+                        "os": "DARWIN"
+                    },
+                    "target": {
+                        "os": "IOS",
+                        "arch": "i386"
+                    },
+                    "default": true
+                },
+                {
+                    "host": {
+                        "os": "DARWIN"
+                    },
+                    "target": {
+                        "os": "IOS",
+                        "arch": "x86_64"
+                    },
+                    "default": true
+                },
+                {
+                    "host": {
+                        "os": "DARWIN"
+                    },
+                    "target": {
+                        "os": "IOS",
+                        "arch": "armv7"
+                    },
+                    "default": true
+                },
+                {
+                    "host": {
+                        "os": "DARWIN"
+                    },
+                    "target": {
+                        "os": "IOS",
+                        "arch": "arm64"
+                    },
+                    "default": true
+                },
+                {
+                    "host": {
+                        "os": "LINUX"
+                    },
+                    "target": {
+                        "os": "LINUX",
+                        "arch": "armv7ahf_cortex_a35"
+                    },
+                    "default": true
+                },
+                {
+                    "host": {
+                        "os": "LINUX"
+                    },
+                    "target": {
+                        "os": "LINUX",
+                        "arch": "armv7ahf_cortex_a53"
+                    },
+                    "default": true
+                },
+                {
+                    "host": {
+                        "os": "LINUX"
+                    },
+                    "target": {
+                        "os": "LINUX",
+                        "arch": "armv8a_cortex_a35"
+                    },
+                    "default": true
+                },
+                {
+                    "host": {
+                        "os": "LINUX"
+                    },
+                    "target": {
+                        "os": "LINUX",
+                        "arch": "armv8a_cortex_a53"
+                    },
+                    "default": true
+                },
+                {
+                    "host": {
+                        "os": "LINUX",
+                        "arch": "ppc64le"
+                    },
+                    "target": {
+                        "os": "LINUX",
+                        "arch": "ppc64le"
+                    },
+                    "default": true
+                },
+                {
+                    "host": {
+                        "os": "LINUX",
+                        "arch": "ppc64le"
+                    },
+                    "target": {
+                        "os": "LINUX",
+                        "arch": "power9le"
+                    },
+                    "default": true
+                }
+            ],
+            "params": {
+                "type": "clang",
+                "match_root": "CLANG",
+                "werror_mode": "all",
+                "c_compiler": "$(CLANG)/bin/clang",
+                "cxx_compiler": "$(CLANG)/bin/clang++",
+                "cxx_std": "c++20",
+                "llvm-symbolizer": "$(CLANG)/bin/llvm-symbolizer",
+                "objcopy": "$(CLANG)/bin/llvm-objcopy",
+                "strip": "$(CLANG)/bin/llvm-strip",
+                "gcc_version": "11.0"
+            }
+        },
         "xcode_11_1": {
             "tools": {
                 "c++": {
@@ -2598,6 +2932,99 @@
                 },
                 "strip": {
                     "bottle": "xcode_11_1",
+                    "executable": "strip"
+                }
+            },
+            "platforms": [
+                {
+                    "host": {
+                        "os": "DARWIN"
+                    },
+                    "target": {
+                        "os": "DARWIN",
+                        "arch": "x86_64"
+                    },
+                    "default": false
+                },
+                {
+                    "host": {
+                        "os": "DARWIN"
+                    },
+                    "target": {
+                        "os": "IOS",
+                        "arch": "i386"
+                    },
+                    "default": false
+                },
+                {
+                    "host": {
+                        "os": "DARWIN"
+                    },
+                    "target": {
+                        "os": "IOS",
+                        "arch": "x86_64"
+                    },
+                    "default": false
+                },
+                {
+                    "host": {
+                        "os": "DARWIN"
+                    },
+                    "target": {
+                        "os": "IOS",
+                        "arch": "armv7"
+                    },
+                    "default": false
+                },
+                {
+                    "host": {
+                        "os": "DARWIN"
+                    },
+                    "target": {
+                        "os": "IOS",
+                        "arch": "arm64"
+                    },
+                    "default": false
+                }
+            ],
+            "params": {
+                "type": "clang",
+                "match_root": "CLANG",
+                "werror_mode": "all",
+                "c_compiler": "$(CLANG)/usr/bin/clang",
+                "cxx_compiler": "$(CLANG)/usr/bin/clang++",
+                "ar": "$(CLANG)/usr/bin/libtool",
+                "inplace_tools": true,
+                "gcc_version": "8.0",
+                "dwarf_tool": {
+                    "DARWIN": "$(CLANG)/usr/bin/dsymutil -flat"
+                }
+            }
+        },
+        "xcode_12_1": {
+            "tools": {
+                "c++": {
+                    "bottle": "xcode_12_1",
+                    "executable": "c++"
+                },
+                "cc": {
+                    "bottle": "xcode_12_1",
+                    "executable": "cc"
+                },
+                "llvm-cov": {
+                    "bottle": "xcode_12_1",
+                    "executable": "llvm-cov"
+                },
+                "llvm-profdata": {
+                    "bottle": "xcode_12_1",
+                    "executable": "llvm-profdata"
+                },
+                "nm": {
+                    "bottle": "xcode_12_1",
+                    "executable": "llvm-nm"
+                },
+                "strip": {
+                    "bottle": "xcode_12_1",
                     "executable": "strip"
                 }
             },
@@ -2724,6 +3151,171 @@
                         "os": "ANDROID",
                         "arch": "i686"
                     },
+                    "default": false
+                },
+                {
+                    "host": {
+                        "os": "LINUX"
+                    },
+                    "target": {
+                        "os": "ANDROID",
+                        "arch": "x86_64"
+                    },
+                    "default": false
+                },
+                {
+                    "host": {
+                        "os": "LINUX"
+                    },
+                    "target": {
+                        "os": "ANDROID",
+                        "arch": "armv7a"
+                    },
+                    "default": false
+                },
+                {
+                    "host": {
+                        "os": "LINUX"
+                    },
+                    "target": {
+                        "os": "ANDROID",
+                        "arch": "armv7a_neon"
+                    },
+                    "default": false
+                },
+                {
+                    "host": {
+                        "os": "LINUX"
+                    },
+                    "target": {
+                        "os": "ANDROID",
+                        "arch": "armv8a"
+                    },
+                    "default": false
+                },
+                {
+                    "host": {
+                        "os": "DARWIN"
+                    },
+                    "target": {
+                        "os": "ANDROID",
+                        "arch": "i686"
+                    },
+                    "default": false
+                },
+                {
+                    "host": {
+                        "os": "DARWIN"
+                    },
+                    "target": {
+                        "os": "ANDROID",
+                        "arch": "x86_64"
+                    },
+                    "default": false
+                },
+                {
+                    "host": {
+                        "os": "DARWIN"
+                    },
+                    "target": {
+                        "os": "ANDROID",
+                        "arch": "armv7a"
+                    },
+                    "default": false
+                },
+                {
+                    "host": {
+                        "os": "DARWIN"
+                    },
+                    "target": {
+                        "os": "ANDROID",
+                        "arch": "armv7a_neon"
+                    },
+                    "default": false
+                },
+                {
+                    "host": {
+                        "os": "DARWIN"
+                    },
+                    "target": {
+                        "os": "ANDROID",
+                        "arch": "armv8a"
+                    },
+                    "default": false
+                }
+            ],
+            "params": {
+                "type": "clang",
+                "match_root": "NDK",
+                "ar": "$(NDK)/llvm-toolchain/bin/llvm-ar",
+                "c_compiler": "$(NDK)/llvm-toolchain/bin/clang",
+                "cxx_compiler": "$(NDK)/llvm-toolchain/bin/clang++",
+                "objcopy": "$(NDK)/llvm-toolchain/bin/llvm-objcopy",
+                "strip": "$(NDK)/llvm-toolchain/bin/llvm-strip",
+                "werror_mode": "all",
+                "gcc_version": "9.0",
+                "target_opt": [
+                    "-DANDROID_FAKEID=android_r21b"
+                ]
+            }
+        },
+        "android-ndk-r22": {
+            "name": "clang11",
+            "tools": {
+                "cc": {
+                    "bottle": "android-ndk-r22",
+                    "executable": "cc"
+                },
+                "c++": {
+                    "bottle": "android-ndk-r22",
+                    "executable": "c++"
+                },
+                "gcov": {
+                    "bottle": "android-ndk-r22",
+                    "executable": "llvm-cov"
+                },
+                "strip": {
+                    "bottle": "android-ndk-r22",
+                    "executable": "strip"
+                },
+                "objcopy": {
+                    "bottle": "android-ndk-r22",
+                    "executable": "objcopy"
+                },
+                "nm": {
+                    "bottle": "android-ndk-r22",
+                    "executable": "nm"
+                },
+                "clang-format": {
+                    "bottle": "android-ndk-r22",
+                    "executable": "clang-format"
+                },
+                "clang-tidy": {
+                    "bottle": "android-ndk-r22",
+                    "executable": "clang-tidy"
+                },
+                "llvm-cov": {
+                    "bottle": "android-ndk-r22",
+                    "executable": "llvm-cov"
+                },
+                "llvm-profdata": {
+                    "bottle": "android-ndk-r22",
+                    "executable": "llvm-profdata"
+                },
+                "llvm-symbolizer": {
+                    "bottle": "android-ndk-r22",
+                    "executable": "llvm-symbolizer"
+                }
+            },
+            "platforms": [
+                {
+                    "host": {
+                        "os": "LINUX"
+                    },
+                    "target": {
+                        "os": "ANDROID",
+                        "arch": "i686"
+                    },
                     "default": true
                 },
                 {
@@ -2824,19 +3416,16 @@
                 "c_compiler": "$(NDK)/llvm-toolchain/bin/clang",
                 "cxx_compiler": "$(NDK)/llvm-toolchain/bin/clang++",
                 "objcopy": "$(NDK)/llvm-toolchain/bin/llvm-objcopy",
-                "strip": "$(NDK)/:lvm-toolchain/bin/llvm-strip",
+                "strip": "$(NDK)/llvm-toolchain/bin/llvm-strip",
                 "werror_mode": "all",
-                "gcc_version": "9.0",
-                "target_opt": [
-                    "-DANDROID_FAKEID=android_r21b"
-                ]
+                "gcc_version": "11.0"
             }
         },
         "bloat": {
             "tools": {
                 "bloat": {
                     "bottle": "bloat",
-                    "executable": "bloat2"
+                    "executable": "bloat"
                 }
             },
             "platforms": [
@@ -3388,6 +3977,42 @@
                 "jar11": {
                     "bottle": "jdk11",
                     "executable": "jar11"
+                }
+            },
+            "platforms": [
+                {
+                    "host": {
+                        "os": "LINUX"
+                    },
+                    "default": true
+                },
+                {
+                    "host": {
+                        "os": "WIN"
+                    },
+                    "default": true
+                },
+                {
+                    "host": {
+                        "os": "DARWIN"
+                    },
+                    "default": true
+                }
+            ]
+        },
+        "jdk15": {
+            "tools": {
+                "javac15": {
+                    "bottle": "jdk15",
+                    "executable": "javac15"
+                },
+                "java15": {
+                    "bottle": "jdk15",
+                    "executable": "java15"
+                },
+                "jar15": {
+                    "bottle": "jdk15",
+                    "executable": "jar15"
                 }
             },
             "platforms": [
@@ -4910,19 +5535,19 @@
                 }
             ]
         },
-        "golang_1_14_6": {
+        "golang_1_15_4": {
             "tools": {
-                "golang_1.14.6": {
-                    "bottle": "golang_1.14.6",
-                    "executable": "golang_1.14.6"
+                "golang_1.15.4": {
+                    "bottle": "golang_1.15.4",
+                    "executable": "golang_1.15.4"
                 },
-                "go_1.14.6": {
-                    "bottle": "golang_1.14.6",
-                    "executable": "go_1.14.6"
+                "go_1.15.4": {
+                    "bottle": "golang_1.15.4",
+                    "executable": "go_1.15.4"
                 },
-                "gofmt_1.14.6": {
-                    "bottle": "golang_1.14.6",
-                    "executable": "gofmt_1.14.6"
+                "gofmt_1.15.4": {
+                    "bottle": "golang_1.15.4",
+                    "executable": "gofmt_1.15.4"
                 }
             },
             "platforms": [
@@ -4947,21 +5572,21 @@
             ],
             "params": {
                 "type": "golang",
-                "version": "1.14.6"
+                "version": "1.15.4"
             }
         },
-        "golang_1_15_2": {
+        "golang_1_15_6": {
             "tools": {
                 "golang": {
-                    "bottle": "golang_1.15.2",
+                    "bottle": "golang_1.15.6",
                     "executable": "golang"
                 },
                 "go": {
-                    "bottle": "golang_1.15.2",
+                    "bottle": "golang_1.15.6",
                     "executable": "go"
                 },
                 "gofmt": {
-                    "bottle": "golang_1.15.2",
+                    "bottle": "golang_1.15.6",
                     "executable": "gofmt"
                 }
             },
@@ -4987,7 +5612,7 @@
             ],
             "params": {
                 "type": "golang",
-                "version": "1.15.2"
+                "version": "1.15.6"
             }
         },
         "godoc": {
@@ -5227,6 +5852,22 @@
                 "lkvm": {
                     "bottle": "kvmtool",
                     "executable": "lkvm"
+                }
+            },
+            "platforms": [
+                {
+                    "host": {
+                        "os": "LINUX"
+                    },
+                    "default": true
+                }
+            ]
+        },
+        "coronerctl": {
+            "tools": {
+                "coronerctl": {
+                    "bottle": "coronerctl",
+                    "executable": "coronerctl"
                 }
             },
             "platforms": [
@@ -5539,6 +6180,66 @@
                     "default": true
                 }
             ]
+        },
+        "buf": {
+            "tools": {
+                "buf": {
+                    "bottle": "buf",
+                    "executable": "buf"
+                }
+            },
+            "platforms": [
+                {
+                    "host": {
+                        "os": "LINUX"
+                    },
+                    "default": true
+                }
+            ]
+        },
+        "iceflame": {
+            "tools": {
+                "iceflame": {
+                    "bottle": "iceflame",
+                    "executable": "iceflame"
+                }
+            },
+            "platforms": [
+                {
+                    "host": {
+                        "os": "LINUX"
+                    },
+                    "default": true
+                },
+                {
+                    "host": {
+                        "os": "DARWIN"
+                    },
+                    "default": true
+                }
+            ]
+        },
+        "wall-e": {
+            "tools": {
+                "wall-e": {
+                    "bottle": "wall-e",
+                    "executable": "wall-e"
+                }
+            },
+            "platforms": [
+                {
+                    "host": {
+                        "os": "LINUX"
+                    },
+                    "default": true
+                },
+                {
+                    "host": {
+                        "os": "DARWIN"
+                    },
+                    "default": true
+                }
+            ]
         }
     },
     "bottles": {
@@ -5573,7 +6274,7 @@
         "ymake": {
             "formula": {
                 "sandbox_id": [
-                    795609337
+                    854228601
                 ],
                 "match": "ymake"
             },
@@ -5597,7 +6298,7 @@
         "arc": {
             "formula": {
                 "sandbox_id": [
-                    795529173
+                    858770809
                 ],
                 "match": "arc"
             },
@@ -5621,8 +6322,8 @@
         "yo": {
             "formula": {
                 "sandbox_id": [
-                    747461269,
-                    747461262
+                    847853670,
+                    847853650
                 ],
                 "match": "yo"
             },
@@ -5650,9 +6351,7 @@
         "swagger": {
             "formula": {
                 "sandbox_id": [
-                    768322495,
-                    768322503,
-                    768322516
+                    801239513
                 ],
                 "match": "swagger"
             },
@@ -5703,7 +6402,7 @@
         "releaser": {
             "formula": {
                 "sandbox_id": [
-                    785075388
+                    811505456
                 ],
                 "match": "releaser"
             },
@@ -5729,7 +6428,7 @@
         "sandboxctl": {
             "formula": {
                 "sandbox_id": [
-                    667910329
+                    832226067
                 ],
                 "match": "tools/sandboxctl/bin/sandboxctl"
             },
@@ -5782,13 +6481,13 @@
         "bloat": {
             "formula": {
                 "sandbox_id": [
-                    372488594
+                    801218211
                 ],
                 "match": "Bloat"
             },
             "executable": {
-                "bloat2": [
-                    "bloat2"
+                "bloat": [
+                    "bloat"
                 ]
             }
         },
@@ -5859,6 +6558,30 @@
                     "java"
                 ],
                 "jar11": [
+                    "bin",
+                    "jar"
+                ]
+            }
+        },
+        "jdk15": {
+            "formula": {
+                "sandbox_id": [
+                    823158461,
+                    823183568,
+                    823899886
+                ],
+                "match": "openjdk"
+            },
+            "executable": {
+                "javac15": [
+                    "bin",
+                    "javac"
+                ],
+                "java15": [
+                    "bin",
+                    "java"
+                ],
+                "jar15": [
                     "bin",
                     "jar"
                 ]
@@ -6092,7 +6815,51 @@
         "clang10": {
             "formula": {
                 "sandbox_id": [
-                    777270390
+                    810336231
+                ],
+                "match": "CLANG"
+            },
+            "executable": {
+                "c++": [
+                    "bin",
+                    "clang++"
+                ],
+                "cc": [
+                    "bin",
+                    "clang"
+                ],
+                "llvm-cov": [
+                    "bin",
+                    "llvm-cov"
+                ],
+                "llvm-profdata": [
+                    "bin",
+                    "llvm-profdata"
+                ],
+                "llvm-symbolizer": [
+                    "bin",
+                    "llvm-symbolizer"
+                ],
+                "llvm-nm": [
+                    "bin",
+                    "llvm-nm"
+                ],
+                "llvm-strip": [
+                    "bin",
+                    "llvm-strip"
+                ],
+                "llvm-objcopy": [
+                    "bin",
+                    "llvm-objcopy"
+                ]
+            }
+        },
+        "clang11": {
+            "formula": {
+                "sandbox_id": [
+                    847800827,
+                    828496042,
+                    827918501
                 ],
                 "match": "CLANG"
             },
@@ -6103,21 +6870,29 @@
                 ],
                 "c++filt": [
                     "bin",
-                    "c++filt"
+                    "llvm-cxxfilt"
                 ],
                 "cc": [
                     "bin",
                     "clang"
                 ],
+                "clang-apply-replacements": [
+                    "bin",
+                    "clang-apply-replacements"
+                ],
                 "clang-format": [
                     "bin",
                     "clang-format"
+                ],
+                "clang-rename": [
+                    "bin",
+                    "clang-rename"
                 ],
                 "clang-tidy": [
                     "bin",
                     "clang-tidy"
                 ],
-                "gcov": [
+                "llvm-gcov": [
                     "bin",
                     "llvm-gcov"
                 ],
@@ -6187,11 +6962,117 @@
                 ]
             }
         },
+        "xcode_12_1": {
+            "formula": {
+                "sandbox_id": [
+                    816448826
+                ],
+                "match": "toolchain"
+            },
+            "executable": {
+                "c++": [
+                    "usr",
+                    "bin",
+                    "clang++"
+                ],
+                "cc": [
+                    "usr",
+                    "bin",
+                    "clang"
+                ],
+                "llvm-cov": [
+                    "usr",
+                    "bin",
+                    "llvm-cov"
+                ],
+                "llvm-profdata": [
+                    "usr",
+                    "bin",
+                    "llvm-profdata"
+                ],
+                "llvm-nm": [
+                    "usr",
+                    "bin",
+                    "llvm-nm"
+                ],
+                "strip": [
+                    "usr",
+                    "bin",
+                    "strip"
+                ]
+            }
+        },
         "android-ndk-r21b": {
             "formula": {
                 "sandbox_id": [
                     681102131,
                     681103148
+                ],
+                "match": "NDK"
+            },
+            "executable": {
+                "c++": [
+                    "llvm-toolchain",
+                    "bin",
+                    "clang++"
+                ],
+                "cc": [
+                    "llvm-toolchain",
+                    "bin",
+                    "clang"
+                ],
+                "strip": [
+                    "llvm-toolchain",
+                    "bin",
+                    "llvm-strip"
+                ],
+                "c++filt": [
+                    "llvm-toolchain",
+                    "bin",
+                    "i686-linux-android-c++filt"
+                ],
+                "clang-format": [
+                    "llvm-toolchain",
+                    "bin",
+                    "clang-format"
+                ],
+                "clang-tidy": [
+                    "llvm-toolchain",
+                    "bin",
+                    "clang-tidy"
+                ],
+                "llvm-cov": [
+                    "llvm-toolchain",
+                    "bin",
+                    "llvm-cov"
+                ],
+                "llvm-profdata": [
+                    "llvm-toolchain",
+                    "bin",
+                    "llvm-profdata"
+                ],
+                "llvm-symbolizer": [
+                    "llvm-toolchain",
+                    "bin",
+                    "llvm-symbolizer"
+                ],
+                "nm": [
+                    "llvm-toolchain",
+                    "bin",
+                    "llvm-nm"
+                ],
+                "objcopy": [
+                    "llvm-toolchain",
+                    "bin",
+                    "llvm-objcopy"
+                ]
+            }
+        },
+        "android-ndk-r22": {
+            "formula": {
+                "sandbox_id": [
+                    847367573,
+                    847367436
                 ],
                 "match": "NDK"
             },
@@ -6404,7 +7285,7 @@
         },
         "yndexer": {
             "formula": {
-                "sandbox_id": 354422815,
+                "sandbox_id": 847830973,
                 "match": "YNDEXER"
             },
             "executable": {
@@ -6470,7 +7351,7 @@
         },
         "perf": {
             "formula": {
-                "sandbox_id": 657978986,
+                "sandbox_id": 829735695,
                 "match": "infra/kernel/tools/perf/build/perf-static.tar.gz"
             },
             "executable": {
@@ -6590,7 +7471,7 @@
         },
         "ytexec": {
             "formula": {
-                "sandbox_id": 790929408,
+                "sandbox_id": 855948062,
                 "match": "ytexec"
             },
             "executable": {
@@ -6640,7 +7521,7 @@
         "yf": {
             "formula": {
                 "sandbox_id": [
-                    755713272
+                    828579949
                 ],
                 "match": "yf-client"
             },
@@ -6649,7 +7530,7 @@
         "yp-util": {
             "formula": {
                 "sandbox_id": [
-                    798880508
+                    840115953
                 ],
                 "match": "yp_util"
             },
@@ -6662,7 +7543,7 @@
         "yp": {
             "formula": {
                 "sandbox_id": [
-                    795608186
+                    840116164
                 ],
                 "match": "yp"
             },
@@ -6675,7 +7556,7 @@
         "yd-migrate": {
             "formula": {
                 "sandbox_id": [
-                    769874813
+                    853304841
                 ],
                 "match": "yd_migrate"
             },
@@ -6688,7 +7569,7 @@
         "dctl": {
             "formula": {
                 "sandbox_id": [
-                    786013387
+                    847093356
                 ],
                 "match": "dctl"
             },
@@ -7058,7 +7939,7 @@
         },
         "horadric": {
             "formula": {
-                "sandbox_id": 799327758,
+                "sandbox_id": 863297605,
                 "match": "horadric"
             },
             "executable": {
@@ -7069,7 +7950,7 @@
         },
         "logbroker": {
             "formula": {
-                "sandbox_id": 799327611,
+                "sandbox_id": 863297602,
                 "match": "logbroker"
             },
             "executable": {
@@ -7080,7 +7961,7 @@
         },
         "zcli": {
             "formula": {
-                "sandbox_id": 798986510,
+                "sandbox_id": 863266308,
                 "match": "zcli"
             },
             "executable": {
@@ -7157,7 +8038,7 @@
         },
         "ycmerge": {
             "formula": {
-                "sandbox_id": 779282266,
+                "sandbox_id": 848502107,
                 "match": "ycmerge"
             },
             "executable": {
@@ -7168,7 +8049,7 @@
         },
         "ygdiff": {
             "formula": {
-                "sandbox_id": 771922665,
+                "sandbox_id": 848469817,
                 "match": "ygdiff"
             },
             "executable": {
@@ -7201,7 +8082,7 @@
         },
         "apphost": {
             "formula": {
-                "sandbox_id": 798680401,
+                "sandbox_id": 860918318,
                 "match": "app_host_launcher"
             },
             "executable": {
@@ -7212,7 +8093,7 @@
         },
         "news": {
             "formula": {
-                "sandbox_id": 791885740,
+                "sandbox_id": 847016589,
                 "match": "news_launcher"
             },
             "executable": {
@@ -7221,32 +8102,32 @@
                 ]
             }
         },
-        "golang_1.14.6": {
+        "golang_1.15.4": {
             "formula": {
                 "sandbox_id": [
-                    727341832,
-                    727342274,
-                    727342815
+                    815621580,
+                    815622043,
+                    815622660
                 ],
                 "match": "GOLANG"
             },
             "executable": {
-                "go_1.14.6": [
+                "go_1.15.4": [
                     "bin",
                     "go"
                 ],
-                "gofmt_1.14.6": [
+                "gofmt_1.15.4": [
                     "bin",
                     "gofmt"
                 ]
             }
         },
-        "golang_1.15.2": {
+        "golang_1.15.6": {
             "formula": {
                 "sandbox_id": [
-                    774223543,
-                    774224070,
-                    774225187
+                    838256896,
+                    838258025,
+                    838259425
                 ],
                 "match": "GOLANG"
             },
@@ -7294,7 +8175,7 @@
         "qyp": {
             "formula": {
                 "sandbox_id": [
-                    714273705
+                    812414883
                 ],
                 "match": "infra/qyp/vmctl/bin/vmctl"
             },
@@ -7451,6 +8332,19 @@
                 ]
             }
         },
+        "coronerctl": {
+            "formula": {
+                "sandbox_id": [
+                    827245421
+                ],
+                "match": "infra/rsm/coroner/cmd/coronerctl/coronerctl"
+            },
+            "executable": {
+                "coronerctl": [
+                    "coronerctl"
+                ]
+            }
+        },
         "lz4": {
             "formula": {
                 "sandbox_id": [
@@ -7529,9 +8423,7 @@
         },
         "vmexec": {
             "formula": {
-                "sandbox_id": [
-                    762363808
-                ],
+                "sandbox_id": 833938089,
                 "match": "infra/qemu/vmexec/vmexec"
             },
             "executable": {
@@ -7564,7 +8456,7 @@
         },
         "sedem": {
             "formula": {
-                "sandbox_id": 796416043,
+                "sandbox_id": 852270808,
                 "match": "SEDEM archive"
             },
             "executable": {
@@ -7593,7 +8485,7 @@
         "ya_sed": {
             "formula": {
                 "sandbox_id": [
-                    679385334
+                    806271103
                 ],
                 "match": "ya_sed"
             },
@@ -7618,7 +8510,7 @@
         },
         "yadi": {
             "formula": {
-                "sandbox_id": 795988084,
+                "sandbox_id": 832380091,
                 "match": "yadi-arc"
             },
             "executable": {
@@ -7635,6 +8527,39 @@
             "executable": {
                 "grpc_cli": [
                     "grpc_cli"
+                ]
+            }
+        },
+        "buf": {
+            "formula": {
+                "sandbox_id": 813444352,
+                "match": "buf"
+            },
+            "executable": {
+                "buf": [
+                    "buf"
+                ]
+            }
+        },
+        "iceflame": {
+            "formula": {
+                "sandbox_id": 861488469,
+                "match": "iceflame"
+            },
+            "executable": {
+                "iceflame": [
+                    "iceflame"
+                ]
+            }
+        },
+        "wall-e": {
+            "formula": {
+                "sandbox_id": 846366628,
+                "match": "wall-e"
+            },
+            "executable": {
+                "wall-e": [
+                    "wall-e"
                 ]
             }
         }

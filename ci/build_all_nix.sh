@@ -18,16 +18,21 @@ function python_version {
         Python*3.6*) echo 3.6 ;;
         Python*3.7*) echo 3.7 ;;
         Python*3.8*) echo 3.8 ;;
+        Python*3.9*) echo 3.9 ;;
         *) echo "Cannot determine python version" ; exit 1 ;;
     esac
 }
 
 function os_sdk {
+    python_version=`python_version python`
+    # workaround for python3.9 - don't use system python for it
+    #TODO(kirillovs): remove workaround when 3.9 will be put in arcadia
     case `uname -s` in
-        Linux) echo "-DOS_SDK=ubuntu-10 -DUSE_SYSTEM_PYTHON=`python_version python`" ;;
+        Linux) if [[ "$python_version" != "3.9" ]]; then echo "-DOS_SDK=ubuntu-10 -DUSE_SYSTEM_PYTHON=$python_version"; else echo "-DOS_SDK=local"; fi ;;
         *) echo "-DOS_SDK=local" ;;
     esac
 }
+
 
 lnx_common_flags="-DNO_DEBUGINFO $CUDA_ARG"
 
@@ -80,4 +85,9 @@ python mk_wheel.py $lnx_common_flags $(os_sdk) -DPYTHON_CONFIG=$(pyenv prefix)/b
 PY38=3.8.0
 pyenv install -s $PY38
 pyenv shell $PY38
+python mk_wheel.py $lnx_common_flags $(os_sdk) -DPYTHON_CONFIG=$(pyenv prefix)/bin/python3-config
+
+PY39=3.9.0
+pyenv install -s $PY39
+pyenv shell $PY39
 python mk_wheel.py $lnx_common_flags $(os_sdk) -DPYTHON_CONFIG=$(pyenv prefix)/bin/python3-config

@@ -10,6 +10,7 @@
 #include <util/system/info.h>
 #include <util/system/thread.h>
 #include <util/generic/xrange.h>
+#include <util/generic/serialized_enum.h>
 
 // TODO (velavokr): BALANCER-1345 add more tests on pollers
 
@@ -43,6 +44,8 @@ class TCoroTest: public TTestBase {
     UNIT_TEST(TestStackPages);
     UNIT_TEST(TestEventQueue)
     UNIT_TEST(TestNestedExecutor)
+    UNIT_TEST(TestComputeCoroutineYield)
+    UNIT_TEST(TestPollEngines);
     UNIT_TEST_SUITE_END();
 
 public:
@@ -73,6 +76,8 @@ public:
     void TestStackPages();
     void TestEventQueue();
     void TestNestedExecutor();
+    void TestComputeCoroutineYield();
+    void TestPollEngines();
 };
 
 void TCoroTest::TestException() {
@@ -362,7 +367,6 @@ namespace NCoroTestJoin {
 
         TPipe in, out;
         TPipe::Pipe(in, out);
-
         SetNonBlock(in.GetHandle());
 
         {
@@ -943,6 +947,58 @@ void TCoroTest::TestNestedExecutor() {
 
     UNIT_ASSERT(!RunningCont());
 #endif
+}
+
+void TCoroTest::TestComputeCoroutineYield() {
+//if we have busy (e.g., on cpu) coroutine, when it yields, io must flow
+    TContExecutor exec(32000);
+    exec.SetFailOnError(true);
+
+    TPipe in, out;
+    TPipe::Pipe(in, out);
+    SetNonBlock(in.GetHandle());
+    size_t lastRead = 42;
+
+    auto compute = [&](TCont* cont) {
+        for (size_t i = 0; i < 10; ++i) {
+            write(out.GetHandle(), &i, sizeof i);
+            Sleep(TDuration::MilliSeconds(10));
+            cont->Yield();
+            UNIT_ASSERT(lastRead == i);
+        }
+    };
+
+    auto io = [&](TCont* cont) {
+        for (size_t i = 0; i < 10; ++i) {
+            NCoro::ReadI(cont, in.GetHandle(), &lastRead, sizeof lastRead);
+        }
+    };
+
+    exec.Create(compute, "compute");
+    exec.Create(io, "io");
+
+    exec.Execute();
+}
+
+void TCoroTest::TestPollEngines() {
+    bool defaultChecked = false;
+    for (auto engine : GetEnumAllValues<EContPoller>()) {
+        auto poller = IPollerFace::Construct(engine);
+        if (!poller) {
+            continue;
+        }
+
+        TContExecutor exec(32000, IPollerFace::Construct(engine));
+
+        if (engine == EContPoller::Default) {
+            defaultChecked = true;
+            UNIT_ASSERT_VALUES_EQUAL(exec.Poller()->PollEngine(), EContPoller::Combined);
+        } else {
+            UNIT_ASSERT_VALUES_EQUAL(exec.Poller()->PollEngine(), engine);
+        }
+    }
+
+    UNIT_ASSERT(defaultChecked);
 }
 
 UNIT_TEST_SUITE_REGISTRATION(TCoroTest);

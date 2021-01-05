@@ -105,7 +105,7 @@ TFoldsCreationParams::TFoldsCreationParams(
 
 ui32 TFoldsCreationParams::CalcCheckSum(
     const NCB::TObjectsGrouping& objectsGrouping,
-    NPar::TLocalExecutor* localExecutor) const {
+    NPar::ILocalExecutor* localExecutor) const {
 
     ui32 checkSum = MultiHash(
         IsOrderedBoosting,
@@ -229,13 +229,14 @@ TLearnContext::TLearnContext(
     const TMaybe<TCustomMetricDescriptor>& evalMetricDescriptor,
     const NCatboostOptions::TOutputFilesOptions& outputOptions,
     const TTrainingDataProviders& data,
+    TMaybe<TPrecomputedOnlineCtrData> precomputedSingleOnlineCtrDataForSingleFold,
     const TLabelConverter& labelConverter,
     const TMaybe<TVector<double>>& startingApprox,
     TMaybe<const TRestorableFastRng64*> initRand,
     TMaybe<TFullModel*> initModel,
     THolder<TLearnProgress> initLearnProgress, // will be modified if not non-nullptr
     NCB::TDataProviders initModelApplyCompatiblePools,
-    NPar::TLocalExecutor* localExecutor,
+    NPar::ILocalExecutor* localExecutor,
     const TString& fileNamesPrefix)
 
     : TCommonContext(
@@ -340,6 +341,7 @@ TLearnContext::TLearnContext(
             foldCreationParamsCheckSum,
             /*estimatedFeaturesQuantizationOptions*/
                 params.DataProcessingOptions->FloatFeaturesBinarization.Get(),
+            std::move(precomputedSingleOnlineCtrDataForSingleFold),
             params.ObliviousTreeOptions.Get(),
             initModel,
             initModelApplyCompatiblePools,
@@ -353,12 +355,6 @@ TLearnContext::TLearnContext(
     UseTreeLevelCachingFlag = NeedToUseTreeLevelCaching(Params, maxBodyTailCount, LearnProgress->ApproxDimension);
 }
 
-
-TLearnContext::~TLearnContext() {
-    if (Params.SystemOptions->IsMaster()) {
-        FinalizeMaster(this);
-    }
-}
 
 void TLearnContext::SaveProgress(std::function<void(IOutputStream*)> onSaveSnapshot) {
     if (!OutputOptions.SaveSnapshot()) {
@@ -446,10 +442,11 @@ TLearnProgress::TLearnProgress(
     ui32 featuresCheckSum,
     ui32 foldCreationParamsCheckSum,
     const NCatboostOptions::TBinarizationOptions& estimatedFeaturesQuantizationOptions,
+    TMaybe<TPrecomputedOnlineCtrData> precomputedSingleOnlineCtrDataForSingleFold,
     const NCatboostOptions::TObliviousTreeLearnerOptions& trainOptions,
     TMaybe<TFullModel*> initModel,
     NCB::TDataProviders initModelApplyCompatiblePools,
-    NPar::TLocalExecutor* localExecutor)
+    NPar::ILocalExecutor* localExecutor)
     : StartingApprox(foldsCreationParams.StartingApprox)
     , FoldCreationParamsCheckSum(foldCreationParamsCheckSum)
     , CatFeatures(CreateCatFeatures(*data.Learn->ObjectsData->GetFeaturesLayout()))
@@ -479,6 +476,10 @@ TLearnProgress::TLearnProgress(
     CB_ENSURE_INTERNAL(
         !isForWorkerLocalData || (foldsCreationParams.LearningFoldCount == 0),
         "foldsCreationParams.LearningFoldCount != 0 for worker local data"
+    );
+    CB_ENSURE_INTERNAL(
+        !precomputedSingleOnlineCtrDataForSingleFold || (foldsCreationParams.LearningFoldCount == 0),
+        "foldsCreationParams.LearningFoldCount != 0 with specified precomputedSingleOnlineCtrDataForSingleFold"
     );
 
     TQuantizedFeaturesInfoPtr onlineEstimatedQuantizedFeaturesInfo;
@@ -526,6 +527,7 @@ TLearnProgress::TLearnProgress(
                     StartingApprox,
                     estimatedFeaturesQuantizationOptions,
                     onlineEstimatedQuantizedFeaturesInfo,
+                    /*precomputedSingleOnlineCtrs*/ nullptr,
                     &Rand,
                     localExecutor
                 )
@@ -540,6 +542,8 @@ TLearnProgress::TLearnProgress(
         }
     }
 
+    TIntrusivePtr<TPrecomputedOnlineCtr> precomputedSingleOnlineCtrs;
+
     AveragingFold = TFold::BuildPlainFold(
         data,
         targetClassifiers,
@@ -551,6 +555,7 @@ TLearnProgress::TLearnProgress(
         StartingApprox,
         estimatedFeaturesQuantizationOptions,
         onlineEstimatedQuantizedFeaturesInfo,
+        precomputedSingleOnlineCtrs,
         &Rand,
         localExecutor
     );
@@ -629,7 +634,7 @@ void TLearnProgress::SetSeparateInitModel(
     const TDataProviders& initModelApplyCompatiblePools,
     bool isOrderedBoosting,
     bool storeExpApproxes,
-    NPar::TLocalExecutor* localExecutor) {
+    NPar::ILocalExecutor* localExecutor) {
 
     CATBOOST_DEBUG_LOG << "TLearnProgress::SetSeparateInitModel\n";
 

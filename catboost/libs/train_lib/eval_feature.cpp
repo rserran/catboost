@@ -10,6 +10,7 @@
 #include <catboost/private/libs/algo/helpers.h>
 #include <catboost/private/libs/algo/preprocess.h>
 #include <catboost/private/libs/algo/train.h>
+#include <catboost/libs/data/features_layout_helpers.h>
 #include <catboost/libs/data/feature_names_converter.h>
 #include <catboost/libs/fstr/output_fstr.h>
 #include <catboost/libs/helpers/exception.h>
@@ -374,7 +375,7 @@ static void CreateFoldData(
     const TVector<NCB::TArraySubsetIndexing<ui32>>& testSubsets,
     TVector<TTrainingDataProviders>* foldsData,
     TVector<TTrainingDataProviders>* testFoldsData,
-    NPar::TLocalExecutor* localExecutor
+    NPar::ILocalExecutor* localExecutor
 ) {
     CB_ENSURE_INTERNAL(trainSubsets.size() == testSubsets.size(), "Number of train and test subsets do not match");
     const NCB::EObjectsOrder objectsOrder = NCB::EObjectsOrder::Ordered;
@@ -431,7 +432,7 @@ static void PrepareTimeSplitFolds(
     ui64 cpuUsedRamLimit,
     TVector<TTrainingDataProviders>* foldsData,
     TVector<TTrainingDataProviders>* testFoldsData,
-    NPar::TLocalExecutor* localExecutor
+    NPar::ILocalExecutor* localExecutor
 ) {
     CB_ENSURE(srcData->ObjectsData->GetGroupIds(), "Timesplit feature evaluation requires dataset with groups");
     CB_ENSURE(srcData->ObjectsData->GetTimestamp(), "Timesplit feature evaluation requires dataset with timestamps");
@@ -495,7 +496,7 @@ static void PrepareFolds(
     ui64 cpuUsedRamLimit,
     TVector<TTrainingDataProviders>* foldsData,
     TVector<TTrainingDataProviders>* testFoldsData,
-    NPar::TLocalExecutor* localExecutor
+    NPar::ILocalExecutor* localExecutor
 ) {
     const int foldCount = cvParams.Initialized() ? cvParams.FoldCount : featureEvalOptions.FoldCount.Get();
     CB_ENSURE(foldCount > 0, "Fold count must be positive integer");
@@ -552,42 +553,6 @@ enum class ETrainingKind {
     Baseline,
     Testing
 };
-
-
-TIntrusivePtr<TTrainingDataProvider> MakeFeatureSubsetDataProvider(
-    const TVector<ui32>& ignoredFeatures,
-    NCB::TTrainingDataProviderPtr trainingDataProvider
-) {
-    TQuantizedObjectsDataProviderPtr newObjects = dynamic_cast<TQuantizedForCPUObjectsDataProvider*>(
-        trainingDataProvider->ObjectsData->GetFeaturesSubset(ignoredFeatures, &NPar::LocalExecutor()).Get());
-    CB_ENSURE(
-        newObjects,
-        "Objects data provider must be TQuantizedForCPUObjectsDataProvider or TQuantizedObjectsDataProvider");
-    TDataMetaInfo newMetaInfo = trainingDataProvider->MetaInfo;
-    newMetaInfo.FeaturesLayout = newObjects->GetFeaturesLayout();
-    return MakeIntrusive<TTrainingDataProvider>(
-        trainingDataProvider->OriginalFeaturesLayout,
-        TDataMetaInfo(newMetaInfo),
-        trainingDataProvider->ObjectsGrouping,
-        newObjects,
-        trainingDataProvider->TargetData);
-}
-
-TTrainingDataProviders MakeFeatureSubsetTrainingData(
-    const TVector<ui32>& ignoredFeatures,
-    const NCB::TTrainingDataProviders& trainingData
-) {
-    TTrainingDataProviders newTrainingData;
-    newTrainingData.Learn = MakeFeatureSubsetDataProvider(ignoredFeatures, trainingData.Learn);
-    newTrainingData.Test.push_back(MakeFeatureSubsetDataProvider(ignoredFeatures, trainingData.Test[0]));
-
-    newTrainingData.FeatureEstimators = trainingData.FeatureEstimators;
-
-    // TODO(akhropov): correctly support ignoring indices based on source data
-    newTrainingData.EstimatedObjectsData = trainingData.EstimatedObjectsData;
-
-    return newTrainingData;
-}
 
 
 static TVector<TTrainingDataProviders> UpdateIgnoredFeaturesInLearn(
@@ -1038,20 +1003,14 @@ static void EvaluateFeaturesImpl(
 
             if (isCalcFstr || isCalcRegularFstr) {
                 const auto& model = foldContext.FullModel.GetRef();
-                const auto& floatFeatures = model.ModelTrees->GetFloatFeatures();
-                const auto& catFeatures = model.ModelTrees->GetCatFeatures();
-                const NCB::TFeaturesLayout layout(
-                    TVector<TFloatFeature>(floatFeatures.begin(), floatFeatures.end()),
-                    TVector<TCatFeature>(catFeatures.begin(), catFeatures.end())
-                );
+                const NCB::TFeaturesLayout layout = MakeFeaturesLayout(model);
                 const auto fstrType = outputFileOptions.GetFstrType();
                 const auto effect = CalcFeatureEffect(model, /*dataset*/nullptr, fstrType, &NPar::LocalExecutor());
                 results->FeatureStrengths[isTest][featureSetIdx].emplace_back(ExpandFeatureDescriptions(layout, effect));
                 if (isCalcRegularFstr) {
                     const auto regularEffect = CalcRegularFeatureEffect(
                         effect,
-                        model.GetNumCatFeatures(),
-                        model.GetNumFloatFeatures());
+                        model);
                     results->RegularFeatureStrengths[isTest][featureSetIdx].emplace_back(
                         ExpandFeatureDescriptions(layout, regularEffect));
                 }

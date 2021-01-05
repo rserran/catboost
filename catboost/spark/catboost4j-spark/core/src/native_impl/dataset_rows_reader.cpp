@@ -51,7 +51,7 @@ static void ParseOptions(
 
 class TRawDatasetRowsReaderVisitor final : public IRawObjectsOrderDataVisitor {
 public:
-    TRawDatasetRowsReaderVisitor(TRawDatasetRowsReader* parent, NPar::TLocalExecutor* localExecutor)
+    TRawDatasetRowsReaderVisitor(TRawDatasetRowsReader* parent, NPar::ILocalExecutor* localExecutor)
         : Parent(parent)
         , LocalExecutor(localExecutor)
     {}
@@ -76,7 +76,7 @@ public:
          CB_ENSURE(false, "SetBaseline is incompatible with blocked processing");
      }
 
-     void SetPairs(TVector<TPair>&& pairs) override {
+     void SetPairs(TRawPairsData&& pairs) override {
          Y_UNUSED(pairs);
          CB_ENSURE(false, "SetPairs is incompatible with blocked processing");
      }
@@ -314,7 +314,7 @@ public:
 
 private:
     TRawDatasetRowsReader* Parent;
-    NPar::TLocalExecutor* LocalExecutor;
+    NPar::ILocalExecutor* LocalExecutor;
 
     bool FirstBlock = true;
     bool IsSparse = false;

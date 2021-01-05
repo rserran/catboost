@@ -361,6 +361,7 @@ class CatBoostClassifier (override val uid: String)
         }
         set(lossFunction, if (distinctLabelValuesCount > 2) "MultiClass" else "Logloss")
       }
+      log.info(s"lossFunction has been inferred as '${this.getLossFunction}'")
     }
 
     (

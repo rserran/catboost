@@ -40,6 +40,9 @@ namespace NCB {
                 << EscapeC(NumVectorDelimiter) << ')'
             );
         }
+
+        SAVELOAD(HasHeader, Delimiter, NumVectorDelimiter, IgnoreCsvQuoting);
+        Y_SAVELOAD_DEFINE(HasHeader, Delimiter, NumVectorDelimiter, IgnoreCsvQuoting);
     };
 
     struct TLineDataReaderArgs {
@@ -63,6 +66,8 @@ namespace NCB {
            not thread-safe
         */
         virtual bool ReadLine(TString* line) = 0;
+
+        virtual bool ReadLine(TString*, TString*) = 0;
 
         virtual ~ILineDataReader() = default;
     };
@@ -110,6 +115,10 @@ namespace NCB {
                 GetHeader();
             }
             return IFStream.ReadLine(*line) != 0;
+        }
+
+        bool ReadLine(TString*, TString*) override {
+            Y_UNREACHABLE();
         }
 
     private:

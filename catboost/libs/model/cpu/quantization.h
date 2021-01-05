@@ -265,6 +265,7 @@ namespace NCB::NModelEvaluation {
               typename TTextFeatureAccessor, typename TEmbeddingFeatureAccessor>
     inline void BinarizeFeatures(
         const TModelTrees& trees,
+        const TModelTrees::TForApplyData& applyData,
         const TIntrusivePtr<ICtrProvider>& ctrProvider,
         const TIntrusivePtr<TTextProcessingCollection>& textProcessingCollection,
         const TIntrusivePtr<TEmbeddingProcessingCollection>& embeddingProcessingCollection,
@@ -338,8 +339,7 @@ namespace NCB::NModelEvaluation {
                     }
                 }
             }
-            if (trees.GetUsedTextFeaturesCount() > 0 &&
-                trees.GetUsedEstimatedFeaturesCount() > 0) {
+            if (applyData.UsedTextFeaturesCount > 0 && applyData.UsedEstimatedFeaturesCount > 0) {
 
                 CB_ENSURE(
                     textProcessingCollection,
@@ -382,9 +382,12 @@ namespace NCB::NModelEvaluation {
                 }
 
                 for (const auto& estimatedFeature : trees.GetEstimatedFeatures()) {
+                    if (estimatedFeature.ModelEstimatedFeature.SourceFeatureType != EEstimatedSourceFeatureType::Text) {
+                        continue;
+                    }
                     const ui32 featureOffset =
-                        textProcessingCollection->GetAbsoluteCalcerOffset(estimatedFeature.CalcerId)
-                        + estimatedFeature.LocalIndex;
+                        textProcessingCollection->GetAbsoluteCalcerOffset(estimatedFeature.ModelEstimatedFeature.CalcerId)
+                        + estimatedFeature.ModelEstimatedFeature.LocalId;
 
                     auto estimatedFeaturePtr = &estimatedFeatures[featureOffset * docCount];
 
@@ -400,8 +403,7 @@ namespace NCB::NModelEvaluation {
                     );
                 }
             }
-            if (trees.GetUsedEmbeddingFeaturesCount() > 0 &&
-                trees.GetUsedEstimatedFeaturesCount() > 0) {
+            if (applyData.UsedEmbeddingFeaturesCount > 0 && applyData.UsedEstimatedFeaturesCount > 0) {
                 CB_ENSURE(
                     embeddingProcessingCollection,
                     "Fail to apply with embedding features: EmbeddingProcessingCollection must present in FullModel"
@@ -443,9 +445,12 @@ namespace NCB::NModelEvaluation {
                 }
 
                 for (const auto& estimatedFeature : trees.GetEstimatedFeatures()) {
+                    if (estimatedFeature.ModelEstimatedFeature.SourceFeatureType != EEstimatedSourceFeatureType::Embedding) {
+                        continue;
+                    }
                     const ui32 featureOffset =
-                        embeddingProcessingCollection->GetAbsoluteCalcerOffset(estimatedFeature.CalcerId)
-                        + estimatedFeature.LocalIndex;
+                        embeddingProcessingCollection->GetAbsoluteCalcerOffset(estimatedFeature.ModelEstimatedFeature.CalcerId)
+                        + estimatedFeature.ModelEstimatedFeature.LocalId;
 
                     auto estimatedFeaturePtr = &estimatedFeatures[featureOffset * docCount];
 
@@ -462,7 +467,7 @@ namespace NCB::NModelEvaluation {
                 }
 
             }
-            if (trees.GetUsedCatFeaturesCount() != 0) {
+            if (applyData.UsedCatFeaturesCount != 0) {
                 THashMap<int, int> catFeaturePackedIndexes;
                 int usedFeatureIdx = 0;
                 for (const auto& catFeature : trees.GetCatFeatures()) {
@@ -481,7 +486,7 @@ namespace NCB::NModelEvaluation {
                     }
                     ++usedFeatureIdx;
                 }
-                Y_ASSERT(trees.GetUsedCatFeaturesCount() == (size_t)usedFeatureIdx);
+                Y_ASSERT(applyData.UsedCatFeaturesCount == (size_t)usedFeatureIdx);
                 OneHotBinsFromTransposedCatFeatures(
                     trees.GetOneHotFeatures(),
                     catFeaturePackedIndexes,
@@ -489,9 +494,9 @@ namespace NCB::NModelEvaluation {
                     transposedHash,
                     resultPtr
                 );
-                if (!trees.GetUsedModelCtrs().empty()) {
+                if (!applyData.UsedModelCtrs.empty()) {
                     ctrProvider->CalcCtrs(
-                        trees.GetUsedModelCtrs(),
+                        applyData.UsedModelCtrs,
                         TConstArrayRef<ui8>(resultPtrForBlockStart, docCount * trees.GetEffectiveBinaryFeaturesBucketsCount()),
                         transposedHash,
                         docCount,
@@ -521,13 +526,14 @@ namespace NCB::NModelEvaluation {
     template <typename TFloatFeatureAccessor, typename TCatFeatureAccessor>
     inline void AssignFeatureBins(
         const TModelTrees& trees,
+        const TModelTrees::TForApplyData& applyData,
         TFloatFeatureAccessor floatAccessor,
         TCatFeatureAccessor /*catAccessor*/,
         size_t start,
         size_t end,
         TCPUEvaluatorQuantizedData* cpuEvaluatorQuantizedData
     ) {
-        CB_ENSURE(trees.GetUsedCatFeaturesCount() == 0,
+        CB_ENSURE(applyData.UsedCatFeaturesCount == 0,
                   "Quantized datasets with categorical features are not currently supported");
         ui8* resultPtr = cpuEvaluatorQuantizedData->QuantizedData.data();
         size_t requiredSize = trees.GetEffectiveBinaryFeaturesBucketsCount() * (end - start);

@@ -11,7 +11,7 @@
 #include <catboost/private/libs/options/load_options.h>
 
 void InitializeMaster(const NCatboostOptions::TSystemOptions& systemOptions);
-void FinalizeMaster(TLearnContext* ctx);
+void FinalizeMaster(const NCatboostOptions::TSystemOptions& systemOptions);
 void SetTrainDataFromQuantizedPool(
     const NCatboostOptions::TPoolLoadParams& poolLoadOptions,
     const NCatboostOptions::TCatBoostOptions& catBoostOptions,
@@ -22,7 +22,7 @@ void SetTrainDataFromQuantizedPool(
 void SetTrainDataFromMaster(
     const NCB::TTrainingDataProviders& trainData,
     ui64 cpuUsedRamLimit,
-    NPar::TLocalExecutor* localExecutor);
+    NPar::ILocalExecutor* localExecutor);
 void MapBuildPlainFold(TLearnContext* ctx);
 void MapRestoreApproxFromTreeStruct(TLearnContext* ctx);
 void MapTensorSearchStart(TLearnContext* ctx);

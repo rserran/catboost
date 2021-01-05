@@ -246,6 +246,15 @@ def emit(key, *value):
     print '{0}={1}'.format(key, ' '.join(to_strings(value)))
 
 
+def emit_with_comment(comment, key, *value):
+    print '# {}'.format(comment)
+    emit(key, *value)
+
+
+def emit_with_ignore_comment(key, *value):
+    emit_with_comment('IGNORE YMAKE CONF CONTEXT', key, *value)
+
+
 def append(key, *value):
     print '{0}+={1}'.format(key, ' '.join(to_strings(value)))
 
@@ -586,7 +595,9 @@ class Build(object):
                 python.configure_posix()
                 python.print_variables()
 
-        Cuda(self).print_()
+        cuda = Cuda(self)
+        cuda.print_()
+        CuDNN(cuda).print_()
 
         print_swig_config()
 
@@ -644,14 +655,17 @@ class YMake(object):
         if opts().presets:
             print '# Variables set from command line by -D options'
             for key in opts().presets:
-                print '{0}={1}'.format(key, opts().presets[key])
+                if key in ('MY_YMAKE_BIN', 'REAL_YMAKE_BIN'):
+                    emit_with_ignore_comment(key, opts().presets[key])
+                else:
+                    emit(key, opts().presets[key])
 
     def print_core_conf(self):
         with open(self._find_core_conf(), 'r') as fin:
             print fin.read()
 
     def print_settings(self):
-        emit('ARCADIA_ROOT', self.arcadia.root)
+        emit_with_ignore_comment('ARCADIA_ROOT', self.arcadia.root)
 
     @staticmethod
     def _find_core_conf():
@@ -715,16 +729,6 @@ when (($USEMPROF == "yes") || ($USE_MPROF == "yes")) {
 }
 '''
 
-    def print_android_const(self):
-        # Set `ANDROID_API=XXX` for substitution purposes
-        emit('ANDROID_API', str(self.platform.android_api))
-
-        # Since ymake does not support `>=` expressions, set
-        # `ANDROID_API_AT_LEAST_XXX` for each supported API level
-        min_android_api = 16  # api levels below are not supported by modern NDK and can be assumed implicitly
-        for api_level in xrange(min_android_api, self.platform.android_api + 1):
-            emit('ANDROID_API_AT_LEAST_{}'.format(api_level), 'yes')
-
     def print_target_settings(self):
         emit('TARGET_PLATFORM', self.platform.os_compat)
         emit('HARDWARE_ARCH', '32' if self.platform.is_32_bit else '64')
@@ -737,7 +741,7 @@ when (($USEMPROF == "yes") || ($USE_MPROF == "yes")) {
             emit(variable, 'yes')
 
         if self.platform.is_android:
-            self.print_android_const()
+            emit('ANDROID_API', str(self.platform.android_api))
 
         if self.platform.is_posix:
             self.print_nix_target_const()
@@ -1276,13 +1280,12 @@ class GnuCompiler(Compiler):
 
             self.cxx_warnings += [
                 '-Wimport-preprocessor-directive-pedantic',
-                '-Wno-c++17-extensions',
                 '-Wno-exceptions',
                 '-Wno-inconsistent-missing-override',
                 '-Wno-undefined-var-template',
             ]
 
-            if self.target.is_linux:
+            if self.target.is_linux and not self.tc.version_at_least(10):
                 self.c_foptions.append('-fuse-init-array')
 
             if self.tc.version_at_least(7):
@@ -1295,8 +1298,41 @@ class GnuCompiler(Compiler):
                     '-Wno-address-of-packed-member',
                     '-Wno-defaulted-function-deleted',
                     '-Wno-enum-compare-switch',
-                    '-Wno-pass-failed',
                 ))
+
+            if self.tc.version_at_least(10):
+                # See https://releases.llvm.org/10.0.0/tools/clang/docs/ReleaseNotes.html#major-new-features
+                # Useful warnings that should be enabled ASAP:
+                self.c_warnings.extend((
+                    '-Wno-implicit-int-float-conversion',
+                    '-Wno-unknown-warning-option',  # For nvcc to accept the above.
+                ))
+                self.cxx_warnings.extend((
+                    '-Wno-c99-designator',
+                    '-Wno-deprecated-copy',
+                    '-Wno-final-dtor-non-final-class',
+                    '-Wno-initializer-overrides',
+                    '-Wno-pessimizing-move',
+                    '-Wno-range-loop-construct',
+                    '-Wno-reorder-init-list',
+                    '-Wno-unused-lambda-capture',
+                ))
+
+            if self.tc.version_at_least(11):
+                # See https://releases.llvm.org/11.0.0/tools/clang/docs/ReleaseNotes.html#improvements-to-clang-s-diagnostics
+                # See https://releases.llvm.org/11.0.0/tools/clang/docs/ReleaseNotes.html#modified-compiler-flags
+                # Disable useful -f and -W that should be restored ASAP:
+                self.c_foptions += ['-fcommon']
+                self.c_warnings += [
+                    '-Wno-implicit-const-int-float-conversion',
+                ]
+                self.cxx_warnings += [
+                    '-Wno-deprecated-anon-enum-enum-conversion',
+                    '-Wno-deprecated-enum-enum-conversion',
+                    '-Wno-deprecated-enum-float-conversion',
+                    '-Wno-ambiguous-reversed-operator',
+                    '-Wno-deprecated-volatile',
+                ]
 
         if self.tc.is_gcc and self.tc.version_at_least(4, 9):
             self.c_foptions.append('-fno-delete-null-pointer-checks')
@@ -1540,6 +1576,7 @@ class GnuCompiler(Compiler):
         # fuzzing configuration
         if self.tc.is_clang and self.tc.version_at_least(5, 0):
             emit('LIBFUZZER_PATH',
+                 'contrib/libs/libfuzzer11' if self.tc.version_at_least(11) else
                  'contrib/libs/libfuzzer10' if self.tc.version_at_least(10) else
                  'contrib/libs/libfuzzer8' if self.tc.version_at_least(8) else
                  'contrib/libs/libfuzzer7' if self.tc.version_at_least(7) else
@@ -1572,18 +1609,28 @@ class Linker(object):
         """
         self.tc = tc
         self.build = build
+        self.type = self._get_default_linker_type()
 
-        if self.tc.is_from_arcadia and self.build.host.is_linux and not (self.build.target.is_apple or self.build.target.is_windows):
+    def _get_default_linker_type(self):
+        if not self.tc.is_from_arcadia:
+            # External (e.g. system) toolchain: disable linker selection logic
+            return None
 
-            if self.build.target.is_android:
-                self.type = Linker.LLD
-            elif self.tc.is_clang:
-                # DEVTOOLSSUPPORT-47 LLD cannot deal with extsearch/images/saas/base/imagesrtyserver
-                self.type = Linker.GOLD if is_positive('USE_LTO') and not is_positive('MUSL') else Linker.LLD
+        if self.build.target.is_android:
+            # Android toolchain is NDK, LLD works on all supported platforms
+            return Linker.LLD
+
+        elif self.build.target.is_linux:
+            # DEVTOOLS-6782: LLD8 fails to link LTO builds with in-memory ELF objects larger than 4 GiB
+            blacklist_lld = is_positive('CLANG7') and is_positive('USE_LTO') and not is_positive('MUSL')
+            if self.tc.is_clang and not blacklist_lld:
+                return Linker.LLD
             else:
-                self.type = Linker.GOLD
-        else:
-            self.type = None
+                # GCC et al.
+                return Linker.GOLD
+
+        # There is no linker choice on Darwin (ld64) or Windows (link.exe)
+        return None
 
     def print_linker(self):
         self._print_linker_selector()
@@ -2440,9 +2487,9 @@ class MSVCLinker(MSVC, Linker):
              )
 
         emit('REAL_LINK_DYN_LIB', ' ${TOOLCHAIN_ENV} ${cwd:ARCADIA_BUILD_ROOT} ${LINK_WRAPPER} ${LINK_WRAPPER_DYNLIB} ${LINK_EXE_CMD} \
-            ${LINK_IMPLIB_VALUE} /DLL /OUT:${qe;rootrel:TARGET} ${LINK_EXTRA_OUTPUT} ${EXPORTS_VALUE} \
+            --ya-start-command-file ${LINK_IMPLIB_VALUE} /DLL /OUT:${qe;rootrel:TARGET} ${LINK_EXTRA_OUTPUT} ${EXPORTS_VALUE} \
             ${qe;rootrel:SRCS_GLOBAL} ${VCS_C_OBJ_RR} ${qe;rootrel:AUTO_INPUT} ${qe;rootrel:PEERS} \
-            $LINK_EXE_FLAGS $LINK_STDLIBS $LDFLAGS $LDFLAGS_GLOBAL $OBJADDE')
+            $LINK_EXE_FLAGS $LINK_STDLIBS $LDFLAGS $LDFLAGS_GLOBAL $OBJADDE --ya-end-command-file')
 
         emit('SWIG_DLL_JAR_CMD', '$GENERATE_MF && $GENERATE_VCS_C_INFO_NODEP && $REAL_SWIG_DLL_JAR_CMD')
 
@@ -2452,19 +2499,19 @@ class MSVCLinker(MSVC, Linker):
                 EXPORTS_VALUE=/DEF:${input:EXPORTS_FILE}
             }
 
-            LINK_LIB=${GENERATE_MF} && ${TOOLCHAIN_ENV} ${cwd:ARCADIA_BUILD_ROOT} ${LIB_WRAPPER} ${LINK_LIB_CMD} /OUT:${qe;rootrel:TARGET} \
-            ${qe;rootrel:AUTO_INPUT} $LINK_LIB_FLAGS ${hide;kv:"soe"} ${hide;kv:"p AR"} ${hide;kv:"pc light-red"}
+            LINK_LIB=${GENERATE_MF} && ${TOOLCHAIN_ENV} ${cwd:ARCADIA_BUILD_ROOT} ${LIB_WRAPPER} ${LINK_LIB_CMD} --ya-start-command-file /OUT:${qe;rootrel:TARGET} \
+            ${qe;rootrel:AUTO_INPUT} $LINK_LIB_FLAGS --ya-end-command-file ${hide;kv:"soe"} ${hide;kv:"p AR"} ${hide;kv:"pc light-red"}
 
-            LINK_EXE=${GENERATE_MF} && $GENERATE_VCS_C_INFO_NODEP && ${TOOLCHAIN_ENV} ${cwd:ARCADIA_BUILD_ROOT} ${LINK_WRAPPER} ${LINK_EXE_CMD} /OUT:${qe;rootrel:TARGET} \
+            LINK_EXE=${GENERATE_MF} && $GENERATE_VCS_C_INFO_NODEP && ${TOOLCHAIN_ENV} ${cwd:ARCADIA_BUILD_ROOT} ${LINK_WRAPPER} ${LINK_EXE_CMD} --ya-start-command-file /OUT:${qe;rootrel:TARGET} \
             ${LINK_EXTRA_OUTPUT} ${qe;rootrel:SRCS_GLOBAL} ${VCS_C_OBJ_RR} ${qe;rootrel:AUTO_INPUT} $LINK_EXE_FLAGS $LINK_STDLIBS $LDFLAGS $LDFLAGS_GLOBAL $OBJADDE \
-            ${qe;rootrel:PEERS} ${hide;kv:"soe"} ${hide;kv:"p LD"} ${hide;kv:"pc blue"}
+            ${qe;rootrel:PEERS} --ya-end-command-file ${hide;kv:"soe"} ${hide;kv:"p LD"} ${hide;kv:"pc blue"}
 
             LINK_DYN_LIB=${GENERATE_MF} && $GENERATE_VCS_C_INFO_NODEP && $REAL_LINK_DYN_LIB ${hide;kv:"soe"} ${hide;kv:"p LD"} ${hide;kv:"pc blue"}
 
             LINK_EXEC_DYN_LIB=${GENERATE_MF} && $GENERATE_VCS_C_INFO_NODEP && ${TOOLCHAIN_ENV} ${cwd:ARCADIA_BUILD_ROOT} ${LINK_WRAPPER} ${LINK_WRAPPER_DYNLIB} ${LINK_EXE_CMD} \
-            /OUT:${qe;rootrel:TARGET} ${LINK_EXTRA_OUTPUT} ${EXPORTS_VALUE} \
+            --ya-start-command-file /OUT:${qe;rootrel:TARGET} ${LINK_EXTRA_OUTPUT} ${EXPORTS_VALUE} \
             ${qe;rootrel:SRCS_GLOBAL} ${VCS_C_OBJ_RR} ${qe;rootrel:AUTO_INPUT} ${qe;rootrel:PEERS} \
-            $LINK_EXE_FLAGS $LINK_STDLIBS $LDFLAGS $LDFLAGS_GLOBAL $OBJADDE ${hide;kv:"soe"} ${hide;kv:"p LD"} ${hide;kv:"pc blue"}
+            $LINK_EXE_FLAGS $LINK_STDLIBS $LDFLAGS $LDFLAGS_GLOBAL $OBJADDE --ya-end-command-file ${hide;kv:"soe"} ${hide;kv:"p LD"} ${hide;kv:"pc blue"}
 
             LINK_FAT_OBJECT=${GENERATE_MF} && $GENERATE_VCS_C_INFO_NODEP && $YMAKE_PYTHON ${input:"build/scripts/touch.py"} $TARGET ${kv;hide:"p LD"} ${kv;hide:"pc light-blue"} ${kv;hide:"show_out"}''')
 
@@ -2734,7 +2781,7 @@ class Cuda(object):
         if self.cuda_version.value in ('8.0', '9.0', '9.1', '9.2'):
             raise ConfigureError('CUDA versions 8.x and 9.x are no longer supported.\nSee DEVTOOLS-7108.')
 
-        if self.cuda_version.value in ('10.0', '10.1', '11.0'):
+        if self.cuda_version.value in ('10.0', '10.1', '11.0', '11.1'):
             return True
 
         return False
@@ -2784,6 +2831,7 @@ class Cuda(object):
 
     def cuda_windows_host_compiler(self):
         vc_version = {
+            '11.1': '14.13.26128',  # (not latest)
             '10.1': '14.13.26128',  # (not latest)
             '10.0': '14.13.26128',  # (not latest)
             '9.2': '14.13.26128',
@@ -2827,6 +2875,26 @@ class Cuda(object):
 
     def auto_cuda_arcadia_includes(self):
         return self.cuda_version_list >= [9, 0]
+
+
+class CuDNN(object):
+    def __init__(self, cuda):
+        """
+        :type cuda: Cuda
+        """
+        self.cuda = cuda
+
+        self.cudnn_version = Setting('CUDNN_VERSION', auto=self.auto_cudnn_version)
+
+    def have_cudnn(self):
+        return self.cudnn_version.value in ('7.6.5', '8.0.5')
+
+    def auto_cudnn_version(self):
+        return '7.6.5'
+
+    def print_(self):
+        if self.cuda.have_cuda.value and self.have_cudnn():
+            self.cudnn_version.emit()
 
 
 class Yasm(object):
@@ -2907,7 +2975,7 @@ def main():
     build = Build(arcadia, options.build_type, options.toolchain_params, force_ignore_local_files=not options.local_distbuild)
     build.print_build()
 
-    emit('CONF_SCRIPT_DEPENDS', __file__)
+    emit_with_ignore_comment('CONF_SCRIPT_DEPENDS', __file__)
 
 
 if __name__ == '__main__':

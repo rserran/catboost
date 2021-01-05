@@ -68,24 +68,28 @@ public:
     {}
 };
 
+const NCB::TDataProviderPtr GetSubsetForFstrCalc(
+    const NCB::TDataProviderPtr dataset,
+    NPar::ILocalExecutor* localExecutor
+);
+
 TVector<std::pair<double, TFeature>> CalcFeatureEffect(
     const TFullModel& model,
     const NCB::TDataProviderPtr dataset, // can be nullptr
     EFstrType type,
-    NPar::TLocalExecutor* localExecutor,
+    NPar::ILocalExecutor* localExecutor,
     ECalcTypeShapValues calcType = ECalcTypeShapValues::Regular
 );
 
 TVector<TFeatureEffect> CalcRegularFeatureEffect(
     const TVector<std::pair<double, TFeature>>& effect,
-    int catFeaturesCount,
-    int floatFeaturesCount);
+    const TFullModel& model);
 
 TVector<double> CalcRegularFeatureEffect(
     const TFullModel& model,
     const NCB::TDataProviderPtr dataset, // can be nullptr
     EFstrType type,
-    NPar::TLocalExecutor* localExecutor,
+    NPar::ILocalExecutor* localExecutor,
     ECalcTypeShapValues calcType = ECalcTypeShapValues::Regular
 );
 

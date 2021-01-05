@@ -50,8 +50,8 @@ void InitializeMaster(const NCatboostOptions::TSystemOptions& systemOptions) {
     TMasterEnvironment::GetRef().SharedTrainData = TMasterEnvironment::GetRef().RootEnvironment->CreateEnvironment(SHARED_ID_TRAIN_DATA, workerMapping);
 }
 
-void FinalizeMaster(TLearnContext* ctx) {
-    Y_ASSERT(ctx->Params.SystemOptions->IsMaster());
+void FinalizeMaster(const NCatboostOptions::TSystemOptions& systemOptions) {
+    Y_ASSERT(systemOptions.IsMaster());
     if (TMasterEnvironment::GetRef().RootEnvironment != nullptr) {
         TMasterEnvironment::GetRef().RootEnvironment->Stop();
     }
@@ -91,7 +91,7 @@ void SetTrainDataFromQuantizedPool(
 void SetTrainDataFromMaster(
     const TTrainingDataProviders& trainData,
     ui64 cpuUsedRamLimit,
-    NPar::TLocalExecutor* localExecutor
+    NPar::ILocalExecutor* localExecutor
 ) {
     const int workerCount = TMasterEnvironment::GetRef().RootEnvironment->GetSlaveCount();
     auto workerParts = Split(*trainData.Learn->ObjectsGrouping, (ui32)workerCount);

@@ -576,7 +576,8 @@ TJsonValue ConvertModelToJson(const TFullModel& model, const TVector<TString>* f
     jsonModel.InsertValue("features_info", GetFeaturesInfoJson(*model.ModelTrees, featureId, catFeaturesHashToString));
     const TStaticCtrProvider* ctrProvider = dynamic_cast<TStaticCtrProvider*>(model.CtrProvider.Get());
     if (ctrProvider) {
-        jsonModel.InsertValue("ctr_data", ConvertCtrsToJson(ctrProvider, model.ModelTrees->GetUsedModelCtrs()));
+        auto applyData = model.ModelTrees->GetApplyData();
+        jsonModel.InsertValue("ctr_data", ConvertCtrsToJson(ctrProvider, applyData->UsedModelCtrs));
     }
     jsonModel.InsertValue("scale_and_bias", GetScaleAndBiasJson(model));
     return jsonModel;
@@ -660,7 +661,6 @@ void ConvertJsonToCatboostModel(const TJsonValue& jsonModel, TFullModel* fullMod
     }
 
     fullModel->UpdateDynamicData();
-    fullModel->ModelTrees->ClearRepackedBins();
 }
 
 void OutputModelJson(const TFullModel& model, const TString& outputPath, const TVector<TString>* featureId, const THashMap<ui32, TString>* catFeaturesHashToString) {

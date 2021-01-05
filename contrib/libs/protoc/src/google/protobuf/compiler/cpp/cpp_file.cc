@@ -980,7 +980,8 @@ void FileGenerator::GenerateTopHeaderGuard(io::Printer* printer,
       "\n"
       "#ifndef PROTOBUF_$filename_identifier$__INCLUDED\n"
       "#define PROTOBUF_$filename_identifier$__INCLUDED\n"
-      "\n",
+      "\n"
+      "#include <string>\n",
       "filename", file_->name(), "filename_identifier", filename_identifier);
   printer->Print("\n");
 }

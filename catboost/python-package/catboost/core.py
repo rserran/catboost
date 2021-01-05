@@ -1523,6 +1523,7 @@ class _CatBoostBase(object):
             'poor_score': False,
             'no_validation': True,
             'stateless': False,
+            'pairwise': False,
             'multilabel': False,
             '_skip_test': False,
             'multioutput_only': False,
@@ -1535,7 +1536,8 @@ class _CatBoostBase(object):
         _process_synonyms(params)
 
         tags['non_deterministic'] = 'task_type' in params and params['task_type'] == 'GPU'
-        tags['multioutput'] = 'loss_function' in params and params['loss_function'] == 'MultiRMSE'
+        loss_function = params.get('loss_function', '')
+        tags['multioutput'] = (loss_function == 'MultiRMSE' or loss_function == 'RMSEWithUncertainty')
         tags['allow_nan'] = 'nan_mode' not in params or params['nan_mode'] != 'Forbidden'
 
         return tags
@@ -1813,7 +1815,7 @@ class CatBoost(_CatBoostBase):
         loss = self._object._get_loss_function_name()
         if loss and is_groupwise_metric(loss):
             pass  # too expensive
-        elif (len(self.get_text_feature_indices()) > 0) or (len(self.get_embedding_feature_indices()) > 0):
+        elif (len(self.get_embedding_feature_indices()) > 0):
             pass  # is not implemented yet
         else:
             if not self._object._has_leaf_weights_in_model():
@@ -4888,16 +4890,7 @@ class CatBoostRegressor(CatBoost):
             otherwise one-dimensional numpy.ndarray of formula return values for each object.
         """
         if prediction_type is None:
-            prediction_type = 'RawFormulaVal'
-            # TODO(ilyzhin) change on get_all_params after MLTOOLS-4758
-            params = deepcopy(self._init_params)
-            _process_synonyms(params)
-            loss_function = params.get('loss_function')
-            if loss_function and isinstance(loss_function, str):
-                if loss_function.startswith('Poisson') or loss_function.startswith('Tweedie'):
-                    prediction_type = 'Exponent'
-                if loss_function == 'RMSEWithUncertainty':
-                    prediction_type = 'RMSEWithUncertainty'
+            prediction_type = self._get_default_prediction_type()
         return self._predict(data, prediction_type, ntree_start, ntree_end, thread_count, verbose, 'predict')
 
     def staged_predict(self, data, prediction_type='RawFormulaVal', ntree_start=0, ntree_end=0, eval_period=1, thread_count=-1, verbose=None):
@@ -4964,13 +4957,16 @@ class CatBoostRegressor(CatBoost):
         y = np.array(y, dtype=np.float64)
         predictions = self._predict(
             X,
-            prediction_type='RawFormulaVal',
+            prediction_type=self._get_default_prediction_type(),
             ntree_start=0,
             ntree_end=0,
             thread_count=-1,
             verbose=None,
             parent_method_name='score'
         )
+        loss = self._object._get_loss_function_name()
+        if loss == 'RMSEWithUncertainty':
+            predictions = predictions[:, 0]
         total_sum_of_squares = np.sum((y - y.mean(axis=0)) ** 2)
         residual_sum_of_squares = np.sum((y - predictions) ** 2)
         return 1 - residual_sum_of_squares / total_sum_of_squares
@@ -4981,6 +4977,17 @@ class CatBoostRegressor(CatBoost):
             raise CatBoostError("Invalid loss_function='{}': for regressor use "
                                 "RMSE, MultiRMSE, MAE, Quantile, LogLinQuantile, Poisson, MAPE, Lq or custom objective object".format(loss_function))
 
+    def _get_default_prediction_type(self):
+        # TODO(ilyzhin) change on get_all_params after MLTOOLS-4758
+        params = deepcopy(self._init_params)
+        _process_synonyms(params)
+        loss_function = params.get('loss_function')
+        if loss_function and isinstance(loss_function, str):
+            if loss_function.startswith('Poisson') or loss_function.startswith('Tweedie'):
+                return 'Exponent'
+            if loss_function == 'RMSEWithUncertainty':
+                return 'RMSEWithUncertainty'
+        return 'RawFormulaVal'
 
 def train(pool=None, params=None, dtrain=None, logging_level=None, verbose=None, iterations=None,
           num_boost_round=None, evals=None, eval_set=None, plot=None, verbose_eval=None, metric_period=None,
@@ -5107,7 +5114,7 @@ def cv(pool=None, params=None, dtrain=None, iterations=None, num_boost_round=Non
        fold_count=None, nfold=None, inverted=False, partition_random_seed=0, seed=None,
        shuffle=True, logging_level=None, stratified=None, as_pandas=True, metric_period=None,
        verbose=None, verbose_eval=None, plot=False, early_stopping_rounds=None,
-       save_snapshot=None, snapshot_file=None, snapshot_interval=None, folds=None, type='Classical'):
+       save_snapshot=None, snapshot_file=None, snapshot_interval=None, metric_update_interval=0.5, folds=None, type='Classical'):
     """
     Cross-validate the CatBoost model.
 
@@ -5201,6 +5208,9 @@ def cv(pool=None, params=None, dtrain=None, iterations=None, num_boost_round=Non
 
     snapshot_interval: int, [default=600]
         Interval between saving snapshots (seconds)
+
+    metric_update_interval: float, [default=0.5]
+        Interval between updating metrics (seconds)
 
     folds: generator or iterator of (train_idx, test_idx) tuples, scikit-learn splitter object or None, optional (default=None)
         If generator or iterator, it should yield the train and test indices for each fold.
@@ -5317,7 +5327,7 @@ def cv(pool=None, params=None, dtrain=None, iterations=None, num_boost_round=Non
 
     with log_fixup(), plot_wrapper(plot, [_get_train_dir(params)]):
         return _cv(params, pool, fold_count, inverted, partition_random_seed, shuffle, stratified,
-                   as_pandas, folds, type)
+                   metric_update_interval, as_pandas, folds, type)
 
 
 class BatchMetricCalcer(_MetricCalcerBase):

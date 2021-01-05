@@ -3,6 +3,7 @@
 #include "recode_result.h"
 #include "unidata.h"
 #include "utf8.h"
+#include "wide_specific.h"
 
 #include <util/generic/algorithm.h>
 #include <util/generic/string.h>
@@ -797,7 +798,7 @@ void EscapeHtmlChars(TUtf16String& str);
 //! returns number of characters in range. Handle surrogate pairs as one character.
 inline size_t CountWideChars(const wchar16* b, const wchar16* e) {
     size_t count = 0;
-    Y_ENSURE(b <= e, AsStringBuf("invalid iterators"));
+    Y_ENSURE(b <= e, TStringBuf("invalid iterators"));
     while (b < e) {
         b = SkipSymbol(b, e);
         ++count;
@@ -811,7 +812,7 @@ inline size_t CountWideChars(const TWtringBuf str) {
 
 //! checks whether the range is valid UTF-16 sequence
 inline bool IsValidUTF16(const wchar16* b, const wchar16* e) {
-    Y_ENSURE(b <= e, AsStringBuf("invalid iterators"));
+    Y_ENSURE(b <= e, TStringBuf("invalid iterators"));
     while (b < e) {
         wchar32 symbol = ReadSymbolAndAdvance(b, e);
         if (symbol == BROKEN_RUNE)

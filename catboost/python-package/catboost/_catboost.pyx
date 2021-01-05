@@ -508,6 +508,8 @@ cdef extern from "catboost/libs/model/model_export/model_exporter.h" namespace "
         const TFullModel& model,
         const TString& userParametersJson)
 
+cdef extern from "catboost/libs/model/utils.h":
+    cdef TJsonValue GetPlainJsonWithAllOptions(const TFullModel& model) nogil except +ProcessException
 
 cdef extern from "library/cpp/containers/2d_array/2d_array.h":
     cdef cppclass TArray2D[T]:
@@ -628,7 +630,7 @@ cdef extern from "catboost/private/libs/options/cross_validation_params.h":
         bool_t Stratified
         TMaybe[TVector[TVector[ui32]]] customTrainSubsets
         TMaybe[TVector[TVector[ui32]]] customTestSubsets
-        double MaxTimeSpentOnFixedCostRatio
+        double MetricUpdateInterval
         ui32 DevMaxIterationsBatchSize
         bool_t IsCalledFromSearchHyperparameters
 
@@ -704,7 +706,7 @@ cdef extern from "catboost/private/libs/algo/apply.h":
         TModelCalcerOnPool(
             const TFullModel& model,
             TIntrusivePtr[TObjectsDataProvider] objectsData,
-            TLocalExecutor* executor
+            ILocalExecutor* executor
         ) nogil except +ProcessException
         void ApplyModelMulti(
             const EPredictionType predictionType,
@@ -800,7 +802,7 @@ cdef extern from "catboost/private/libs/algo/roc_curve.h":
 
         void Output(const TString& outputPath) except +ProcessException
 
-cdef extern from "catboost/libs/eval_result/eval_helpers.h":
+cdef extern from "catboost/libs/eval_result/eval_helpers.h" namespace "NCB":
     cdef TVector[TVector[double]] PrepareEval(
         const EPredictionType predictionType,
         const TMaybe[TString]& lossFunctionName,
@@ -929,7 +931,9 @@ cdef extern from "catboost/python-package/catboost/helpers.h":
         TConstArrayRef[ui32] indices,
         TConstArrayRef[bool_t] catFeaturesMask,
         IRawObjectsOrderDataVisitor* builderVisitor,
-        TLocalExecutor* localExecutor) nogil except +ProcessException
+        ILocalExecutor* localExecutor) nogil except +ProcessException
+    cdef size_t GetNumPairs(const TDataProvider& dataProvider) except +ProcessException
+    cdef TConstArrayRef[TPair] GetUngroupedPairs(const TDataProvider& dataProvider) except +ProcessException
 
 
 cdef extern from "catboost/python-package/catboost/helpers.h":
@@ -974,12 +978,6 @@ cdef extern from "catboost/python-package/catboost/helpers.h":
         const TJsonValue& plainOptions,
         const TDataMetaInfo& trainDataMetaInfo,
         const TMaybe[TDataMetaInfo]& trainDataMetaInfo
-    ) nogil except +ProcessException
-
-    cdef TJsonValue GetPlainJsonWithAllOptions(
-        const TFullModel& model,
-        bool_t hasCatFeatures,
-        bool_t hasTextFeatures
     ) nogil except +ProcessException
 
     cdef cppclass TPythonStreamWrapper(IInputStream):
@@ -2688,7 +2686,7 @@ def _set_data_from_scipy_csr_sparse(
             indices_i32_ref,
             is_cat_feature_ref,
             builder_visitor,
-            &py_builder_visitor.local_executor)
+            <ILocalExecutor*>&py_builder_visitor.local_executor)
 
     if numpy_num_dtype == np.float64_t:
         data_np = cast_to_nparray(data, np.float64)
@@ -2698,7 +2696,7 @@ def _set_data_from_scipy_csr_sparse(
             indices_i32_ref,
             is_cat_feature_ref,
             builder_visitor,
-            &py_builder_visitor.local_executor)
+            <ILocalExecutor*>&py_builder_visitor.local_executor)
 
     if numpy_num_dtype == np.int8_t:
         data_np = cast_to_nparray(data, np.int8)
@@ -2708,7 +2706,7 @@ def _set_data_from_scipy_csr_sparse(
             indices_i32_ref,
             is_cat_feature_ref,
             builder_visitor,
-            &py_builder_visitor.local_executor)
+            <ILocalExecutor*>&py_builder_visitor.local_executor)
 
     if numpy_num_dtype == np.uint8_t:
         data_np = cast_to_nparray(data, np.uint8)
@@ -2718,7 +2716,7 @@ def _set_data_from_scipy_csr_sparse(
             indices_i32_ref,
             is_cat_feature_ref,
             builder_visitor,
-            &py_builder_visitor.local_executor)
+            <ILocalExecutor*>&py_builder_visitor.local_executor)
 
     if numpy_num_dtype == np.int16_t:
         data_np = cast_to_nparray(data, np.int16)
@@ -2728,7 +2726,7 @@ def _set_data_from_scipy_csr_sparse(
             indices_i32_ref,
             is_cat_feature_ref,
             builder_visitor,
-            &py_builder_visitor.local_executor)
+            <ILocalExecutor*>&py_builder_visitor.local_executor)
 
     if numpy_num_dtype == np.uint16_t:
         data_np = cast_to_nparray(data, np.uint16)
@@ -2738,7 +2736,7 @@ def _set_data_from_scipy_csr_sparse(
             indices_i32_ref,
             is_cat_feature_ref,
             builder_visitor,
-            &py_builder_visitor.local_executor)
+            <ILocalExecutor*>&py_builder_visitor.local_executor)
 
     if numpy_num_dtype == np.int32_t:
         data_np = cast_to_nparray(data, np.int32)
@@ -2748,7 +2746,7 @@ def _set_data_from_scipy_csr_sparse(
             indices_i32_ref,
             is_cat_feature_ref,
             builder_visitor,
-            &py_builder_visitor.local_executor)
+            <ILocalExecutor*>&py_builder_visitor.local_executor)
 
     if numpy_num_dtype == np.uint32_t:
         data_np = cast_to_nparray(data, np.uint32)
@@ -2758,7 +2756,7 @@ def _set_data_from_scipy_csr_sparse(
             indices_i32_ref,
             is_cat_feature_ref,
             builder_visitor,
-            &py_builder_visitor.local_executor)
+            <ILocalExecutor*>&py_builder_visitor.local_executor)
 
     if numpy_num_dtype == np.int64_t:
         data_np = cast_to_nparray(data, np.int64)
@@ -2768,7 +2766,7 @@ def _set_data_from_scipy_csr_sparse(
             indices_i32_ref,
             is_cat_feature_ref,
             builder_visitor,
-            &py_builder_visitor.local_executor)
+            <ILocalExecutor*>&py_builder_visitor.local_executor)
 
     if numpy_num_dtype == np.uint64_t:
         data_np = cast_to_nparray(data, np.uint64)
@@ -2778,7 +2776,7 @@ def _set_data_from_scipy_csr_sparse(
             indices_i32_ref,
             is_cat_feature_ref,
             builder_visitor,
-            &py_builder_visitor.local_executor)
+            <ILocalExecutor*>&py_builder_visitor.local_executor)
 
     assert False, "CSR sparse arrays support only numeric data types"
 
@@ -3334,7 +3332,7 @@ cdef class _PoolBase:
 
         cdef TPathWithScheme pairs_file_path
         if len(pairs_file):
-            pairs_file_path = TPathWithScheme(<TStringBuf>to_arcadia_string(pairs_file), TStringBuf(<char*>'dsv'))
+            pairs_file_path = TPathWithScheme(<TStringBuf>to_arcadia_string(pairs_file), TStringBuf(<char*>'dsv-flat'))
 
         cdef TPathWithScheme feature_names_file_path
         if len(feature_names_file):
@@ -3674,7 +3672,7 @@ cdef class _PoolBase:
         )
 
     cpdef _set_pairs_weight(self, pairs_weight):
-        cdef TConstArrayRef[TPair] old_pairs = self.__pool.Get()[0].RawTargetData.GetPairs()
+        cdef TConstArrayRef[TPair] old_pairs = GetUngroupedPairs(self.__pool.Get()[0])
         cdef TVector[TPair] new_pairs
         for i in range(old_pairs.size()):
             new_pairs.push_back(TPair(old_pairs[i].WinnerId, old_pairs[i].LoserId, pairs_weight[i]))
@@ -3769,7 +3767,7 @@ cdef class _PoolBase:
         -------
         number of pairs : int
         """
-        return self.__pool.Get()[0].RawTargetData.GetPairs().size()
+        return GetNumPairs(self.__pool.Get()[0])
 
     @property
     def shape(self):
@@ -3796,7 +3794,7 @@ cdef class _PoolBase:
         self,
         TRawObjectsDataProvider* raw_objects_data_provider,
         factor_idx,
-        TLocalExecutor* local_executor,
+        ILocalExecutor* local_executor,
         dst_data):
 
         cdef TMaybeData[const TFloatValuesHolder*] maybe_factor_data = raw_objects_data_provider[0].GetFloatFeature(factor_idx)
@@ -3835,7 +3833,7 @@ cdef class _PoolBase:
         data = np.empty(self.shape, dtype=np.float32)
 
         for factor in range(self.num_col()):
-            self._get_feature(raw_objects_data_provider, factor, &local_executor, data)
+            self._get_feature(raw_objects_data_provider, factor, <ILocalExecutor*>&local_executor, data)
 
         return data
 
@@ -4390,7 +4388,7 @@ cdef class _CatBoost:
         return metrics, [to_native_str(name) for name in metric_names]
 
     cpdef _get_loss_function_name(self):
-        return self.__model.GetLossFunctionName()
+        return to_native_str(self.__model.GetLossFunctionName())
 
     cpdef _calc_partial_dependence(self, _PoolBase pool, features, int thread_count):
         thread_count = UpdateThreadCount(thread_count);
@@ -4583,14 +4581,7 @@ cdef class _CatBoost:
             return {}
 
     cpdef _get_plain_params(self):
-        hasCatFeatures = len(self._get_cat_feature_indices()) != 0
-        hasTextFeatures = len(self._get_text_feature_indices()) != 0
-        cdef TJsonValue plainOptions = GetPlainJsonWithAllOptions(
-            dereference(self.__model),
-            hasCatFeatures,
-            hasTextFeatures
-        )
-        return loads(to_native_str(WriteTJsonValue(plainOptions)))
+        return loads(to_native_str(WriteTJsonValue(GetPlainJsonWithAllOptions(dereference(self.__model)))))
 
     def _get_tree_count(self):
         return self.__model.GetTreeCount()
@@ -5021,7 +5012,7 @@ cdef TCustomTrainTestSubsets _make_train_test_subsets(_PoolBase pool, folds) exc
 
 
 cpdef _cv(dict params, _PoolBase pool, int fold_count, bool_t inverted, int partition_random_seed,
-          bool_t shuffle, bool_t stratified, bool_t as_pandas, folds, type):
+          bool_t shuffle, bool_t stratified, float metric_update_interval, bool_t as_pandas, folds, type):
     prep_params = _PreprocessParams(params)
     cdef TCrossValidationParams cvParams
     cdef TVector[TCVResult] results
@@ -5030,6 +5021,7 @@ cpdef _cv(dict params, _PoolBase pool, int fold_count, bool_t inverted, int part
     cvParams.PartitionRandSeed = partition_random_seed
     cvParams.Shuffle = shuffle
     cvParams.Stratified = stratified
+    cvParams.MetricUpdateInterval = metric_update_interval
 
     if type == 'Classical':
         cvParams.Type = ECrossValidation_Classical
@@ -5126,7 +5118,7 @@ cdef class _StagedPredictIterator:
         self.__modelCalcerOnPool = new TModelCalcerOnPool(
             dereference(self.__model),
             pool.__pool.Get()[0].ObjectsData,
-            &self.__executor
+            <ILocalExecutor*>&self.__executor
         )
 
     def __dealloc__(self):
@@ -5520,6 +5512,10 @@ cpdef is_minimizable_metric(metric_name):
 
 cpdef is_maximizable_metric(metric_name):
     return IsMaxOptimal(to_arcadia_string(metric_name))
+
+
+cpdef is_user_defined_metric(metric_name):
+    return IsUserDefined(to_arcadia_string(metric_name))
 
 
 cpdef get_experiment_name(ui32 feature_set_idx, ui32 fold_idx):

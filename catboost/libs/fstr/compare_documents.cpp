@@ -83,8 +83,9 @@ static void CalcNonSymmetricIndicatorCoefficients(
     const auto& stepNodes = model.ModelTrees->GetModelTreeData()->GetNonSymmetricStepNodes();
     const auto& binFeatures = model.ModelTrees->GetBinFeatures();
 
+    auto applyData = model.ModelTrees->GetApplyData();
     for (size_t treeId = 0; treeId < model.ModelTrees->GetTreeCount(); ++treeId) {
-        size_t leafOffset = model.ModelTrees->GetFirstLeafOffsets()[treeId];
+        size_t leafOffset = applyData->TreeFirstLeafOffsets[treeId];
         double leafValue = model.ModelTrees->GetModelTreeData()->GetLeafValues()[leafOffset + treeLeafIdxes[treeId]];
         size_t splitIdx = model.ModelTrees->GetModelTreeData()->GetTreeStartOffsets()[treeId];
         int nextSplitStep = 0;
@@ -164,7 +165,7 @@ static TVector<double> GetPredictionDiffSingle(
 TVector<TVector<double>> GetPredictionDiff(
     const TFullModel& model,
     const TDataProvider& dataProvider,
-    NPar::TLocalExecutor* localExecutor
+    NPar::ILocalExecutor* localExecutor
 ) {
     CB_ENSURE(model.ModelTrees->GetDimensionsCount() == 1,  "Is not supported for multiclass");
     CB_ENSURE(dataProvider.GetObjectCount() == 2, "PredictionDiff requires 2 documents for compare");
@@ -250,7 +251,7 @@ void CalcAndOutputPredictionDiff(
     const TFullModel& model,
     const NCB::TDataProvider& dataProvider,
     const TString& outputPath,
-    NPar::TLocalExecutor* localExecutor
+    NPar::ILocalExecutor* localExecutor
 ) {
     auto factorImpact = GetPredictionDiff(model, dataProvider, localExecutor);
     TVector<std::pair<double, int>> impacts;

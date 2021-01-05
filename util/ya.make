@@ -15,19 +15,9 @@ PEERDIR(
     contrib/libs/double-conversion
 )
 
-# socket
 PEERDIR(
     contrib/libs/libc_compat
 )
-
-IF (OS_ANDROID)
-    PEERDIR(
-        contrib/libs/android_ifaddrs
-    )
-    ADDINCL(
-        contrib/libs/android_ifaddrs
-    )
-ENDIF()
 
 # datetime
 JOIN_SRCS(
@@ -101,7 +91,6 @@ JOIN_SRCS(
     generic/bt_exception.cpp
     generic/buffer.cpp
     generic/cast.cpp
-    generic/chartraits.cpp
     generic/deque.cpp
     generic/explicit_type.cpp
     generic/fastqueue.cpp
@@ -239,6 +228,7 @@ JOIN_SRCS(
     string/hex.cpp
     string/join.cpp
     string/printf.cpp
+    string/reverse.cpp
     string/split.cpp
     string/strip.cpp
     string/strspn.cpp

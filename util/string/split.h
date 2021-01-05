@@ -21,7 +21,7 @@
 
 // NOTE: Check StringSplitter below to get more convenient split string interface.
 
-namespace NPrivate {
+namespace NStringSplitPrivate {
 
     template <class T, class I, class = void>
     struct TIsConsumer : std::false_type {};
@@ -36,10 +36,21 @@ namespace NPrivate {
     template <class T, class I>
     constexpr bool TIsConsumerV = TIsConsumer<T, I>::value;
 
+    template <class T>
+    T* Find(T* str, std::common_type_t<T> ch) {
+        for (; *str; ++str) {
+            if (*str == ch) {
+                return str;
+            }
+        }
+
+        return nullptr;
+    }
+
 }
 
 template <class I, class TDelim, class TConsumer>
-std::enable_if_t<::NPrivate::TIsConsumerV<TConsumer, I>>
+std::enable_if_t<::NStringSplitPrivate::TIsConsumerV<TConsumer, I>>
 SplitString(I b, I e, const TDelim& d, TConsumer&& c) {
     I l, i;
 
@@ -50,7 +61,7 @@ SplitString(I b, I e, const TDelim& d, TConsumer&& c) {
 }
 
 template <class I, class TDelim, class TConsumer>
-std::enable_if_t<::NPrivate::TIsConsumerV<TConsumer, I>>
+std::enable_if_t<::NStringSplitPrivate::TIsConsumerV<TConsumer, I>>
 SplitString(I b, const TDelim& d, TConsumer&& c) {
     I l, i;
 
@@ -62,10 +73,10 @@ SplitString(I b, const TDelim& d, TConsumer&& c) {
 
 template <class I1, class I2>
 static inline I1* FastStrChr(I1* str, I2 f) noexcept {
-    I1* ret = (I1*)TCharTraits<I1>::Find(str, f);
+    I1* ret = NStringSplitPrivate::Find(str, f);
 
     if (!ret) {
-        ret = str + TCharTraits<I1>::GetLength(str);
+        ret = str + std::char_traits<I1>::length(str);
     }
 
     return ret;
@@ -73,25 +84,29 @@ static inline I1* FastStrChr(I1* str, I2 f) noexcept {
 
 template <class I>
 static inline I* FastStrStr(I* str, I* f, size_t l) noexcept {
-    (void)l;
-    I* ret = (I*)TCharTraits<I>::Find(str, *f);
+    std::basic_string_view<I> strView(str);
+    const auto ret = strView.find(*f);
 
-    if (ret) {
-        ret = (I*)TCharTraits<I>::Find(ret, f);
+    if (ret != std::string::npos) {
+        std::basic_string_view<I> fView(f, l);
+        strView = strView.substr(ret);
+        for (; strView.size() >= l; strView = strView.substr(1)) {
+            if (strView.substr(0, l) == fView) {
+                break;
+            }
+        }
+
+        return strView.size() >= l ? strView.data() : strView.data() + strView.size();
+    } else {
+        return strView.data() + strView.size();
     }
-
-    if (!ret) {
-        ret = str + TCharTraits<I>::GetLength(str);
-    }
-
-    return ret;
 }
 
 template <class Char>
 struct TStringDelimiter {
     inline TStringDelimiter(Char* delim) noexcept
         : Delim(delim)
-        , Len(TCharTraits<Char>::GetLength(delim))
+        , Len(std::char_traits<Char>::length(delim))
     {
     }
 
@@ -102,11 +117,12 @@ struct TStringDelimiter {
     }
 
     inline Char* Find(Char*& b, Char* e) const noexcept {
-        Char* ret = const_cast<Char*>(TCharTraits<Char>::Find(b, e - b, Delim, Len));
+        const auto ret = std::basic_string_view<Char>(b, e - b).find(Delim, 0, Len);
 
-        if (ret) {
-            b = ret + Len;
-            return ret;
+        if (ret != std::string::npos) {
+            const auto result = b + ret;
+            b = result + Len;
+            return result;
         }
 
         return (b = e);
@@ -115,11 +131,7 @@ struct TStringDelimiter {
     inline Char* Find(Char*& b) const noexcept {
         Char* ret = FastStrStr(b, Delim, Len);
 
-        if (*ret) {
-            b = ret + Len;
-        } else {
-            b = ret;
-        }
+        b = *ret ? ret + Len : ret;
 
         return ret;
     }
@@ -136,11 +148,12 @@ struct TCharDelimiter {
     }
 
     inline Char* Find(Char*& b, Char* e) const noexcept {
-        Char* ret = const_cast<Char*>(TCharTraits<Char>::Find(b, Ch, e - b));
+        const auto ret = std::basic_string_view<Char>(b, e - b).find(Ch);
 
-        if (ret) {
-            b = ret + 1;
-            return ret;
+        if (ret != std::string::npos) {
+            const auto result = b + ret;
+            b = result + 1;
+            return result;
         }
 
         return (b = e);
@@ -192,14 +205,16 @@ struct TFindFirstOf {
     inline Char* FindFirstOf(Char* b, Char* e) const noexcept {
         Char* ret = b;
         for (; ret != e; ++ret) {
-            if (TCharTraits<Char>::Find(Set, *ret))
+            if (NStringSplitPrivate::Find(Set, *ret))
                 break;
         }
         return ret;
     }
 
     inline Char* FindFirstOf(Char* b) const noexcept {
-        return b + TCharTraits<Char>::FindFirstOf(b, Set);
+        const std::basic_string_view<Char> bView(b);
+        const auto ret = bView.find_first_of(Set);
+        return ret != std::string::npos ? b + ret : b + bView.size();
     }
 
     Char* Set;
@@ -413,7 +428,7 @@ inline size_t Split(const TStringBuf s, const TSetDelimiter<const char>& delim, 
 template <class P, class D>
 void GetNext(TStringBuf& s, D delim, P& param) {
     TStringBuf next = s.NextTok(delim);
-    Y_ENSURE(next.IsInited(), AsStringBuf("Split: number of fields less than number of Split output arguments"));
+    Y_ENSURE(next.IsInited(), TStringBuf("Split: number of fields less than number of Split output arguments"));
     param = FromString<P>(next);
 }
 
@@ -428,12 +443,12 @@ void GetNext(TStringBuf& s, D delim, TMaybe<P>& param) {
 }
 
 // example:
-// Split(AsStringBuf("Sherlock,2014,36.6"), ',', name, year, temperature);
+// Split(TStringBuf("Sherlock,2014,36.6"), ',', name, year, temperature);
 template <class D, class P1, class P2>
 void Split(TStringBuf s, D delim, P1& p1, P2& p2) {
     GetNext(s, delim, p1);
     GetNext(s, delim, p2);
-    Y_ENSURE(!s.IsInited(), AsStringBuf("Split: number of fields more than number of Split output arguments"));
+    Y_ENSURE(!s.IsInited(), TStringBuf("Split: number of fields more than number of Split output arguments"));
 }
 
 template <class D, class P1, class P2, class... Other>
@@ -475,7 +490,7 @@ void Split(TStringBuf s, D delim, P1& p1, P2& p2, Other&... other) {
  * \endcode
  */
 
-namespace NPrivate {
+namespace NStringSplitPrivate {
     Y_HAS_MEMBER(push_back, PushBack);
     Y_HAS_MEMBER(insert, Insert);
     Y_HAS_MEMBER(data, Data);
@@ -641,6 +656,17 @@ namespace NPrivate {
 
         operator TStringBufType() const noexcept {
             return Token();
+        }
+
+        template<
+            typename Other,
+            class = typename std::enable_if<
+                std::is_convertible<Other, TStringBufType>::value,
+                void
+            >::type
+        >
+        bool operator==(const Other& toCompare) const {
+            return TStringBufType(*this) == TStringBufType(toCompare);
         }
 
         explicit operator bool() const {
@@ -1025,30 +1051,30 @@ namespace NPrivate {
 
 template <class Iterator>
 auto StringSplitter(Iterator begin, Iterator end) {
-    return ::NPrivate::MakeStringSplitter(TIteratorRange<Iterator>(begin, end));
+    return ::NStringSplitPrivate::MakeStringSplitter(TIteratorRange<Iterator>(begin, end));
 }
 
 template <class Char>
 auto StringSplitter(const Char* begin, const Char* end) {
-    return ::NPrivate::MakeStringSplitter(TBasicStringBuf<Char>(begin, end));
+    return ::NStringSplitPrivate::MakeStringSplitter(TBasicStringBuf<Char>(begin, end));
 }
 
 template <class Char>
 auto StringSplitter(const Char* begin, size_t len) {
-    return ::NPrivate::MakeStringSplitter(TBasicStringBuf<Char>(begin, len));
+    return ::NStringSplitPrivate::MakeStringSplitter(TBasicStringBuf<Char>(begin, len));
 }
 
 template <class Char>
 auto StringSplitter(const Char* str) {
-    return ::NPrivate::MakeStringSplitter(TBasicStringBuf<Char>(str));
+    return ::NStringSplitPrivate::MakeStringSplitter(TBasicStringBuf<Char>(str));
 }
 
 template <class String, std::enable_if_t<!std::is_pointer<std::remove_reference_t<String>>::value, int> = 0>
 auto StringSplitter(String& s) {
-    return ::NPrivate::MakeStringSplitter(::NPrivate::TStringBufOf<String>(s.data(), s.size()));
+    return ::NStringSplitPrivate::MakeStringSplitter(::NStringSplitPrivate::TStringBufOf<String>(s.data(), s.size()));
 }
 
 template <class String, std::enable_if_t<!std::is_pointer<std::remove_reference_t<String>>::value, int> = 0>
 auto StringSplitter(String&& s) {
-    return ::NPrivate::MakeStringSplitter(std::move(s));
+    return ::NStringSplitPrivate::MakeStringSplitter(std::move(s));
 }

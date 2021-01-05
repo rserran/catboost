@@ -1720,6 +1720,22 @@
             "uri": "file://test.test_dist_train_yetirank/test_1.eval"
         }
     ],
+    "test.test_embeddings_train[Ordered]": [
+        {
+            "uri": "file://test.test_embeddings_train_Ordered_/learn.tsv"
+        },
+        {
+            "uri": "file://test.test_embeddings_train_Ordered_/test.tsv"
+        }
+    ],
+    "test.test_embeddings_train[Plain]": [
+        {
+            "uri": "file://test.test_embeddings_train_Plain_/learn.tsv"
+        },
+        {
+            "uri": "file://test.test_embeddings_train_Plain_/test.tsv"
+        }
+    ],
     "test.test_empty_eval[Ordered]": [
         {
             "uri": "file://test.test_empty_eval_Ordered_/test.eval"
@@ -3219,6 +3235,9 @@
         },
         {
             "uri": "file://test.test_fit_binclass_with_text_features_BM25-ByDelimiter-Ordered_/test.tsv"
+        },
+        {
+            "uri": "file://test.test_fit_binclass_with_text_features_BM25-ByDelimiter-Ordered_/test.eval"
         }
     ],
     "test.test_fit_binclass_with_text_features[BM25-ByDelimiter-Plain]": [
@@ -3227,6 +3246,9 @@
         },
         {
             "uri": "file://test.test_fit_binclass_with_text_features_BM25-ByDelimiter-Plain_/test.tsv"
+        },
+        {
+            "uri": "file://test.test_fit_binclass_with_text_features_BM25-ByDelimiter-Plain_/test.eval"
         }
     ],
     "test.test_fit_binclass_with_text_features[BM25-BySense-Ordered]": [
@@ -3235,6 +3257,9 @@
         },
         {
             "uri": "file://test.test_fit_binclass_with_text_features_BM25-BySense-Ordered_/test.tsv"
+        },
+        {
+            "uri": "file://test.test_fit_binclass_with_text_features_BM25-BySense-Ordered_/test.eval"
         }
     ],
     "test.test_fit_binclass_with_text_features[BM25-BySense-Plain]": [
@@ -3243,6 +3268,9 @@
         },
         {
             "uri": "file://test.test_fit_binclass_with_text_features_BM25-BySense-Plain_/test.tsv"
+        },
+        {
+            "uri": "file://test.test_fit_binclass_with_text_features_BM25-BySense-Plain_/test.eval"
         }
     ],
     "test.test_fit_binclass_with_text_features[BoW,NaiveBayes,BM25-ByDelimiter-Ordered]": [
@@ -3251,6 +3279,9 @@
         },
         {
             "uri": "file://test.test_fit_binclass_with_text_features_BoW_NaiveBayes_BM25-ByDelimiter-Ordered_/test.tsv"
+        },
+        {
+            "uri": "file://test.test_fit_binclass_with_text_features_BoW_NaiveBayes_BM25-ByDelimiter-Ordered_/test.eval"
         }
     ],
     "test.test_fit_binclass_with_text_features[BoW,NaiveBayes,BM25-ByDelimiter-Plain]": [
@@ -3259,6 +3290,9 @@
         },
         {
             "uri": "file://test.test_fit_binclass_with_text_features_BoW_NaiveBayes_BM25-ByDelimiter-Plain_/test.tsv"
+        },
+        {
+            "uri": "file://test.test_fit_binclass_with_text_features_BoW_NaiveBayes_BM25-ByDelimiter-Plain_/test.eval"
         }
     ],
     "test.test_fit_binclass_with_text_features[BoW,NaiveBayes,BM25-BySense-Ordered]": [
@@ -3267,6 +3301,9 @@
         },
         {
             "uri": "file://test.test_fit_binclass_with_text_features_BoW_NaiveBayes_BM25-BySense-Ordered_/test.tsv"
+        },
+        {
+            "uri": "file://test.test_fit_binclass_with_text_features_BoW_NaiveBayes_BM25-BySense-Ordered_/test.eval"
         }
     ],
     "test.test_fit_binclass_with_text_features[BoW,NaiveBayes,BM25-BySense-Plain]": [
@@ -3275,6 +3312,9 @@
         },
         {
             "uri": "file://test.test_fit_binclass_with_text_features_BoW_NaiveBayes_BM25-BySense-Plain_/test.tsv"
+        },
+        {
+            "uri": "file://test.test_fit_binclass_with_text_features_BoW_NaiveBayes_BM25-BySense-Plain_/test.eval"
         }
     ],
     "test.test_fit_binclass_with_text_features[BoW,NaiveBayes-ByDelimiter-Ordered]": [
@@ -3283,6 +3323,9 @@
         },
         {
             "uri": "file://test.test_fit_binclass_with_text_features_BoW_NaiveBayes-ByDelimiter-Ordered_/test.tsv"
+        },
+        {
+            "uri": "file://test.test_fit_binclass_with_text_features_BoW_NaiveBayes-ByDelimiter-Ordered_/test.eval"
         }
     ],
     "test.test_fit_binclass_with_text_features[BoW,NaiveBayes-ByDelimiter-Plain]": [
@@ -3291,6 +3334,9 @@
         },
         {
             "uri": "file://test.test_fit_binclass_with_text_features_BoW_NaiveBayes-ByDelimiter-Plain_/test.tsv"
+        },
+        {
+            "uri": "file://test.test_fit_binclass_with_text_features_BoW_NaiveBayes-ByDelimiter-Plain_/test.eval"
         }
     ],
     "test.test_fit_binclass_with_text_features[BoW,NaiveBayes-BySense-Ordered]": [
@@ -3299,6 +3345,9 @@
         },
         {
             "uri": "file://test.test_fit_binclass_with_text_features_BoW_NaiveBayes-BySense-Ordered_/test.tsv"
+        },
+        {
+            "uri": "file://test.test_fit_binclass_with_text_features_BoW_NaiveBayes-BySense-Ordered_/test.eval"
         }
     ],
     "test.test_fit_binclass_with_text_features[BoW,NaiveBayes-BySense-Plain]": [
@@ -3307,6 +3356,9 @@
         },
         {
             "uri": "file://test.test_fit_binclass_with_text_features_BoW_NaiveBayes-BySense-Plain_/test.tsv"
+        },
+        {
+            "uri": "file://test.test_fit_binclass_with_text_features_BoW_NaiveBayes-BySense-Plain_/test.eval"
         }
     ],
     "test.test_fit_binclass_with_text_features[BoW-ByDelimiter-Ordered]": [
@@ -3315,6 +3367,9 @@
         },
         {
             "uri": "file://test.test_fit_binclass_with_text_features_BoW-ByDelimiter-Ordered_/test.tsv"
+        },
+        {
+            "uri": "file://test.test_fit_binclass_with_text_features_BoW-ByDelimiter-Ordered_/test.eval"
         }
     ],
     "test.test_fit_binclass_with_text_features[BoW-ByDelimiter-Plain]": [
@@ -3323,6 +3378,9 @@
         },
         {
             "uri": "file://test.test_fit_binclass_with_text_features_BoW-ByDelimiter-Plain_/test.tsv"
+        },
+        {
+            "uri": "file://test.test_fit_binclass_with_text_features_BoW-ByDelimiter-Plain_/test.eval"
         }
     ],
     "test.test_fit_binclass_with_text_features[BoW-BySense-Ordered]": [
@@ -3331,6 +3389,9 @@
         },
         {
             "uri": "file://test.test_fit_binclass_with_text_features_BoW-BySense-Ordered_/test.tsv"
+        },
+        {
+            "uri": "file://test.test_fit_binclass_with_text_features_BoW-BySense-Ordered_/test.eval"
         }
     ],
     "test.test_fit_binclass_with_text_features[BoW-BySense-Plain]": [
@@ -3339,6 +3400,9 @@
         },
         {
             "uri": "file://test.test_fit_binclass_with_text_features_BoW-BySense-Plain_/test.tsv"
+        },
+        {
+            "uri": "file://test.test_fit_binclass_with_text_features_BoW-BySense-Plain_/test.eval"
         }
     ],
     "test.test_fit_binclass_with_text_features[NaiveBayes-ByDelimiter-Ordered]": [
@@ -3347,6 +3411,9 @@
         },
         {
             "uri": "file://test.test_fit_binclass_with_text_features_NaiveBayes-ByDelimiter-Ordered_/test.tsv"
+        },
+        {
+            "uri": "file://test.test_fit_binclass_with_text_features_NaiveBayes-ByDelimiter-Ordered_/test.eval"
         }
     ],
     "test.test_fit_binclass_with_text_features[NaiveBayes-ByDelimiter-Plain]": [
@@ -3355,6 +3422,9 @@
         },
         {
             "uri": "file://test.test_fit_binclass_with_text_features_NaiveBayes-ByDelimiter-Plain_/test.tsv"
+        },
+        {
+            "uri": "file://test.test_fit_binclass_with_text_features_NaiveBayes-ByDelimiter-Plain_/test.eval"
         }
     ],
     "test.test_fit_binclass_with_text_features[NaiveBayes-BySense-Ordered]": [
@@ -3363,6 +3433,9 @@
         },
         {
             "uri": "file://test.test_fit_binclass_with_text_features_NaiveBayes-BySense-Ordered_/test.tsv"
+        },
+        {
+            "uri": "file://test.test_fit_binclass_with_text_features_NaiveBayes-BySense-Ordered_/test.eval"
         }
     ],
     "test.test_fit_binclass_with_text_features[NaiveBayes-BySense-Plain]": [
@@ -3371,6 +3444,9 @@
         },
         {
             "uri": "file://test.test_fit_binclass_with_text_features_NaiveBayes-BySense-Plain_/test.tsv"
+        },
+        {
+            "uri": "file://test.test_fit_binclass_with_text_features_NaiveBayes-BySense-Plain_/test.eval"
         }
     ],
     "test.test_fit_multiclass_with_class_names": [
@@ -3384,6 +3460,9 @@
         },
         {
             "uri": "file://test.test_fit_multiclass_with_text_features_MultiClass-BM25-ByDelimiter_/test.tsv"
+        },
+        {
+            "uri": "file://test.test_fit_multiclass_with_text_features_MultiClass-BM25-ByDelimiter_/test.eval"
         }
     ],
     "test.test_fit_multiclass_with_text_features[MultiClass-BM25-BySense]": [
@@ -3392,6 +3471,9 @@
         },
         {
             "uri": "file://test.test_fit_multiclass_with_text_features_MultiClass-BM25-BySense_/test.tsv"
+        },
+        {
+            "uri": "file://test.test_fit_multiclass_with_text_features_MultiClass-BM25-BySense_/test.eval"
         }
     ],
     "test.test_fit_multiclass_with_text_features[MultiClass-BoW,NaiveBayes,BM25-ByDelimiter]": [
@@ -3400,6 +3482,9 @@
         },
         {
             "uri": "file://test.test_fit_multiclass_with_text_features_MultiClass-BoW_NaiveBayes_BM25-ByDelimiter_/test.tsv"
+        },
+        {
+            "uri": "file://test.test_fit_multiclass_with_text_features_MultiClass-BoW_NaiveBayes_BM25-ByDelimiter_/test.eval"
         }
     ],
     "test.test_fit_multiclass_with_text_features[MultiClass-BoW,NaiveBayes,BM25-BySense]": [
@@ -3408,6 +3493,9 @@
         },
         {
             "uri": "file://test.test_fit_multiclass_with_text_features_MultiClass-BoW_NaiveBayes_BM25-BySense_/test.tsv"
+        },
+        {
+            "uri": "file://test.test_fit_multiclass_with_text_features_MultiClass-BoW_NaiveBayes_BM25-BySense_/test.eval"
         }
     ],
     "test.test_fit_multiclass_with_text_features[MultiClass-BoW,NaiveBayes-ByDelimiter]": [
@@ -3416,6 +3504,9 @@
         },
         {
             "uri": "file://test.test_fit_multiclass_with_text_features_MultiClass-BoW_NaiveBayes-ByDelimiter_/test.tsv"
+        },
+        {
+            "uri": "file://test.test_fit_multiclass_with_text_features_MultiClass-BoW_NaiveBayes-ByDelimiter_/test.eval"
         }
     ],
     "test.test_fit_multiclass_with_text_features[MultiClass-BoW,NaiveBayes-BySense]": [
@@ -3424,6 +3515,9 @@
         },
         {
             "uri": "file://test.test_fit_multiclass_with_text_features_MultiClass-BoW_NaiveBayes-BySense_/test.tsv"
+        },
+        {
+            "uri": "file://test.test_fit_multiclass_with_text_features_MultiClass-BoW_NaiveBayes-BySense_/test.eval"
         }
     ],
     "test.test_fit_multiclass_with_text_features[MultiClass-BoW-ByDelimiter]": [
@@ -3432,6 +3526,9 @@
         },
         {
             "uri": "file://test.test_fit_multiclass_with_text_features_MultiClass-BoW-ByDelimiter_/test.tsv"
+        },
+        {
+            "uri": "file://test.test_fit_multiclass_with_text_features_MultiClass-BoW-ByDelimiter_/test.eval"
         }
     ],
     "test.test_fit_multiclass_with_text_features[MultiClass-BoW-BySense]": [
@@ -3440,6 +3537,9 @@
         },
         {
             "uri": "file://test.test_fit_multiclass_with_text_features_MultiClass-BoW-BySense_/test.tsv"
+        },
+        {
+            "uri": "file://test.test_fit_multiclass_with_text_features_MultiClass-BoW-BySense_/test.eval"
         }
     ],
     "test.test_fit_multiclass_with_text_features[MultiClass-NaiveBayes-ByDelimiter]": [
@@ -3448,6 +3548,9 @@
         },
         {
             "uri": "file://test.test_fit_multiclass_with_text_features_MultiClass-NaiveBayes-ByDelimiter_/test.tsv"
+        },
+        {
+            "uri": "file://test.test_fit_multiclass_with_text_features_MultiClass-NaiveBayes-ByDelimiter_/test.eval"
         }
     ],
     "test.test_fit_multiclass_with_text_features[MultiClass-NaiveBayes-BySense]": [
@@ -3456,6 +3559,9 @@
         },
         {
             "uri": "file://test.test_fit_multiclass_with_text_features_MultiClass-NaiveBayes-BySense_/test.tsv"
+        },
+        {
+            "uri": "file://test.test_fit_multiclass_with_text_features_MultiClass-NaiveBayes-BySense_/test.eval"
         }
     ],
     "test.test_fit_multiclass_with_text_features[MultiClassOneVsAll-BM25-ByDelimiter]": [
@@ -3464,6 +3570,9 @@
         },
         {
             "uri": "file://test.test_fit_multiclass_with_text_features_MultiClassOneVsAll-BM25-ByDelimiter_/test.tsv"
+        },
+        {
+            "uri": "file://test.test_fit_multiclass_with_text_features_MultiClassOneVsAll-BM25-ByDelimiter_/test.eval"
         }
     ],
     "test.test_fit_multiclass_with_text_features[MultiClassOneVsAll-BM25-BySense]": [
@@ -3472,6 +3581,9 @@
         },
         {
             "uri": "file://test.test_fit_multiclass_with_text_features_MultiClassOneVsAll-BM25-BySense_/test.tsv"
+        },
+        {
+            "uri": "file://test.test_fit_multiclass_with_text_features_MultiClassOneVsAll-BM25-BySense_/test.eval"
         }
     ],
     "test.test_fit_multiclass_with_text_features[MultiClassOneVsAll-BoW,NaiveBayes,BM25-ByDelimiter]": [
@@ -3480,6 +3592,9 @@
         },
         {
             "uri": "file://test.test_fit_multiclass_with_text_features_MultiClassOneVsAll-BoW_NaiveBayes_BM25-ByDelimiter_/test.tsv"
+        },
+        {
+            "uri": "file://test.test_fit_multiclass_with_text_features_MultiClassOneVsAll-BoW_NaiveBayes_BM25-ByDelimiter_/test.eval"
         }
     ],
     "test.test_fit_multiclass_with_text_features[MultiClassOneVsAll-BoW,NaiveBayes,BM25-BySense]": [
@@ -3488,6 +3603,9 @@
         },
         {
             "uri": "file://test.test_fit_multiclass_with_text_features_MultiClassOneVsAll-BoW_NaiveBayes_BM25-BySense_/test.tsv"
+        },
+        {
+            "uri": "file://test.test_fit_multiclass_with_text_features_MultiClassOneVsAll-BoW_NaiveBayes_BM25-BySense_/test.eval"
         }
     ],
     "test.test_fit_multiclass_with_text_features[MultiClassOneVsAll-BoW,NaiveBayes-ByDelimiter]": [
@@ -3496,6 +3614,9 @@
         },
         {
             "uri": "file://test.test_fit_multiclass_with_text_features_MultiClassOneVsAll-BoW_NaiveBayes-ByDelimiter_/test.tsv"
+        },
+        {
+            "uri": "file://test.test_fit_multiclass_with_text_features_MultiClassOneVsAll-BoW_NaiveBayes-ByDelimiter_/test.eval"
         }
     ],
     "test.test_fit_multiclass_with_text_features[MultiClassOneVsAll-BoW,NaiveBayes-BySense]": [
@@ -3504,6 +3625,9 @@
         },
         {
             "uri": "file://test.test_fit_multiclass_with_text_features_MultiClassOneVsAll-BoW_NaiveBayes-BySense_/test.tsv"
+        },
+        {
+            "uri": "file://test.test_fit_multiclass_with_text_features_MultiClassOneVsAll-BoW_NaiveBayes-BySense_/test.eval"
         }
     ],
     "test.test_fit_multiclass_with_text_features[MultiClassOneVsAll-BoW-ByDelimiter]": [
@@ -3512,6 +3636,9 @@
         },
         {
             "uri": "file://test.test_fit_multiclass_with_text_features_MultiClassOneVsAll-BoW-ByDelimiter_/test.tsv"
+        },
+        {
+            "uri": "file://test.test_fit_multiclass_with_text_features_MultiClassOneVsAll-BoW-ByDelimiter_/test.eval"
         }
     ],
     "test.test_fit_multiclass_with_text_features[MultiClassOneVsAll-BoW-BySense]": [
@@ -3520,6 +3647,9 @@
         },
         {
             "uri": "file://test.test_fit_multiclass_with_text_features_MultiClassOneVsAll-BoW-BySense_/test.tsv"
+        },
+        {
+            "uri": "file://test.test_fit_multiclass_with_text_features_MultiClassOneVsAll-BoW-BySense_/test.eval"
         }
     ],
     "test.test_fit_multiclass_with_text_features[MultiClassOneVsAll-NaiveBayes-ByDelimiter]": [
@@ -3528,6 +3658,9 @@
         },
         {
             "uri": "file://test.test_fit_multiclass_with_text_features_MultiClassOneVsAll-NaiveBayes-ByDelimiter_/test.tsv"
+        },
+        {
+            "uri": "file://test.test_fit_multiclass_with_text_features_MultiClassOneVsAll-NaiveBayes-ByDelimiter_/test.eval"
         }
     ],
     "test.test_fit_multiclass_with_text_features[MultiClassOneVsAll-NaiveBayes-BySense]": [
@@ -3536,6 +3669,9 @@
         },
         {
             "uri": "file://test.test_fit_multiclass_with_text_features_MultiClassOneVsAll-NaiveBayes-BySense_/test.tsv"
+        },
+        {
+            "uri": "file://test.test_fit_multiclass_with_text_features_MultiClassOneVsAll-NaiveBayes-BySense_/test.eval"
         }
     ],
     "test.test_fit_with_per_feature_text_options[Ordered]": [
@@ -3768,6 +3904,78 @@
     },
     "test.test_fstr_with_target_border_and_class_weights[ShapValues]": {
         "uri": "file://test.test_fstr_with_target_border_and_class_weights_ShapValues_/fstr.tsv"
+    },
+    "test.test_fstr_with_text_features[Ordered-SymmetricTree-Interaction]": {
+        "uri": "file://test.test_fstr_with_text_features_Ordered-SymmetricTree-Interaction_/fstr.tsv"
+    },
+    "test.test_fstr_with_text_features[Ordered-SymmetricTree-InternalFeatureImportance]": {
+        "uri": "file://test.test_fstr_with_text_features_Ordered-SymmetricTree-InternalFeatureImportance_/fstr.tsv"
+    },
+    "test.test_fstr_with_text_features[Ordered-SymmetricTree-InternalInteraction]": {
+        "uri": "file://test.test_fstr_with_text_features_Ordered-SymmetricTree-InternalInteraction_/fstr.tsv"
+    },
+    "test.test_fstr_with_text_features[Ordered-SymmetricTree-PredictionValuesChange]": {
+        "uri": "file://test.test_fstr_with_text_features_Ordered-SymmetricTree-PredictionValuesChange_/fstr.tsv"
+    },
+    "test.test_fstr_with_text_features[Plain-Depthwise-Interaction]": {
+        "uri": "file://test.test_fstr_with_text_features_Plain-Depthwise-Interaction_/fstr.tsv"
+    },
+    "test.test_fstr_with_text_features[Plain-Depthwise-InternalFeatureImportance]": {
+        "uri": "file://test.test_fstr_with_text_features_Plain-Depthwise-InternalFeatureImportance_/fstr.tsv"
+    },
+    "test.test_fstr_with_text_features[Plain-Depthwise-InternalInteraction]": {
+        "uri": "file://test.test_fstr_with_text_features_Plain-Depthwise-InternalInteraction_/fstr.tsv"
+    },
+    "test.test_fstr_with_text_features[Plain-Depthwise-PredictionValuesChange]": {
+        "uri": "file://test.test_fstr_with_text_features_Plain-Depthwise-PredictionValuesChange_/fstr.tsv"
+    },
+    "test.test_fstr_with_text_features[Plain-Lossguide-Interaction]": {
+        "uri": "file://test.test_fstr_with_text_features_Plain-Lossguide-Interaction_/fstr.tsv"
+    },
+    "test.test_fstr_with_text_features[Plain-Lossguide-InternalFeatureImportance]": {
+        "uri": "file://test.test_fstr_with_text_features_Plain-Lossguide-InternalFeatureImportance_/fstr.tsv"
+    },
+    "test.test_fstr_with_text_features[Plain-Lossguide-InternalInteraction]": {
+        "uri": "file://test.test_fstr_with_text_features_Plain-Lossguide-InternalInteraction_/fstr.tsv"
+    },
+    "test.test_fstr_with_text_features[Plain-Lossguide-PredictionValuesChange]": {
+        "uri": "file://test.test_fstr_with_text_features_Plain-Lossguide-PredictionValuesChange_/fstr.tsv"
+    },
+    "test.test_fstr_with_text_features[Plain-SymmetricTree-Interaction]": {
+        "uri": "file://test.test_fstr_with_text_features_Plain-SymmetricTree-Interaction_/fstr.tsv"
+    },
+    "test.test_fstr_with_text_features[Plain-SymmetricTree-InternalFeatureImportance]": {
+        "uri": "file://test.test_fstr_with_text_features_Plain-SymmetricTree-InternalFeatureImportance_/fstr.tsv"
+    },
+    "test.test_fstr_with_text_features[Plain-SymmetricTree-InternalInteraction]": {
+        "uri": "file://test.test_fstr_with_text_features_Plain-SymmetricTree-InternalInteraction_/fstr.tsv"
+    },
+    "test.test_fstr_with_text_features[Plain-SymmetricTree-PredictionValuesChange]": {
+        "uri": "file://test.test_fstr_with_text_features_Plain-SymmetricTree-PredictionValuesChange_/fstr.tsv"
+    },
+    "test.test_fstr_with_text_features_shap[Ordered-SymmetricTree-LossFunctionChange]": {
+        "uri": "file://test.test_fstr_with_text_features_shap_Ordered-SymmetricTree-LossFunctionChange_/fstr.tsv"
+    },
+    "test.test_fstr_with_text_features_shap[Ordered-SymmetricTree-ShapValues]": {
+        "uri": "file://test.test_fstr_with_text_features_shap_Ordered-SymmetricTree-ShapValues_/fstr.tsv"
+    },
+    "test.test_fstr_with_text_features_shap[Plain-Depthwise-LossFunctionChange]": {
+        "uri": "file://test.test_fstr_with_text_features_shap_Plain-Depthwise-LossFunctionChange_/fstr.tsv"
+    },
+    "test.test_fstr_with_text_features_shap[Plain-Depthwise-ShapValues]": {
+        "uri": "file://test.test_fstr_with_text_features_shap_Plain-Depthwise-ShapValues_/fstr.tsv"
+    },
+    "test.test_fstr_with_text_features_shap[Plain-Lossguide-LossFunctionChange]": {
+        "uri": "file://test.test_fstr_with_text_features_shap_Plain-Lossguide-LossFunctionChange_/fstr.tsv"
+    },
+    "test.test_fstr_with_text_features_shap[Plain-Lossguide-ShapValues]": {
+        "uri": "file://test.test_fstr_with_text_features_shap_Plain-Lossguide-ShapValues_/fstr.tsv"
+    },
+    "test.test_fstr_with_text_features_shap[Plain-SymmetricTree-LossFunctionChange]": {
+        "uri": "file://test.test_fstr_with_text_features_shap_Plain-SymmetricTree-LossFunctionChange_/fstr.tsv"
+    },
+    "test.test_fstr_with_text_features_shap[Plain-SymmetricTree-ShapValues]": {
+        "uri": "file://test.test_fstr_with_text_features_shap_Plain-SymmetricTree-ShapValues_/fstr.tsv"
     },
     "test.test_fstr_with_weights[Depthwise-InternalFeatureImportance]": {
         "uri": "file://test.test_fstr_with_weights_Depthwise-InternalFeatureImportance_/fstr.tsv"

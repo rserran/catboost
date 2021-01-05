@@ -2,7 +2,6 @@
 
 #include <catboost/libs/data/exclusive_feature_bundling.h>
 #include <catboost/libs/data/objects.h>
-#include <catboost/libs/helpers/clear_array.h>
 
 #include <library/cpp/containers/dense_hash/dense_hash.h>
 
@@ -34,7 +33,7 @@ void CalcHashes(
     const NCB::TPerfectHashedToHashedCatValuesMap* perfectHashedToHashedCatValuesMap,
     ui64* begin,
     ui64* end,
-    NPar::TLocalExecutor* localExecutor);
+    NPar::ILocalExecutor* localExecutor);
 
 
 /// Compute reindexHash and reindex hash values in range [begin,end).

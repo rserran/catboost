@@ -1,8 +1,10 @@
 #include "full_model_saver.h"
 
+#include <catboost/libs/data/features_layout_helpers.h>
 #include <catboost/libs/helpers/exception.h>
 #include <catboost/libs/helpers/vector_helpers.h>
 #include <catboost/libs/model/ctr_value_table.h>
+#include <catboost/libs/model/model_estimated_features.h>
 #include <catboost/libs/model/model.h>
 #include <catboost/libs/model/model_export/model_exporter.h>
 #include <catboost/libs/model/static_ctr_provider.h>
@@ -32,7 +34,7 @@ namespace {
         TTextCollectionBuilder(
             const TFeatureEstimators& estimators,
             const TTextDigitizers& textDigitizers,
-            NPar::TLocalExecutor* localExecutor
+            NPar::ILocalExecutor* localExecutor
         )
             : WasBuilt(false)
             , FeatureEstimators(estimators)
@@ -62,7 +64,7 @@ namespace {
 
             TVector<ui32> localIds;
             for (const auto& estimatedFeature : estimatedFeatures) {
-                localIds.push_back(estimatedFeature.LocalIndex);
+                localIds.push_back(estimatedFeature.ModelEstimatedFeature.LocalId);
             }
 
             const ui32 calcerFlatIdx = AddCalcer(MakeFinalFeatureCalcer(calcerId, MakeConstArrayRef(localIds)));
@@ -150,12 +152,14 @@ namespace {
         ) {
             const auto& calcer = Calcers[calcerFlatIdx];
             for (ui32 localIndex: xrange(calcer->FeatureCount())) {
-                TEstimatedFeature estimatedFeature = TEstimatedFeature{
-                    SafeIntegerCast<int>(textFeatureId),
-                    calcer->Id(),
-                    SafeIntegerCast<int>(localIndex)
-                };
-                estimatedFeature.Borders = estimatedFeatures[localIndex].Borders;
+                TEstimatedFeature estimatedFeature(TModelEstimatedFeature{
+                        SafeIntegerCast<int>(textFeatureId),
+                        calcer->Id(),
+                        SafeIntegerCast<int>(localIndex),
+                        EEstimatedSourceFeatureType::Text
+                    },
+                    estimatedFeatures[localIndex].Borders
+                );
                 EstimatedFeatures.push_back(estimatedFeature);
             }
         }
@@ -223,14 +227,14 @@ namespace {
         THashMap<TGuid, TDigitizerId> CalcerToDigitizer;
         TVector<TEstimatedFeature> EstimatedFeatures;
 
-        NPar::TLocalExecutor* LocalExecutor;
+        NPar::ILocalExecutor* LocalExecutor;
     };
 
     class TEmbeddingCollectionBuilder {
     public:
         TEmbeddingCollectionBuilder(
             const TFeatureEstimators& estimators,
-            NPar::TLocalExecutor* localExecutor
+            NPar::ILocalExecutor* localExecutor
         )
             : WasBuilt(false)
             , FeatureEstimators(estimators)
@@ -247,7 +251,7 @@ namespace {
 
             TVector<ui32> localIds;
             for (const auto& estimatedFeature : estimatedFeatures) {
-                localIds.push_back(estimatedFeature.LocalIndex);
+                localIds.push_back(estimatedFeature.ModelEstimatedFeature.LocalId);
             }
 
             const ui32 calcerFlatIdx = AddCalcer(MakeFinalFeatureCalcer(calcerId, MakeConstArrayRef(localIds)));
@@ -293,11 +297,12 @@ namespace {
         )  {
             const auto& calcer = Calcers[calcerFlatIdx];
             for (ui32 localIndex: xrange(calcer->FeatureCount())) {
-                TEstimatedFeature estimatedFeature = TEstimatedFeature{
+                TEstimatedFeature estimatedFeature(TModelEstimatedFeature{
                     SafeIntegerCast<int>(FeatureId),
                     calcer->Id(),
-                    SafeIntegerCast<int>(localIndex)
-                };
+                    SafeIntegerCast<int>(localIndex),
+                    EEstimatedSourceFeatureType::Embedding
+                });
                 if (localIndex < estimatedFeatures.size()) {
                     estimatedFeature.Borders = estimatedFeatures[localIndex].Borders;
                 }
@@ -325,14 +330,14 @@ namespace {
         TVector<TVector<ui32>> PerEmbeddingFeatureCalcers;
         TVector<TEmbeddingFeatureCalcerPtr> Calcers;
         TVector<TEstimatedFeature> EstimatedFeatures;
-        NPar::TLocalExecutor* LocalExecutor;
+        NPar::ILocalExecutor* LocalExecutor;
     };
 }
 
 namespace NCB {
 
     static void CreateTargetClasses(
-        NPar::TLocalExecutor& localExecutor,
+        NPar::ILocalExecutor& localExecutor,
         TConstArrayRef<TConstArrayRef<float>> targets,
         const TVector<TTargetClassifier>& targetClassifiers,
         TVector<TVector<int>>* learnTargetClasses,
@@ -362,7 +367,7 @@ namespace NCB {
 
     static bool NeedTargetClasses(const TFullModel& coreModel) {
         return AnyOf(
-            coreModel.ModelTrees->GetUsedModelCtrs(),
+            coreModel.ModelTrees->GetApplyData()->UsedModelCtrs,
             [](const TModelCtr& modelCtr) {
                 return NeedTargetClassifier(modelCtr.Base.CtrType);
             }
@@ -522,7 +527,7 @@ namespace NCB {
     void TCoreModelToFullModelConverter::Do(
         bool requiresStaticCtrProvider,
         TFullModel* dstModel,
-        NPar::TLocalExecutor* localExecutor,
+        NPar::ILocalExecutor* localExecutor,
         const TVector<TTargetClassifier>* targetClassifiers) {
 
         DoImpl(requiresStaticCtrProvider, dstModel, localExecutor, targetClassifiers);
@@ -532,7 +537,7 @@ namespace NCB {
         const TString& fullModelPath,
         const TVector<EModelType>& formats,
         bool addFileFormatExtension,
-        NPar::TLocalExecutor* localExecutor,
+        NPar::ILocalExecutor* localExecutor,
         const TVector<TTargetClassifier>* targetClassifiers
     ) {
         TFullModel fullModel;
@@ -557,7 +562,7 @@ namespace NCB {
     void TCoreModelToFullModelConverter::DoImpl(
         bool requiresStaticCtrProvider,
         TFullModel* dstModel,
-        NPar::TLocalExecutor* localExecutor,
+        NPar::ILocalExecutor* localExecutor,
         const TVector<TTargetClassifier>* targetClassifiers
     ) {
         CB_ENSURE_INTERNAL(CoreModel, "CoreModel has not been specified");
@@ -647,16 +652,15 @@ namespace NCB {
             PerfectHashedToHashedCatValuesMap,
             "PerfectHashedToHashedCatValuesMap has not been specified"
         );
-
+        auto applyData = dstModel->ModelTrees->GetApplyData();
         if (requiresStaticCtrProvider) {
             dstModel->CtrProvider = new TStaticCtrProvider;
 
             TMutex lock;
-
             CalcFinalCtrs(
                 datasetDataForFinalCtrs,
                 *featureCombinationToProjectionMap,
-                dstModel->ModelTrees->GetUsedModelCtrBases(),
+                applyData->GetUsedModelCtrBases(),
                 [&dstModel, &lock](TCtrValueTable&& table) {
                     with_lock(lock) {
                         dstModel->CtrProvider->AddCtrCalcerData(std::move(table));
@@ -665,10 +669,9 @@ namespace NCB {
             );
 
             dstModel->UpdateDynamicData();
-            dstModel->ModelTrees->ClearRepackedBins();
         } else {
             dstModel->CtrProvider = new TStaticCtrOnFlightSerializationProvider(
-                dstModel->ModelTrees->GetUsedModelCtrBases(),
+                applyData->GetUsedModelCtrBases(),
                 [this,
                  datasetDataForFinalCtrs = std::move(datasetDataForFinalCtrs),
                  featureCombinationToProjectionMap] (
@@ -719,7 +722,7 @@ namespace NCB {
         TTextProcessingCollection* textProcessingCollection,
         TEmbeddingProcessingCollection* embeddingProcessingCollection,
         TVector<TEstimatedFeature>* reorderedEstimatedFeatures,
-        NPar::TLocalExecutor* localExecutor
+        NPar::ILocalExecutor* localExecutor
     ) {
         CB_ENSURE(
             !estimatedFeatures.empty(),
@@ -738,10 +741,10 @@ namespace NCB {
         );
 
         TVector<TEstimatedFeature> usedEstimatedFeatures;
-        TGuid lastCalcerId = estimatedFeatures[0].CalcerId;
+        TGuid lastCalcerId = estimatedFeatures[0].ModelEstimatedFeature.CalcerId;
 
         for (const auto& estimatedFeature: estimatedFeatures) {
-            const TGuid currentCalcerIndex = estimatedFeature.CalcerId;
+            const TGuid currentCalcerIndex = estimatedFeature.ModelEstimatedFeature.CalcerId;
             if (lastCalcerId != currentCalcerIndex) {
                 if (featureEstimators.GetEstimatorSourceType(lastCalcerId) == EFeatureType::Text) {
                     textCollectionBuilder.AddFeatureEstimator(lastCalcerId, usedEstimatedFeatures);
@@ -773,12 +776,7 @@ namespace NCB {
         TConstArrayRef<EModelType> formats,
         bool addFileFormatExtension
     ) {
-        const TConstArrayRef<TFloatFeature> floatFeatures = fullModel.ModelTrees->GetFloatFeatures();
-        const TConstArrayRef<TCatFeature> catFeatures = fullModel.ModelTrees->GetCatFeatures();
-        TFeaturesLayout featuresLayout(
-            TVector<TFloatFeature>(floatFeatures.begin(), floatFeatures.end()),
-            TVector<TCatFeature>(catFeatures.begin(), catFeatures.end())
-        );
+        TFeaturesLayout featuresLayout = MakeFeaturesLayout(fullModel);
         TVector<TString> featureIds = featuresLayout.GetExternalFeatureIds();
 
         THashMap<ui32, TString> catFeaturesHashToString;

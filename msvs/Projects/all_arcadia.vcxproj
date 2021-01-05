@@ -165,6 +165,9 @@
     <ProjectReference Include="$(SolutionDir)Projects\catboost\libs\eval_result\catboost-libs-eval_result.vcxproj">
       <Project>4721D1FD-2700-CA2E-7C39-1340CCD203BE</Project>
     </ProjectReference>
+    <ProjectReference Include="$(SolutionDir)Projects\catboost\libs\features_selection\catboost-libs-features_selection.vcxproj">
+      <Project>45FEA6AA-0FB4-5E64-F5AB-EA7D45438072</Project>
+    </ProjectReference>
     <ProjectReference Include="$(SolutionDir)Projects\catboost\libs\fstr\catboost-libs-fstr.vcxproj">
       <Project>E83B3FB9-9F00-AC47-8D5D-2028D57A073D</Project>
     </ProjectReference>
@@ -570,6 +573,9 @@
     <ProjectReference Include="$(SolutionDir)Projects\contrib\libs\sqlite3\contrib-libs-sqlite3.vcxproj">
       <Project>95B1672E-65CB-6C0E-8AEB-4971392AB876</Project>
     </ProjectReference>
+    <ProjectReference Include="$(SolutionDir)Projects\contrib\libs\tbb\contrib-libs-tbb.vcxproj">
+      <Project>41EBD2AA-3257-780F-5463-5A2401A4CE00</Project>
+    </ProjectReference>
     <ProjectReference Include="$(SolutionDir)Projects\contrib\libs\tensorboard\contrib-libs-tensorboard.vcxproj">
       <Project>85643E70-B3E5-4747-7C6D-59B9CF26EE48</Project>
     </ProjectReference>
@@ -603,6 +609,12 @@
     <ProjectReference Include="$(SolutionDir)Projects\contrib\python\attrs\pycontrib-python-attrs.vcxproj">
       <Project>B19D597D-A363-F744-6165-C68C1835DD61</Project>
     </ProjectReference>
+    <ProjectReference Include="$(SolutionDir)Projects\contrib\python\configparser\pycontrib-python-configparser.vcxproj">
+      <Project>6DF26701-68E9-E05A-808F-1840FF373955</Project>
+    </ProjectReference>
+    <ProjectReference Include="$(SolutionDir)Projects\contrib\python\contextlib2\pycontrib-python-contextlib2.vcxproj">
+      <Project>76AD5AB3-EDE1-7BAC-90B7-9BA08DC851AD</Project>
+    </ProjectReference>
     <ProjectReference Include="$(SolutionDir)Projects\contrib\python\dateutil\py3dateutil.vcxproj">
       <Project>4F62D972-C51F-BBC3-4B6A-266C6674E907</Project>
     </ProjectReference>
@@ -623,6 +635,9 @@
     </ProjectReference>
     <ProjectReference Include="$(SolutionDir)Projects\contrib\python\graphviz\pycontrib-python-graphviz.vcxproj">
       <Project>F7A1107D-8D70-ACE8-DC3B-C262EC7A87FA</Project>
+    </ProjectReference>
+    <ProjectReference Include="$(SolutionDir)Projects\contrib\python\importlib-metadata\pycontrib-python-importlib-metadata.vcxproj">
+      <Project>7F463C70-BAD7-7EF0-2E4C-848242C99C7E</Project>
     </ProjectReference>
     <ProjectReference Include="$(SolutionDir)Projects\contrib\python\more-itertools\pycontrib-python-more-itertools.vcxproj">
       <Project>BC62290A-1F8B-7962-8C00-63BFE8DAE2A0</Project>
@@ -1029,6 +1044,9 @@
     <ProjectReference Include="$(SolutionDir)Projects\library\cpp\build_info\library-cpp-build_info.vcxproj">
       <Project>75AA4D86-C2AE-6E67-9434-636BC64B3E6A</Project>
     </ProjectReference>
+    <ProjectReference Include="$(SolutionDir)Projects\library\cpp\cache\library-cpp-cache.vcxproj">
+      <Project>81F27AB8-35D2-C0A0-9D64-6D234C1AB239</Project>
+    </ProjectReference>
     <ProjectReference Include="$(SolutionDir)Projects\library\cpp\cgiparam\library-cpp-cgiparam.vcxproj">
       <Project>7D7BC687-C41D-BE31-16E6-D1EFDED414F9</Project>
     </ProjectReference>
@@ -1301,6 +1319,9 @@
     </ProjectReference>
     <ProjectReference Include="$(SolutionDir)Projects\library\cpp\testing\common\cpp-testing-common.vcxproj">
       <Project>68BC6E30-C1B2-55F8-2F66-99AE7F9777EC</Project>
+    </ProjectReference>
+    <ProjectReference Include="$(SolutionDir)Projects\library\cpp\testing\hook\cpp-testing-hook.vcxproj">
+      <Project>C0884422-4F82-5904-C966-570C6AE9F7F7</Project>
     </ProjectReference>
     <ProjectReference Include="$(SolutionDir)Projects\library\cpp\testing\unittest\cpp-testing-unittest.vcxproj">
       <Project>A4CAA34B-E96C-B010-71AC-2425B5C8B123</Project>

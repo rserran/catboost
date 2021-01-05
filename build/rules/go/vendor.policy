@@ -10,6 +10,12 @@ ALLOW .* -> vendor/github.com/go-stomp/stomp
 # CONTRIB-1946 htmp tag selecting / parsing
 ALLOW .* -> vendor/github.com/andybalholm/cascadia
 
+# CONTRIB-2082 prometheus-libvirt-exporter
+ALLOW .* -> vendor/github.com/zhangjianweibj/prometheus-libvirt-exporter
+
+# CONTRIB-2086 go-libvirt
+ALLOW .* -> vendor/github.com/digitalocean/go-libvirt
+
 # CONTRIB-1872 pure ipp proto implementation
 ALLOW .* -> vendor/github.com/phin1x/go-ipp
 
@@ -36,28 +42,40 @@ ALLOW .* -> vendor/github.com/BurntSushi/toml
 # helpers for data sizes (kilobytes, petabytes), human readable sizes, parsing
 ALLOW .* -> vendor/github.com/c2h5oh/datasize
 
+# Disable tests because testdata won't fit into arcadia commit.
+DENY .* -> vendor/github.com/go-git/go-git/v5/storage/test
+DENY .* -> vendor/github.com/go-git/go-git/v5/plumbing/transport/test
+DENY .* -> vendor/github.com/go-git/go-git/v5;test
+ALLOW .* -> vendor/github.com/go-git/go-git/v5
+
 # etcd client
-DENY .* -> vendor/github.com/coreos/etcd/clientv3/naming
-ALLOW .* -> vendor/github.com/coreos/etcd/mvcc
-ALLOW .* -> vendor/github.com/coreos/etcd/etcdserver/stats
-ALLOW .* -> vendor/github.com/coreos/etcd/etcdserver/api
-ALLOW .* -> vendor/github.com/coreos/etcd/wal
-ALLOW .* -> vendor/github.com/coreos/etcd/raft
-ALLOW .* -> vendor/github.com/coreos/etcd/rafthttp
-ALLOW .* -> vendor/github.com/coreos/etcd/snap
-ALLOW .* -> vendor/github.com/coreos/etcd/clientv3
-ALLOW .* -> vendor/github.com/coreos/etcd/pkg/fileutil
-ALLOW .* -> vendor/github.com/coreos/etcd/pkg/stringutil
-ALLOW .* -> vendor/github.com/coreos/etcd/pkg/transport
-ALLOW .* -> vendor/github.com/coreos/etcd/pkg/types
+DENY .* -> vendor/go.etcd.io/etcd/clientv3/naming
+ALLOW .* -> vendor/go.etcd.io/etcd/mvcc
+ALLOW .* -> vendor/go.etcd.io/etcd/etcdserver/stats
+ALLOW .* -> vendor/go.etcd.io/etcd/etcdserver/api
+ALLOW .* -> vendor/go.etcd.io/etcd/wal
+ALLOW .* -> vendor/go.etcd.io/etcd/raft
+ALLOW .* -> vendor/go.etcd.io/etcd/rafthttp
+ALLOW .* -> vendor/go.etcd.io/etcd/snap
+ALLOW .* -> vendor/go.etcd.io/etcd/clientv3
+ALLOW .* -> vendor/go.etcd.io/etcd/pkg/fileutil
+ALLOW .* -> vendor/go.etcd.io/etcd/pkg/stringutil
+ALLOW .* -> vendor/go.etcd.io/etcd/pkg/transport
+ALLOW .* -> vendor/go.etcd.io/etcd/pkg/types
 
 # logging to systemd
 ALLOW .* -> vendor/github.com/coreos/go-systemd/journal
+
+# systemd dbus
+ALLOW .* -> vendor/github.com/coreos/go-systemd/v22/dbus
 
 # mocking for database/sql
 ALLOW .* -> vendor/github.com/DATA-DOG/go-sqlmock
 
 # Cucumber-like BDD for Go
+## New location
+ALLOW .* -> vendor/github.com/cucumber/godog
+## Old location (deprecated)
 ALLOW .* -> vendor/github.com/DATA-DOG/godog
 
 # pretty printer for GO
@@ -104,7 +122,20 @@ ALLOW .* -> vendor/github.com/golang/geo
 # snappy compression
 ALLOW .* -> vendor/github.com/golang/snappy
 
-# API for sentry
+# CONTRIB-632, CONTRIB-1992 API for sentry
+DENY .* -> vendor/github.com/AndreasBriese/bbloom;test
+DENY .* -> vendor/github.com/getsentry/sentry-go;test
+DENY .* -> vendor/github.com/gavv/httpexpect/_examples
+DENY .* -> vendor/github.com/getsentry/sentry-go/example
+DENY .* -> vendor/github.com/getsentry/sentry-go/fasthttp
+DENY .* -> vendor/github.com/getsentry/sentry-go/gin
+DENY .* -> vendor/github.com/getsentry/sentry-go/iris
+DENY .* -> vendor/github.com/getsentry/sentry-go/martini
+DENY .* -> vendor/github.com/getsentry/sentry-go/negroni
+DENY .* -> vendor/github.com/rs/cors/examples
+DENY .* -> vendor/github.com/rs/cors/wrapper/gin
+
+ALLOW .* -> vendor/github.com/getsentry/sentry-go
 ALLOW .* -> vendor/github.com/getsentry/raven-go
 
 # configuration library
@@ -122,6 +153,10 @@ ALLOW .* -> vendor/github.com/jackc/pgproto3/v2
 
 # database/sql wrapper with a lot of helper functions
 ALLOW .* -> vendor/github.com/jmoiron/sqlx
+
+# gorm and PostgreSQL driver
+ALLOW .* -> vendor/gorm.io/gorm
+ALLOW .* -> vendor/gorm.io/driver/postgres
 
 # clock mock for tests
 ALLOW .* -> vendor/github.com/jonboulle/clockwork
@@ -190,10 +225,13 @@ ALLOW .* -> vendor/github.com/prometheus/client_model
 ALLOW .* -> vendor/github.com/prometheus/common
 
 # ZooKeeper client
-ALLOW .* -> vendor/github.com/samuel/go-zookeeper
+ALLOW .* -> vendor/github.com/go-zookeeper/zk
 
 # Consistent hashring implementation (using the same algorithm as libketama)
 ALLOW .* -> vendor/github.com/serialx/hashring
+
+# Slack API in Go
+ALLOW .* -> vendor/github.com/slack-go/slack
 
 # Text diffing.
 ALLOW .* -> vendor/github.com/pmezard/go-difflib
@@ -339,7 +377,7 @@ ALLOW .* -> vendor/github.com/tus/tusd
 ALLOW .* -> vendor/github.com/twmb/murmur3
 
 # gopsutil: psutil for golang
-ALLOW .* -> vendor/github.com/shirou/gopsutil
+ALLOW .* -> vendor/github.com/shirou/gopsutil/v3
 
 # Go Imagick is a Go bind to ImageMagick's MagickWand C API
 ALLOW .* -> vendor/gopkg.in/gographics/imagick.v2
@@ -411,7 +449,7 @@ ALLOW .* -> vendor/google.golang.org/api/firebaseremoteconfig/v1
 ALLOW .* -> vendor/github.com/zaf/g711
 
 # CONTRIB-1505 The exponential backoff algorithm & retry library
-ALLOW .* -> vendor/github.com/cenkalti/backoff
+ALLOW .* -> vendor/github.com/cenkalti/backoff/v4
 
 # CONTRIB-1491 A parser library for Go
 ALLOW .* -> vendor/github.com/alecthomas/participle
@@ -511,6 +549,59 @@ ALLOW .* -> vendor/github.com/minio/sha256-simd
 # CONTRIB-1979 command line editor with history
 ALLOW .* -> vendor/github.com/peterh/liner
 
+# CONTRIB-2002 A Go implementation of RTP
+ALLOW .* -> vendor/github.com/pion/rtp
+
+# CONTRIB-1959 Добавить casbin
+ALLOW .* -> vendor/github.com/casbin/casbin/v2
+
+# CONTRIB-1931 coredns
+ALLOW .* -> vendor/github.com/coredns/coredns/request
+ALLOW .* -> vendor/github.com/coredns/coredns/core/dnsserver
+ALLOW .* -> vendor/github.com/coredns/coredns/coremain
+ALLOW .* -> vendor/github.com/coredns/coredns/plugin/bind
+ALLOW .* -> vendor/github.com/coredns/coredns/plugin/cache
+ALLOW .* -> vendor/github.com/coredns/coredns/plugin/chaos
+ALLOW .* -> vendor/github.com/coredns/coredns/plugin/forward
+ALLOW .* -> vendor/github.com/coredns/coredns/plugin/file
+ALLOW .* -> vendor/github.com/coredns/coredns/plugin/health
+ALLOW .* -> vendor/github.com/coredns/coredns/plugin/log
+ALLOW .* -> vendor/github.com/coredns/coredns/plugin/metrics
+ALLOW .* -> vendor/github.com/coredns/coredns/plugin/pkg
+ALLOW .* -> vendor/github.com/coredns/coredns/plugin/reload
+ALLOW .* -> vendor/github.com/coredns/coredns/plugin/rewrite
+ALLOW .* -> vendor/github.com/coredns/coredns/plugin/ready
+ALLOW .* -> vendor/github.com/coredns/coredns/plugin/rewrite
+ALLOW .* -> vendor/github.com/coredns/coredns/plugin/root
+
+# CONTRIB-2021
+ALLOW .* -> vendor/github.com/shopspring/decimal
+
+# CONTRIB-2050
+ALLOW .* -> vendor/github.com/brianvoe/gofakeit
+
+# CONTRIB-2051
+ALLOW .* -> vendor/github.com/envoyproxy/go-control-plane
+
+# CONTRIB-2043
+ALLOW .* -> vendor/github.com/xitongsys/parquet-go
+ALLOW vendor -> vendor/github.com/slon/thrift
+
+# CONTRIB-2063 flatbuffers support
+ALLOW .* -> vendor/github.com/google/flatbuffers/go
+
+# CONTRIB-2073
+ALLOW .* -> vendor/github.com/andybalholm/brotli
+
+# CONTRIB-2081 BTree implementation for Go
+ALLOW .* -> vendor/github.com/google/btree
+
+# CONTRIB-2084 Word transformation
+ALLOW .* -> vendor/github.com/jinzhu/inflection
+#
+# CONTRIB-2069
+ALLOW .* -> vendor/github.com/coredhcp/coredhcp
+
 #
 # Tools
 #
@@ -537,8 +628,9 @@ ALLOW transfer_manager/go/pkg/source/mysql/canal -> vendor/github.com/siddontang
 ALLOW transfer_manager/go/pkg/source/mysql/canal -> vendor/github.com/siddontang/go-mysql/client
 ALLOW transfer_manager/go/pkg/source/mysql/canal -> vendor/github.com/siddontang/go-mysql/schema
 
-# CONTRIB-1244. resposible: gzuykov@
-ALLOW cloud -> vendor/github.com/rcrowley/go-metrics
+# CONTRIB-1244. resposible: frystile@
+ALLOW cloud/compute/gokikimr/client -> vendor/github.com/rcrowley/go-metrics
+ALLOW cloud/compute/snapshot/snapshot/lib/misc -> vendor/github.com/rcrowley/go-metrics
 
 # IGNIETFERRO-1287
 ALLOW cloud/compute/snapshot/snapshot/config -> vendor/github.com/pkg/errors
@@ -570,23 +662,19 @@ ALLOW yt/jaeger/plugin/cmd/collector -> vendor/github.com/pkg/errors
 
 # IGNIETFERRO-1396
 
-ALLOW cloud/blockstore/tests/hwlab/pg_test/pgshooter -> vendor/github.com/jackc/pgx
 ALLOW district/feed_reader/app/lib -> vendor/github.com/jackc/pgx
 ALLOW edadeal/backend/go/charm/cmd/charm -> vendor/github.com/jackc/pgx
 ALLOW edadeal/backend/go/gluon/internal/app/bootstrap -> vendor/github.com/jackc/pgx
 ALLOW edadeal/backend/go/nachalnik/internal/app/bootstrap -> vendor/github.com/jackc/pgx
 ALLOW edadeal/backend/go/nachalnik/internal/pkg/store -> vendor/github.com/jackc/pgx
 ALLOW extsearch/video/robot/rt_transcoder/video-manager/db -> vendor/github.com/jackc/pgx
-ALLOW games/backend/internal/db_utils -> vendor/github.com/jackc/pgx
-ALLOW games/backend/internal -> vendor/github.com/jackc/pgx
+ALLOW games/backend/internal/dbutils -> vendor/github.com/jackc/pgx
 ALLOW games/backend/pkg/database -> vendor/github.com/jackc/pgx
-ALLOW games/backend -> vendor/github.com/jackc/pgx
 ALLOW mail/calendar/load/bbmock -> vendor/github.com/jackc/pgx
 ALLOW mail/collectors/tests-load/pandora -> vendor/github.com/jackc/pgx
 ALLOW market/sre/services/dist_meta_store/app -> vendor/github.com/jackc/pgx
 ALLOW market/sre/services/dist_meta_store/database -> vendor/github.com/jackc/pgx
 ALLOW quasar/gackend/db -> vendor/github.com/jackc/pgx
-ALLOW quasar/tsup/db -> vendor/github.com/jackc/pgx
 ALLOW transfer_manager/go/cmd/load_generator -> vendor/github.com/jackc/pgx
 ALLOW transfer_manager/go/pkg/mapreduce/pg_to_yt -> vendor/github.com/jackc/pgx
 ALLOW transfer_manager/go/pkg/sink/pg -> vendor/github.com/jackc/pgx
@@ -594,20 +682,12 @@ ALLOW transfer_manager/go/pkg/source/pg -> vendor/github.com/jackc/pgx
 ALLOW transfer_manager/go/pkg/storage/pg -> vendor/github.com/jackc/pgx
 ALLOW transfer_manager/go/pkg/worker/tasks -> vendor/github.com/jackc/pgx
 ALLOW transfer_manager/go/pkg/pg -> vendor/github.com/jackc/pgx
-ALLOW travel/avia/shared_flights/status_importer/internal/db -> vendor/github.com/jackc/pgx
-ALLOW travel/avia/shared_flights/status_importer/internal/objects/db/carrier -> vendor/github.com/jackc/pgx
-ALLOW travel/avia/shared_flights/status_importer/internal/objects/db/flight-leg -> vendor/github.com/jackc/pgx
-ALLOW travel/avia/shared_flights/status_importer/internal/objects/db/station -> vendor/github.com/jackc/pgx
-ALLOW travel/avia/shared_flights/status_importer/internal/objects/db/status-source -> vendor/github.com/jackc/pgx
-ALLOW travel/avia/shared_flights/status_importer/internal/status -> vendor/github.com/jackc/pgx
-ALLOW travel/avia/shared_flights/status_importer/internal/storage -> vendor/github.com/jackc/pgx
+ALLOW transfer_manager/go/tests/e2e/pg2pg/replication -> vendor/github.com/jackc/pgx
 ALLOW yabs/telephony/platform/common/db -> vendor/github.com/jackc/pgx
 ALLOW yabs/telephony/platform/common/lifecycle -> vendor/github.com/jackc/pgx
 ALLOW yabs/telephony/platform/registrar-agent -> vendor/github.com/jackc/pgx
 ALLOW yabs/vh/cms-pgaas/dhdd/db -> vendor/github.com/jackc/pgx
 ALLOW yabs/vh/cms-pgaas/transcoded -> vendor/github.com/jackc/pgx
-ALLOW zootopia/analytics/dajr/models -> vendor/github.com/jackc/pgx
-ALLOW zootopia/analytics/drive/models -> vendor/github.com/jackc/pgx
 
 #
 # Permanent exceptions.
@@ -626,7 +706,23 @@ ALLOW alice/iot/adapters/tuya_adapter/server -> vendor/github.com/sirupsen/logru
 # SUBBOTNIK-90
 ALLOW infra/rtc/instance_resolver/pkg/clients/iss3 -> vendor/git.apache.org/thrift.git/lib/go
 
-# CONTRIB-1959 Добавить casbin
-ALLOW .* -> vendor/github.com/casbin/casbin/v2
+# Benchmarks using github.com/pkg/errors
+ALLOW library/go/core/xerrors -> vendor/github.com/pkg/errors
+
+# CONTRIB-2040
+ALLOW load/projects/pandora -> vendor/github.com/pkg/errors
+
+# CONTRIB-2032
+ALLOW load/projects/pandora -> vendor/github.com/onsi/gomega
+
+# CONTRIB-2009
+ALLOW load/projects/pandora -> vendor/github.com/hashicorp/go-multierror
+
+# CONTRIB-2006
+ALLOW load/projects/pandora -> vendor/github.com/asaskevich/govalidator
+
+#
+# This section is for EXCEPTIONS. Add new rule above, not here.
+#
 
 DENY .* -> vendor/

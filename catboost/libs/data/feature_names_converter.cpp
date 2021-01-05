@@ -214,6 +214,27 @@ void ConvertFeaturesToEvaluateFromStringToIndices(const NCatboostOptions::TPoolL
     }
 }
 
+
+void ConvertFeaturesForSelectFromStringToIndices(const NCatboostOptions::TPoolLoadParams& poolLoadParams, NJson::TJsonValue* featuresSelectJsonOptions) {
+    const auto& indicesFromNames = MakeIndicesFromNames(poolLoadParams);
+    const auto& featureNamesForSelect = (*featuresSelectJsonOptions)["features_for_select"].GetString();
+    TVector<int> featuresForSelect;
+    for (const auto& nameOrRange : StringSplitter(featureNamesForSelect).Split(',').SkipEmpty()) {
+        const TString nameOrRangeAsString(nameOrRange);
+        auto left = nameOrRangeAsString;
+        auto right = nameOrRangeAsString;
+        StringSplitter(nameOrRangeAsString).Split('-').TryCollectInto(&left, &right);
+        for (ui32 idx : xrange(ConvertToIndex(left, indicesFromNames), ConvertToIndex(right, indicesFromNames) + 1)) {
+            featuresForSelect.push_back(idx);
+        }
+    }
+    Sort(featuresForSelect);
+    NCatboostOptions::TJsonFieldHelper<TVector<int>>::Write(
+        TVector<int>(featuresForSelect.begin(), Unique(featuresForSelect.begin(), featuresForSelect.end())),
+        &(*featuresSelectJsonOptions)["features_for_select"]);
+}
+
+
 static const TStringBuf FEATURE_NAMES_DEPENDENT_KEYS[] = {
     AsStringBuf("features_to_evaluate"),
     AsStringBuf("ignored_features"),

@@ -3,6 +3,8 @@
 
 #include <library/cpp/testing/unittest/registar.h>
 
+#include <util/string/reverse.h>
+
 #include <algorithm>
 
 namespace {
@@ -862,7 +864,7 @@ public:
         wchar16 upperCase[n];
         std::copy(wideCyrillicAlphabet, wideCyrillicAlphabet + n, upperCase);
         ToLower(upperCase, n);
-        UNIT_ASSERT(TCharTraits<wchar16>::Compare(upperCase, wideCyrillicAlphabet + n, n) == 0);
+        UNIT_ASSERT(TWtringBuf(upperCase, n) == TWtringBuf(wideCyrillicAlphabet + n, n));
     }
 
     void TestToUpper() {
@@ -870,7 +872,7 @@ public:
         wchar16 lowerCase[n];
         std::copy(wideCyrillicAlphabet + n, wideCyrillicAlphabet + n * 2, lowerCase);
         ToUpper(lowerCase, n);
-        UNIT_ASSERT(TCharTraits<wchar16>::Compare(lowerCase, wideCyrillicAlphabet, n) == 0);
+        UNIT_ASSERT(TWtringBuf(lowerCase, n) == TWtringBuf(wideCyrillicAlphabet, n));
     }
 
     void TestWideString() {
@@ -909,7 +911,7 @@ public:
         const TUtf16String reversed = UTF32ToWide(buffer.begin(), buffer.size());
 
         temp = original;
-        temp.reverse();
+        ReverseInPlace(temp);
         UNIT_ASSERT(temp == reversed);
     }
 

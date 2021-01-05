@@ -27,7 +27,7 @@
 
 
 namespace NPar {
-    class TLocalExecutor;
+    class ILocalExecutor;
 }
 
 namespace NCatboostOptions {
@@ -53,7 +53,7 @@ public:
         const TMaybe<TVector<double>>& startingApprox,
         bool isForWorkerLocalData);
 
-    ui32 CalcCheckSum(const NCB::TObjectsGrouping& objectsGrouping, NPar::TLocalExecutor* localExecutor) const;
+    ui32 CalcCheckSum(const NCB::TObjectsGrouping& objectsGrouping, NPar::ILocalExecutor* localExecutor) const;
 };
 
 
@@ -130,10 +130,13 @@ public:
         ui32 featuresCheckSum,
         ui32 foldCreationParamsCheckSum,
         const NCatboostOptions::TBinarizationOptions& estimatedFeaturesQuantizationOptions,
+
+        // can be non-empty only if there is single fold
+        TMaybe<NCB::TPrecomputedOnlineCtrData> precomputedSingleOnlineCtrDataForSingleFold,
         const NCatboostOptions::TObliviousTreeLearnerOptions& trainOptions,
         TMaybe<TFullModel*> initModel,
         NCB::TDataProviders initModelApplyCompatiblePools,
-        NPar::TLocalExecutor* localExecutor);
+        NPar::ILocalExecutor* localExecutor);
 
     // call after fold initizalization
     void SetSeparateInitModel(
@@ -141,7 +144,7 @@ public:
         const NCB::TDataProviders& initModelApplyCompatiblePools,
         bool isOrderedBoosting,
         bool storeExpApproxes,
-        NPar::TLocalExecutor* localExecutor);
+        NPar::ILocalExecutor* localExecutor);
 
     void PrepareForContinuation();
 
@@ -162,7 +165,7 @@ public:
         const TMaybe<TCustomObjectiveDescriptor>& objectiveDescriptor,
         const TMaybe<TCustomMetricDescriptor>& evalMetricDescriptor,
         NCB::TFeaturesLayoutPtr layout,
-        NPar::TLocalExecutor* localExecutor
+        NPar::ILocalExecutor* localExecutor
     )
         : Params(params)
         , ObjectiveDescriptor(objectiveDescriptor)
@@ -178,7 +181,7 @@ public:
     NCB::TFeaturesLayoutPtr Layout;
     TCtrHelper CtrsHelper;
     // TODO(asaitgalin): local executor should be shared by all contexts. MLTOOLS-2451.
-    NPar::TLocalExecutor* LocalExecutor;
+    NPar::ILocalExecutor* LocalExecutor;
 };
 
 
@@ -195,16 +198,17 @@ public:
         const TMaybe<TCustomMetricDescriptor>& evalMetricDescriptor,
         const NCatboostOptions::TOutputFilesOptions& outputOptions,
         const NCB::TTrainingDataProviders& data,
+
+        // can be non-empty only if there is single fold
+        TMaybe<NCB::TPrecomputedOnlineCtrData> precomputedSingleOnlineCtrDataForSingleFold,
         const TLabelConverter& labelConverter,
         const TMaybe<TVector<double>>& startingApprox,
         TMaybe<const TRestorableFastRng64*> initRand,
         TMaybe<TFullModel*> initModel,
         THolder<TLearnProgress> initLearnProgress, // will be modified if not non-nullptr
         NCB::TDataProviders initModelApplyCompatiblePools,
-        NPar::TLocalExecutor* localExecutor,
+        NPar::ILocalExecutor* localExecutor,
         const TString& fileNamesPrefix = "");
-
-    ~TLearnContext();
 
     void SaveProgress(std::function<void(IOutputStream*)> onSaveSnapshot = [] (IOutputStream* /*snapshot*/) {});
     bool TryLoadProgress(std::function<bool(IInputStream*)> onLoadSnapshot = [] (IInputStream* /*snapshot*/) { return true; });

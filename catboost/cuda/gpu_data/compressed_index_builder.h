@@ -42,7 +42,7 @@ namespace NCatboostCuda {
         using TIndex = TSharedCompressedIndex<TLayoutPolicy>;
 
         TSharedCompressedIndexBuilder(TIndex& compressedIndex,
-                                      NPar::TLocalExecutor* localExecutor)
+                                      NPar::ILocalExecutor* localExecutor)
             : CompressedIndex(compressedIndex)
             , LocalExecutor(localExecutor)
         {
@@ -229,14 +229,12 @@ namespace NCatboostCuda {
             return *this;
         }
 
-        // TODO(kirillovs): figure out, why compilation without template fails here
-        template<typename TBinsVector>
         void WriteBinsVector(
             const ui32 dataSetId,
             const ui32 featureId,
             const ui32 binCount,
             bool permute,
-            const TBinsVector& binsVector
+            TConstArrayRef<ui8> binsVector
         ) {
             auto& dataSet = *CompressedIndex.DataSets[dataSetId];
             const NCudaLib::TDistributedObject<TCFeature>& feature = dataSet.GetTCFeature(featureId);
@@ -299,13 +297,11 @@ namespace NCatboostCuda {
         TIndex& CompressedIndex;
         TVector<TSet<ui32>> SeenFeatures;
         TVector<TAtomicSharedPtr<TDatasetPermutationOrderAndSubsetIndexing>> GatherIndex;
-        NPar::TLocalExecutor* LocalExecutor;
+        NPar::ILocalExecutor* LocalExecutor;
     };
 
     extern template class TSharedCompressedIndexBuilder<TFeatureParallelLayout>;
 
     extern template class TSharedCompressedIndexBuilder<TDocParallelLayout>;
-
-    extern template class TSharedCompressedIndexBuilder<TSingleDevLayout>;
 
 }

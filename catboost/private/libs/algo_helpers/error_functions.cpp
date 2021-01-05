@@ -169,7 +169,9 @@ static void CalcCrossEntropyDerRangeImpl(
     TExpForwardView</*Capacity*/16> expApproxes(MakeArrayRef(approxes + start, count));
     TExpForwardView</*Capacity*/16> expApproxDeltas(MakeArrayRef(approxDeltas + start, count));
     Y_ASSERT(HasDelta == (approxDeltas != nullptr));
+#if defined(NDEBUG) && !defined(address_sanitizer_enabled)
 #pragma clang loop vectorize_width(4) interleave_count(2)
+#endif
     for (int i = start; i < start + count; ++i) {
         double e;
         if (UseExpApprox) {
@@ -358,7 +360,7 @@ void TStochasticRankError::CalcDersForQueries(
     const TVector<TQueryInfo>& queriesInfo,
     TArrayRef<TDers> ders,
     ui64 randomSeed,
-    NPar::TLocalExecutor* localExecutor
+    NPar::ILocalExecutor* localExecutor
 ) const {
     auto start = queriesInfo[queryStartIndex].Begin;
     NPar::ParallelFor(*localExecutor, queryStartIndex, queryEndIndex, [&](int queryIndex) {

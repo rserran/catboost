@@ -29,6 +29,11 @@ enum class EFeatureType {
     Embedding
 };
 
+enum class EEstimatedSourceFeatureType {
+    Text,
+    Embedding
+};
+
 enum EErrorType {
     PerObjectError,
     PairwiseError,
@@ -384,5 +389,11 @@ namespace NCB {
         Float,
         String,
         None
+    };
+
+    enum class EFeaturesSelectionAlgorithm {
+        RecursiveByPredictionValuesChange,
+        RecursiveByLossFunctionChange,
+        RecursiveByShapValues
     };
 }

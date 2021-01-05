@@ -1,3 +1,33 @@
+# Release 0.24.4
+
+## Speedup
+* Major speedup asymmetric trees training time on CPU (2x speedup on Epsilon with 16 threads). We would like to recognize Intel software engineering team’s contributions to Catboost project.
+
+## New features
+* Now we publish Python 3.9 wheels. Related issues: #1491, #1509, #1510
+* Allow `boost_from_average` for `MultiRMSE` loss.
+* Add tag pairwise=False for sklearn compatibility. Fixes issue #1518
+
+## Bugfixes:
+* Allow fstr calculation for datasets with embeddings
+* Fix `feature_importances_` for fstr with texts
+* Virtual ensebles fix: use proper unshrinkage coefficients
+* Fixed constants in RMSEWithUnceratainty loss function calculation to correspond values from original paper
+* Allow shap values calculation for model with zero-weights and non-zero leaf values. Now we use sum of leaf weights on train and current dataset to guarantee non-zero weights for leafs, reachable on current dataset. Fixes issues #1512, #1284
+
+# Release 0.24.3
+
+
+## New functionality
+* Support fstr text features and embeddings. Issue #1293
+   
+## Bugfixes:
+* Fix model apply speed regression from 0.24.1 & 0.24.2
+* Different fixes in embeddings support: fixed apply and model serialization, fixed apply on texts and embeddings
+* Fixed virtual ensembles prediction - use proper scaling, fix apply (issue #1462)
+* Fix `score()` method for `RMSEWithUncertainty` issue #1482
+* Automatically use correct `prediction_type` in `score()`
+
 # Release 0.24.2
 
 ## Uncertainty prediction

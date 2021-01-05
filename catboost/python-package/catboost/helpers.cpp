@@ -139,7 +139,7 @@ TVector<double> EvalMetricsForUtils(
             objectGrouping,
             subgroupId.empty() ? Nothing() : NCB::TMaybeData<TConstArrayRef<TSubgroupId>>(subgroupId),
             groupWeight.empty() ? NCB::TWeights(groupId.size()) : NCB::TWeights(TVector<float>(groupWeight)),
-            pairs
+            TConstArrayRef<TPair>(pairs)
         ).Get();
     }
     TVector<double> metricResults;
@@ -178,13 +178,14 @@ NJson::TJsonValue GetTrainingOptions(
     NCatboostOptions::PlainJsonToOptions(plainJsonParams, &trainOptionsJson, &outputFilesOptionsJson);
     ConvertParamsToCanonicalFormat(trainDataMetaInfo, &trainOptionsJson);
     NCatboostOptions::TCatBoostOptions catboostOptions(NCatboostOptions::LoadOptions(trainOptionsJson));
-    NCatboostOptions::TOption<bool> useBestModelOption("use_best_model", false);
+    NCatboostOptions::TOutputFilesOptions outputOptions;
+    outputOptions.UseBestModel.SetDefault(false);
     SetDataDependentDefaults(
         trainDataMetaInfo,
         testDataMetaInfo,
         /*continueFromModel*/ false,
         /*learningContinuation*/ false,
-        &useBestModelOption,
+        &outputOptions,
         &catboostOptions
     );
     NJson::TJsonValue catboostOptionsJson;
@@ -192,20 +193,24 @@ NJson::TJsonValue GetTrainingOptions(
     return catboostOptionsJson;
 }
 
-NJson::TJsonValue GetPlainJsonWithAllOptions(
-    const TFullModel& model,
-    bool hasCatFeatures,
-    bool hasTextFeatures
-) {
-    NJson::TJsonValue trainOptions = ReadTJsonValue(model.ModelInfo.at("params"));
-    NJson::TJsonValue outputOptions = ReadTJsonValue(model.ModelInfo.at("output_options"));
-    NJson::TJsonValue plainOptions;
-    NCatboostOptions::ConvertOptionsToPlainJson(trainOptions, outputOptions, &plainOptions);
-    CB_ENSURE(!plainOptions.GetMapSafe().empty(), "plainOptions should not be empty.");
-    NJson::TJsonValue cleanedOptions(plainOptions);
-    CB_ENSURE(!cleanedOptions.GetMapSafe().empty(), "problems with copy constructor.");
-    NCatboostOptions::CleanPlainJson(hasCatFeatures, &cleanedOptions, hasTextFeatures);
-    CB_ENSURE(!cleanedOptions.GetMapSafe().empty(), "cleanedOptions should not be empty.");
-    return cleanedOptions;
+size_t GetNumPairs(const NCB::TDataProvider& dataProvider) {
+    size_t result = 0;
+    const NCB::TMaybeData<NCB::TRawPairsData>& maybePairsData = dataProvider.RawTargetData.GetPairs();
+    if (maybePairsData) {
+        Visit([&](const auto& pairs) { result = pairs.size(); }, *maybePairsData);
+    }
+    return result;
 }
 
+TConstArrayRef<TPair> GetUngroupedPairs(const NCB::TDataProvider& dataProvider) {
+    TConstArrayRef<TPair> result;
+    const NCB::TMaybeData<NCB::TRawPairsData>& maybePairsData = dataProvider.RawTargetData.GetPairs();
+    if (maybePairsData) {
+        CB_ENSURE(
+            HoldsAlternative<TFlatPairsInfo>(*maybePairsData),
+            "Cannot get ungrouped pairs: pairs data is grouped"
+        );
+        result = Get<TFlatPairsInfo>(*maybePairsData);
+    }
+    return result;
+}

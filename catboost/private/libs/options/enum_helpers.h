@@ -55,6 +55,7 @@ bool AreZeroWeightsAfterBootstrap(EBootstrapType type);
 bool ShouldSkipCalcOnTrainByDefault(ELossFunction lossFunction);
 
 bool IsUserDefined(ELossFunction lossFunction);
+bool IsUserDefined(TStringBuf metricName);
 
 bool IsEmbeddingFeatureEstimator(EFeatureCalcerType estimatorType);
 
@@ -72,3 +73,8 @@ EFstrType AdjustFeatureImportanceType(EFstrType type, TStringBuf lossDescription
 bool IsInternalFeatureImportanceType(EFstrType type);
 
 bool IsUncertaintyPredictionType(EPredictionType type);
+
+EEstimatedSourceFeatureType FeatureTypeToEstimatedSourceFeatureType(EFeatureType featureType);
+
+EFeatureType EstimatedSourceFeatureTypeToFeatureType(EEstimatedSourceFeatureType featureType);
+

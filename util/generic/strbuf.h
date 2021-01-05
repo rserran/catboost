@@ -50,6 +50,7 @@ public:
     using TStringView::data;
 
     using TStringView::operator[];
+
     /*
      * WARN:
      * TBase::at silently return 0 in case of range error,

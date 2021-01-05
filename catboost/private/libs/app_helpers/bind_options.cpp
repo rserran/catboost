@@ -36,14 +36,15 @@ using namespace NCB;
 void InitOptions(
     const TString& optionsFile,
     NJson::TJsonValue* catBoostJsonOptions,
-    NJson::TJsonValue* outputOptionsJson
+    NJson::TJsonValue* outputOptionsJson,
+    NJson::TJsonValue* featuresSelectOptions
 ) {
     if (!optionsFile.empty()) {
         CB_ENSURE(NFs::Exists(optionsFile), "Params file does not exist " << optionsFile);
         TIFStream in(optionsFile);
         NJson::TJsonValue fromOptionsFile;
         CB_ENSURE(NJson::ReadJsonTree(&in, &fromOptionsFile), "can't parse params file");
-        NCatboostOptions::PlainJsonToOptions(fromOptionsFile, catBoostJsonOptions, outputOptionsJson);
+        NCatboostOptions::PlainJsonToOptions(fromOptionsFile, catBoostJsonOptions, outputOptionsJson, featuresSelectOptions);
     }
     if (!outputOptionsJson->Has("train_dir")) {
         (*outputOptionsJson)["train_dir"] = ".";
@@ -81,8 +82,21 @@ inline static TVector<TVector<int>> ParseIndexSetsLine(const TStringBuf indicesL
     return result;
 }
 
-inline static void BindPoolLoadParams(NLastGetopt::TOpts* parser, NCatboostOptions::TPoolLoadParams* loadParamsPtr) {
+void BindQuantizerPoolLoadParams(NLastGetopt::TOpts* parser, NCatboostOptions::TPoolLoadParams* loadParamsPtr) {
     BindColumnarPoolFormatParams(parser, &(loadParamsPtr->ColumnarPoolFormatParams));
+    parser->AddLongOption("input-borders-file", "file with borders")
+            .RequiredArgument("PATH")
+            .StoreResult(&loadParamsPtr->BordersFile);
+
+    parser->AddLongOption("feature-names-path", "path to feature names data")
+        .RequiredArgument("[SCHEME://]PATH")
+        .Handler1T<TStringBuf>([loadParamsPtr](const TStringBuf& str) {
+            loadParamsPtr->FeatureNamesPath = TPathWithScheme(str, "dsv");
+        });
+}
+
+void BindPoolLoadParams(NLastGetopt::TOpts* parser, NCatboostOptions::TPoolLoadParams* loadParamsPtr) {
+    BindQuantizerPoolLoadParams(parser, loadParamsPtr);
 
     parser->AddLongOption("cv-no-shuffle", "Do not shuffle dataset before cross-validation")
       .NoArgument()
@@ -110,13 +124,13 @@ inline static void BindPoolLoadParams(NLastGetopt::TOpts* parser, NCatboostOptio
     parser->AddLongOption("learn-pairs", "path to learn pairs")
         .RequiredArgument("[SCHEME://]PATH")
         .Handler1T<TStringBuf>([loadParamsPtr](const TStringBuf& str) {
-            loadParamsPtr->PairsFilePath = TPathWithScheme(str, "file");
+            loadParamsPtr->PairsFilePath = TPathWithScheme(str, "dsv-flat");
         });
 
     parser->AddLongOption("test-pairs", "path to test pairs")
         .RequiredArgument("[SCHEME://]PATH")
         .Handler1T<TStringBuf>([loadParamsPtr](const TStringBuf& str) {
-            loadParamsPtr->TestPairsFilePath = TPathWithScheme(str, "file");
+            loadParamsPtr->TestPairsFilePath = TPathWithScheme(str, "dsv-flat");
         });
 
     parser->AddLongOption("learn-group-weights", "path to learn group weights")
@@ -181,16 +195,6 @@ inline static void BindPoolLoadParams(NLastGetopt::TOpts* parser, NCatboostOptio
     parser->AddLongOption("cv-rand", "cross-validation random seed")
         .RequiredArgument("seed")
         .StoreResult(&loadParamsPtr->CvParams.PartitionRandSeed);
-
-    parser->AddLongOption("input-borders-file", "file with borders")
-            .RequiredArgument("PATH")
-            .StoreResult(&loadParamsPtr->BordersFile);
-
-    parser->AddLongOption("feature-names-path", "path to feature names data")
-        .RequiredArgument("[SCHEME://]PATH")
-        .Handler1T<TStringBuf>([loadParamsPtr](const TStringBuf& str) {
-            loadParamsPtr->FeatureNamesPath = TPathWithScheme(str, "dsv");
-        });
 
     parser->AddLongOption(
        "hosts-already-contain-loaded-data",
@@ -682,6 +686,59 @@ static void BindFeatureEvalParams(NLastGetopt::TOpts* parserPtr, NJson::TJsonVal
         });
 }
 
+static void BindFeaturesSelectParams(NLastGetopt::TOpts* parserPtr, NJson::TJsonValue* plainJsonPtr) {
+    auto& parser = *parserPtr;
+    parser
+        .AddLongOption("features-for-select")
+        .RequiredArgument("INDEX,INDEX-INDEX,...")
+        .Help("From which features perform selection; each set is a comma-separated list of indices and index intervals, e.g. 4,78-89,312.")
+        .Handler1T<TString>([plainJsonPtr](const TString& indicesLine) {
+            (*plainJsonPtr)["features_for_select"] = indicesLine;
+        });
+    parser
+        .AddLongOption("num-features-to-select")
+        .RequiredArgument("int")
+        .Help("How many features to select from features-for-select.")
+        .Handler1T<int>([plainJsonPtr](const int numberOfFeaturesToSelect) {
+            (*plainJsonPtr)["num_features_to_select"] = numberOfFeaturesToSelect;
+        });
+    parser
+        .AddLongOption("features-selection-steps")
+        .RequiredArgument("int")
+        .Help("How many steps to perform during feature selection.")
+        .Handler1T<int>([plainJsonPtr](const int steps) {
+            (*plainJsonPtr)["features_selection_steps"] = steps;
+        });
+    parser
+        .AddLongOption("train-final-model")
+        .NoArgument()
+        .Help("Need to train and save model after features selection.")
+        .Handler0([plainJsonPtr]() {
+            (*plainJsonPtr)["train_final_model"] = true;
+        });
+    parser
+        .AddLongOption("features-selection-result-path")
+        .RequiredArgument("PATH")
+        .Help("Where to save results of features selection.")
+        .Handler1T<TString>([plainJsonPtr](const TString& path) {
+            (*plainJsonPtr)["features_selection_result_path"] = path;
+        });
+    parser
+        .AddLongOption("features-selection-algorithm")
+        .Help("Which algorithm to use for features selection.")
+        .Handler1T<EFeaturesSelectionAlgorithm>([plainJsonPtr](const auto algorithm) {
+            (*plainJsonPtr)["features_selection_algorithm"] = ToString(algorithm);
+        });
+    parser
+        .AddLongOption("shap-calc-type")
+        .DefaultValue("Regular")
+        .Help(TString::Join(
+            "Should be one of: ", GetEnumAllNames<ECalcTypeShapValues>()))
+        .Handler1T<ECalcTypeShapValues>([plainJsonPtr](const ECalcTypeShapValues calcType) {
+            (*plainJsonPtr)["shap_calc_type"] = ToString(calcType);
+        });
+}
+
 static void BindTreeParams(NLastGetopt::TOpts* parserPtr, NJson::TJsonValue* plainJsonPtr) {
     auto& parser = *parserPtr;
     parser.AddLongOption("rsm", "random subspace method (feature bagging)")
@@ -1095,7 +1152,7 @@ static void BindTextFeaturesParams(NLastGetopt::TOpts* parserPtr, NJson::TJsonVa
         });
 }
 
-static void BindDataProcessingParams(NLastGetopt::TOpts* parserPtr, NJson::TJsonValue* plainJsonPtr) {
+void BindQuantizerDataProcessingParams(NLastGetopt::TOpts* parserPtr, NJson::TJsonValue* plainJsonPtr) {
     auto& parser = *parserPtr;
     parser.AddLongOption('I', "ignore-features",
                          "don't use the specified features in the learn set (the features are separated by colon and can be specified as an inclusive interval, for example: -I 4:78-89:312)")
@@ -1105,7 +1162,20 @@ static void BindDataProcessingParams(NLastGetopt::TOpts* parserPtr, NJson::TJson
                 (*plainJsonPtr)["ignored_features"].AppendValue(ignoredFeature.Token());
             }
         });
+    parser.AddLongOption("class-names", "names for classes.")
+        .RequiredArgument("comma separated list of names")
+        .Handler1T<TString>([plainJsonPtr](const TString& namesLine) {
+            for (const auto& t : StringSplitter(namesLine).Split(',').SkipEmpty()) {
+                (*plainJsonPtr)["class_names"].AppendValue(t.Token());
+            }
+            CB_ENSURE(!(*plainJsonPtr)["class_names"].GetArray().empty(), "Empty class names list" << namesLine);
+        })
+        .Help("Takes effect only with MultiClass/LogLoss loss functions. Wihout this parameter classes are 0, 1, ..., classes-count - 1");
+}
 
+void BindDataProcessingParams(NLastGetopt::TOpts* parserPtr, NJson::TJsonValue* plainJsonPtr) {
+    BindQuantizerDataProcessingParams(parserPtr, plainJsonPtr);
+    auto& parser = *parserPtr;
     parser.AddLongOption("has-time", "Use dataset order as time")
         .NoArgument()
         .Handler0([plainJsonPtr]() {
@@ -1130,16 +1200,6 @@ static void BindDataProcessingParams(NLastGetopt::TOpts* parserPtr, NJson::TJson
             (*plainJsonPtr).InsertValue("classes_count", classesCount);
         })
         .Help("Takes effect only with MultiClass loss function. If classes-count is given (and class-names is not given), then each class label should be less than that number.");
-
-    parser.AddLongOption("class-names", "names for classes.")
-        .RequiredArgument("comma separated list of names")
-        .Handler1T<TString>([plainJsonPtr](const TString& namesLine) {
-            for (const auto& t : StringSplitter(namesLine).Split(',').SkipEmpty()) {
-                (*plainJsonPtr)["class_names"].AppendValue(t.Token());
-            }
-            CB_ENSURE(!(*plainJsonPtr)["class_names"].GetArray().empty(), "Empty class names list" << namesLine);
-        })
-        .Help("Takes effect only with MultiClass/LogLoss loss functions. Wihout this parameter classes are 0, 1, ..., classes-count - 1");
 
     parser.AddLongOption("class-weights", "Weights for classes.")
         .RequiredArgument("comma separated list of weights")
@@ -1257,7 +1317,7 @@ static void BindSystemParams(NLastGetopt::TOpts* parserPtr, NJson::TJsonValue* p
             });
 }
 
-static void BindBinarizationParams(NLastGetopt::TOpts* parserPtr, NJson::TJsonValue* plainJsonPtr) {
+void BindQuantizerBinarizationParams(NLastGetopt::TOpts* parserPtr, NJson::TJsonValue* plainJsonPtr) {
     auto& parser = *parserPtr;
     parser.AddLongOption('x', "border-count", "count of borders per float feature. Should be in range [1, 255]")
         .RequiredArgument("int")
@@ -1278,7 +1338,8 @@ static void BindBinarizationParams(NLastGetopt::TOpts* parserPtr, NJson::TJsonVa
     const auto featureBorderTypeHelp = TString::Join(
         "Must be one of: ",
         GetEnumAllNames<EBorderSelectionType>());
-    parser.AddLongOption("feature-border-type", featureBorderTypeHelp)
+    parser.AddLongOption('g', "feature-border-type", featureBorderTypeHelp)
+        .AddLongName("grid")
         .RequiredArgument("border-type")
         .Handler1T<EBorderSelectionType>([plainJsonPtr](const auto type) {
             (*plainJsonPtr)["feature_border_type"] = ToString(type);
@@ -1294,7 +1355,11 @@ static void BindBinarizationParams(NLastGetopt::TOpts* parserPtr, NJson::TJsonVa
         .Handler1T<ENanMode>([plainJsonPtr](const auto nanMode) {
             (*plainJsonPtr)["nan_mode"] = ToString(nanMode);
         });
+}
 
+static void BindBinarizationParams(NLastGetopt::TOpts* parserPtr, NJson::TJsonValue* plainJsonPtr) {
+    BindQuantizerBinarizationParams(parserPtr, plainJsonPtr);
+    auto& parser = *parserPtr;
     parser.AddLongOption("dev-max-subset-size-for-build-borders", "Maximum size of subset for build borders algorithm. Default: 200000")
         .RequiredArgument("int")
         .Handler1T<int>([plainJsonPtr](const int maxSubsetSizeForBuildBorders) {
@@ -1480,6 +1545,50 @@ void ParseFeatureEvalCommandLine(
     BindBinarizationParams(&parser, plainJsonPtr);
 
     BindSystemParams(&parser, plainJsonPtr);
+
+    BindCatboostParams(&parser, plainJsonPtr);
+
+    ParseMetadata(argc, argv, &parser, plainJsonPtr);
+}
+
+
+void ParseFeaturesSelectCommandLine(
+    int argc,
+    const char* argv[],
+    NJson::TJsonValue* plainJsonPtr,
+    TString* paramsPath,
+    NCatboostOptions::TPoolLoadParams* params
+) {
+    auto parser = NLastGetopt::TOpts();
+    parser.AddHelpOption();
+    BindPoolLoadParams(&parser, params);
+
+    parser.AddLongOption("params-file", "Path to JSON file with params.")
+        .RequiredArgument("PATH")
+        .StoreResult(paramsPath)
+        .Help("If param is given in json file and in command line then one from command line will be used.");
+
+    BindMetricParams(&parser, plainJsonPtr);
+
+    BindOutputParams(&parser, plainJsonPtr);
+
+    BindBoostingParams(&parser, plainJsonPtr);
+
+    BindFeaturesSelectParams(&parser, plainJsonPtr);
+
+    BindTreeParams(&parser, plainJsonPtr);
+
+    BindCatFeatureParams(&parser, plainJsonPtr);
+
+    BindTextFeaturesParams(&parser, plainJsonPtr);
+
+    BindDataProcessingParams(&parser, plainJsonPtr);
+
+    BindBinarizationParams(&parser, plainJsonPtr);
+
+    BindSystemParams(&parser, plainJsonPtr);
+
+    BindDistributedTrainingParams(&parser, plainJsonPtr);
 
     BindCatboostParams(&parser, plainJsonPtr);
 
