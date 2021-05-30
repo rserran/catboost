@@ -8,7 +8,6 @@
 #include <util/generic/map.h>
 #include <util/generic/ptr.h>
 #include <util/generic/set.h>
-#include <util/generic/type_name.h>
 #include <util/generic/typetraits.h>
 #include <util/generic/vector.h>
 #include <util/generic/yexception.h>
@@ -18,7 +17,7 @@
 #include <util/string/printf.h>
 
 #include <util/system/defaults.h>
-#include <util/system/demangle.h>
+#include <util/system/type_name.h>
 #include <util/system/spinlock.h>
 #include <util/system/src_location.h>
 
@@ -73,8 +72,6 @@ namespace NUnitTest {
             : Processor(processor)
         {
         }
-
-        const TString& GetParam(const TString& key, const TString& def) const;
 
         using TMetrics = THashMap<TString, double>;
         TMetrics Metrics;
@@ -145,10 +142,6 @@ namespace NUnitTest {
 
         // --fork-tests is set (warning: this may be false, but never the less test will be forked if called inside UNIT_FORKED_TEST)
         virtual bool GetForkTests() const;
-
-        virtual void SetParam(const TString& /*key*/, const TString& /*value*/);
-
-        virtual const TString& GetParam(const TString& /*key*/, const TString& /*def*/) const;
 
     private:
         virtual void OnStart();
@@ -410,13 +403,13 @@ public:                       \
         const auto _ed = (E);                                                                                                          \
         const auto _ad = (A);                                                                                                          \
         const auto _dd = (D);                                                                                                          \
-        if (std::isnan(_ed) && !std::isnan(_ad)) {                                                                                     \
-            const auto _as = ToString((long double)_ad);                                                                                            \
+        if (std::isnan((long double)_ed) && !std::isnan((long double)_ad)) {                                                           \
+            const auto _as = ToString((long double)_ad);                                                                               \
             auto&& failMsg = Sprintf("expected NaN, got %s %s", _as.data(), (TStringBuilder() << C).data());                           \
             UNIT_FAIL_IMPL("assertion failure", failMsg);                                                                              \
         }                                                                                                                              \
-        if (!std::isnan(_ed) && std::isnan(_ad)) {                                                                                     \
-            const auto _es = ToString((long double)_ed);                                                                                            \
+        if (!std::isnan((long double)_ed) && std::isnan((long double)_ad)) {                                                           \
+            const auto _es = ToString((long double)_ed);                                                                               \
             auto&& failMsg = Sprintf("expected %s, got NaN %s", _es.data(), (TStringBuilder() << C).data());                           \
             UNIT_FAIL_IMPL("assertion failure", failMsg);                                                                              \
         }                                                                                                                              \
@@ -743,8 +736,6 @@ public:                       \
 #define UNIT_ASSERT_TEST_FAILS(A) UNIT_ASSERT_TEST_FAILS_C(A, "")
 
 #define UNIT_ADD_METRIC(name, value) ut_context.Metrics[name] = value
-
-#define UNIT_GET_PARAM(key, def) ut_context.Processor->GetParam(key, def)
 
     class TTestFactory {
         friend class TTestBase;

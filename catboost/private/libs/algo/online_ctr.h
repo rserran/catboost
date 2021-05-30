@@ -11,6 +11,7 @@
 #include <catboost/libs/model/target_classifier.h>
 
 #include <catboost/private/libs/index_range/index_range.h>
+#include <catboost/private/libs/algo_helpers/scratch_cache.h>
 
 #include <util/generic/array_ref.h>
 #include <util/generic/fwd.h>
@@ -115,7 +116,7 @@ public:
 public:
     NCB::TOnlineCtrUniqValuesCounts GetUniqValuesCounts(const TProjection& projection) const override {
         Y_ASSERT(projection.IsSingleCatFeature());
-        return Data.ValuesCounts[projection.CatFeatures[0]];
+        return Data.Meta.ValuesCounts.at(projection.CatFeatures[0]);
     }
 
     TConstArrayRef<ui8> GetData(const TCtr& ctr, ui32 datasetIdx) const override;
@@ -138,7 +139,8 @@ void ComputeOnlineCTRs(
     const TVector<TVector<int>>& foldLearnTargetClass,
     const TVector<int>& foldTargetClassesCount,
     const NCatboostOptions::TCatFeatureParams& catFeatureParams,
-    NPar::TLocalExecutor* localExecutor,
+    NPar::ILocalExecutor* localExecutor,
+    NCB::TScratchCache* scratchCache,
     IOnlineCtrProjectionDataWriter* writer
 );
 
@@ -146,7 +148,7 @@ void ComputeOnlineCTRs(
     const NCB::TTrainingDataProviders& data,
     const TFold& fold,
     const TProjection& proj,
-    const TLearnContext* ctx,
+    TLearnContext* ctx,
     TOwnedOnlineCtr* onlineCtrStorage
 );
 

@@ -1,5 +1,6 @@
 #pragma once
 
+#include "ctrs.h"
 #include "data_provider.h"
 #include "loader.h"
 #include "objects.h"
@@ -32,6 +33,7 @@ namespace NCB {
         const TPathWithScheme& timestampsFilePath, // can be uninited
         const TPathWithScheme& baselineFilePath, // can be uninited
         const TPathWithScheme& featureNamesPath, // can be uninited
+        const TPathWithScheme& poolMetaInfoPath, // can be uninited
         const NCatboostOptions::TColumnarPoolFormatParams& columnarPoolFormatParams,
         const TVector<ui32>& ignoredFeatures,
         EObjectsOrder objectsOrder,
@@ -49,6 +51,7 @@ namespace NCB {
         const TPathWithScheme& timestampsFilePath, // can be uninited
         const TPathWithScheme& baselineFilePath, // can be uninited
         const TPathWithScheme& featureNamesPath, // can be uninited
+        const TPathWithScheme& poolMetaInfoPath, // can be uninited
         const NCatboostOptions::TColumnarPoolFormatParams& columnarPoolFormatParams,
         const TVector<ui32>& ignoredFeatures,
         EObjectsOrder objectsOrder,
@@ -65,6 +68,7 @@ namespace NCB {
         const TPathWithScheme& timestampsFilePath, // can be uninited
         const TPathWithScheme& baselineFilePath, // can be uninited
         const TPathWithScheme& featureNamesPath, // can be uninited
+        const TPathWithScheme& poolMetaInfoPath, // can be uninited
         const NCB::TDsvFormatOptions& poolFormat,
         const TVector<TColumn>& columnsDescription, // TODO(smirnovpavel): TVector<EColumn>
         const TVector<ui32>& ignoredFeatures,
@@ -80,6 +84,13 @@ namespace NCB {
         bool readTestData,
         TDatasetSubset trainDatasetSubset,
         TMaybe<TVector<NJson::TJsonValue>*> classLabels,
+        NPar::ILocalExecutor* executor,
+        TProfileInfo* profile
+    );
+
+    TPrecomputedOnlineCtrData ReadPrecomputedOnlineCtrData(
+        TMaybe<ETaskType> taskType,
+        const NCatboostOptions::TPoolLoadParams& loadOptions,
         NPar::ILocalExecutor* executor,
         TProfileInfo* profile
     );

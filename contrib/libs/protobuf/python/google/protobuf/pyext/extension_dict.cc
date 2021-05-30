@@ -31,7 +31,7 @@
 // Author: anuraag@google.com (Anuraag Agrawal)
 // Author: tibell@google.com (Johan Tibell)
 
-#include "pyext/extension_dict.h"
+#include <google/protobuf/pyext/extension_dict.h>
 
 #include <google/protobuf/stubs/logging.h>
 #include <google/protobuf/stubs/common.h>
@@ -39,28 +39,21 @@
 #include <google/protobuf/dynamic_message.h>
 #include <google/protobuf/message.h>
 #include <google/protobuf/descriptor.pb.h>
-#include "pyext/descriptor.h"
-#include "pyext/message.h"
-#include "pyext/message_factory.h"
-#include "pyext/repeated_composite_container.h"
-#include "pyext/repeated_scalar_container.h"
-#include "pyext/scoped_pyobject_ptr.h"
-
-#include <memory>
-#ifndef _SHARED_PTR_H
-#error #include <google/protobuf/stubs/shared_ptr.h>
-#endif
+#include <google/protobuf/pyext/descriptor.h>
+#include <google/protobuf/pyext/message.h>
+#include <google/protobuf/pyext/message_factory.h>
+#include <google/protobuf/pyext/repeated_composite_container.h>
+#include <google/protobuf/pyext/repeated_scalar_container.h>
+#include <google/protobuf/pyext/scoped_pyobject_ptr.h>
 
 #if PY_MAJOR_VERSION >= 3
   #if PY_VERSION_HEX < 0x03030000
     #error "Python 3.0 - 3.2 are not supported."
   #endif
-#define PyString_AsStringAndSize(ob, charpp, sizep)                           \
-  (PyUnicode_Check(ob) ? ((*(charpp) = const_cast<char*>(                     \
-                               PyUnicode_AsUTF8AndSize(ob, (sizep)))) == NULL \
-                              ? -1                                            \
-                              : 0)                                            \
-                       : PyBytes_AsStringAndSize(ob, (charpp), (sizep)))
+  #define PyString_AsStringAndSize(ob, charpp, sizep) \
+    (PyUnicode_Check(ob)? \
+       ((*(charpp) = const_cast<char*>(PyUnicode_AsUTF8AndSize(ob, (sizep)))) == NULL? -1: 0): \
+       PyBytes_AsStringAndSize(ob, (charpp), (sizep)))
 #endif
 
 namespace google {
@@ -245,8 +238,7 @@ ExtensionDict* NewExtensionDict(CMessage *parent) {
   return self;
 }
 
-void dealloc(PyObject* object) {
-  ExtensionDict* self = reinterpret_cast<ExtensionDict*>(object);
+void dealloc(ExtensionDict* self) {
   Py_CLEAR(self->values);
   self->owner.reset();
   Py_TYPE(self)->tp_free(reinterpret_cast<PyObject*>(self));

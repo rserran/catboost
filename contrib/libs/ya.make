@@ -9,6 +9,7 @@ RECURSE(
     crcutil
     cxxsupp/libcxx
     cxxsupp/libcxx-filesystem
+    cxxsupp/libcxxabi-parts
     expat
     fastlz
     flatbuffers
@@ -16,6 +17,7 @@ RECURSE(
     gamma_function_apache_math_port
     jdk
     jemalloc
+    jemalloc/dynamic
     libbz2
     libc_compat
     libunwind
@@ -27,11 +29,8 @@ RECURSE(
     nayuki_md5
     onnx
     openssl
-    openssl/apps
-    openssl/dynamic
     protobuf
     protobuf/python
-    protobuf/python/test
     pugixml
     python
     python/ut
@@ -71,18 +70,11 @@ IF (OS_WINDOWS)
 )
 ELSE()
     RECURSE(
-    re2/tests
-)
-ENDIF()
-
-IF (OS_LINUX OR OS_WINDOWS)
-    RECURSE(
     
 )
 ENDIF()
 
-IF (OS_WINDOWS AND USE_UWP)
-    # Other platforms will be added on demand or in background
+IF (OS_LINUX OR OS_WINDOWS)
     RECURSE(
     
 )
@@ -95,6 +87,12 @@ IF (OS_ANDROID)
 ENDIF()
 
 IF (OS_IOS AND ARCH_ARM64 OR OS_DARWIN)
+    RECURSE(
+    
+)
+ENDIF()
+
+IF (OS_LINUX AND ARCH_ARM64)
     RECURSE(
     
 )

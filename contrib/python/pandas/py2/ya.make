@@ -1,8 +1,8 @@
-PY23_LIBRARY()
-
-VERSION(0.24.2)
+PY2_LIBRARY()
 
 LICENSE(BSD-3-Clause)
+
+VERSION(0.24.2)
 
 
 
@@ -14,7 +14,7 @@ PEERDIR(
 )
 
 ADDINCL(
-    contrib/python/pandas/py2
+    FOR cython contrib/python/pandas/py2
     contrib/python/pandas/py2/pandas/_libs
     contrib/python/pandas/py2/pandas/_libs/src
     contrib/python/pandas/py2/pandas/_libs/src/klib

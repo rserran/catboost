@@ -18,6 +18,7 @@ import sun.net.util.IPAddressUtil
 
 import org.apache.commons.io.FileUtils
 
+import org.apache.spark.internal.Logging
 import org.apache.spark.sql.SparkSession
 
 import ru.yandex.catboost.spark.catboost4j_spark.core.src.native_impl
@@ -25,44 +26,63 @@ import ru.yandex.catboost.spark.catboost4j_spark.core.src.native_impl
 import ai.catboost.CatBoostError
 import ai.catboost.spark._
 
-private[spark] object Master {
+private[spark] object CatBoostMasterWrapper {
   // use this method to create Master instances
   def apply(
     preprocessedTrainPool: Pool,
     preprocessedEvalPools: Array[Pool],
-    catBoostJsonParamsForMasterString: String
-  ) : Master = {
-    val savedPoolsFuture = Future {
-      val threadCount = SparkHelpers.getThreadCountForDriver(preprocessedTrainPool.data.sparkSession)
+    catBoostJsonParamsForMasterString: String,
+    precomputedOnlineCtrMetaDataAsJsonString: String
+  ) : CatBoostMasterWrapper = {
+    val result = new CatBoostMasterWrapper(
+      preprocessedTrainPool.data.sparkSession, 
+      catBoostJsonParamsForMasterString,
+      precomputedOnlineCtrMetaDataAsJsonString
+    )
 
-      val trainPoolAsFile = DataHelpers.downloadQuantizedPoolToTempFile(
+    result.savedPoolsFuture = Future {
+      val threadCount = SparkHelpers.getThreadCountForDriver(preprocessedTrainPool.data.sparkSession)
+      val localExecutor = new native_impl.TLocalExecutor
+      localExecutor.Init(threadCount)
+
+      val trainPoolFiles = DataHelpers.downloadQuantizedPoolToTempFiles(
         preprocessedTrainPool,
         includeFeatures=false,
-        threadCount
+        includeEstimatedFeatures=false,
+        localExecutor=localExecutor,
+        dataPartName="Learn Dataset",
+        log=result.log
       )
-      val testPoolsAsFiles = preprocessedEvalPools.map {
-        testPool => DataHelpers.downloadQuantizedPoolToTempFile(
+      val testMainAndEstimatedPoolsAsFiles = preprocessedEvalPools.zipWithIndex.map {
+        case (testPool, idx) => DataHelpers.downloadQuantizedPoolToTempFiles(
           testPool,
           includeFeatures=true,
-          threadCount
+          includeEstimatedFeatures=true,
+          localExecutor=localExecutor,
+          dataPartName=s"Eval Dataset #${idx}",
+          log=result.log
         )
-      }.toArray
+      }
 
-      (trainPoolAsFile, testPoolsAsFiles)
+      (trainPoolFiles, testMainAndEstimatedPoolsAsFiles)
     }
-    new Master(preprocessedTrainPool.data.sparkSession, savedPoolsFuture, catBoostJsonParamsForMasterString)
+
+    result
   }
 }
 
 
-private[spark] class Master(
+private[spark] class CatBoostMasterWrapper (
   val spark: SparkSession,
-  val savedPoolsFuture : Future[(Path, Array[Path])],
   val catBoostJsonParamsForMasterString: String,
+  val precomputedOnlineCtrMetaDataAsJsonString: String,
 
+  var savedPoolsFuture : Future[(PoolFilesPaths, Array[PoolFilesPaths])] = null, // inited later
+  
   // will be set in trainCallback, called from the trainingDriver's run()
   var nativeModelResult : native_impl.TFullModel = null
-) {
+) extends Logging {
+
   private def saveHostsListToFile(hostsFilePath: Path, workersInfo: Array[WorkerInfo]) = {
     val pw = new PrintWriter(hostsFilePath.toFile)
     try {
@@ -98,6 +118,15 @@ private[spark] class Master(
 
     val jsonParamsFile = tmpDirPath.resolve("json_params")
     Files.write(jsonParamsFile, catBoostJsonParamsForMasterString.getBytes(StandardCharsets.UTF_8))
+    
+    var precomputedOnlineCtrMetaDataFile: Path = null
+    if (precomputedOnlineCtrMetaDataAsJsonString != null) {
+      precomputedOnlineCtrMetaDataFile =  tmpDirPath.resolve("precomputed_online_ctr_metadata")
+      Files.write(
+        precomputedOnlineCtrMetaDataFile,
+        precomputedOnlineCtrMetaDataAsJsonString.getBytes(StandardCharsets.UTF_8)
+      )
+    }
 
     val args = mutable.ArrayBuffer[String](
       "--node-type", "Master",
@@ -105,6 +134,12 @@ private[spark] class Master(
       "--params-file", jsonParamsFile.toString,
       "--file-with-hosts", hostsFilePath.toString,
       "--hosts-already-contain-loaded-data",
+      /* permutations on master are impossible when data is preloaded on hosts, shuffling is performed in Spark 
+       * on the preprocessing phase
+       */
+      "--has-time", 
+      "--max-ctr-complexity", "1",
+      "--final-ctr-computation-mode", "Skip", // final ctrs are computed in post-processing
       "--model-file", resultModelFilePath.toString
     )
 
@@ -112,15 +147,43 @@ private[spark] class Master(
     if (driverNativeMemoryLimit.isDefined) {
       args += ("--used-ram-limit", driverNativeMemoryLimit.get.toString)
     }
+    if (precomputedOnlineCtrMetaDataAsJsonString != null) {
+      args += ("--precomputed-data-meta", precomputedOnlineCtrMetaDataFile.toString)
+    }
+    
+    log.info("Wait until Dataset data parts are ready.")
 
-    val (savedTrainPool, savedEvalPools) = Await.result(savedPoolsFuture, Duration.Inf)
+    val (savedTrainPool, savedEvalMainAndEstimatedPools) = Await.result(savedPoolsFuture, Duration.Inf)
 
-    args += ("--learn-set", "spark-quantized://master-part:" + savedTrainPool.toString)
-    if (!savedEvalPools.isEmpty) {
+    log.info("Dataset data parts are ready. Start CatBoost Master process.")
+
+    args += ("--learn-set", "spark-quantized://master-part:" + savedTrainPool.mainData.toString)
+    if (savedTrainPool.pairsData.isDefined) {
+      args += ("--learn-pairs", "dsv-grouped-with-idx://" + savedTrainPool.pairsData.get.toString)
+    }
+    if (!savedEvalMainAndEstimatedPools.isEmpty) {
       args += (
         "--test-set",
-        savedEvalPools.map(path => "spark-quantized://master-part:" + path).mkString(",")
+        savedEvalMainAndEstimatedPools.map(
+            poolFilesPaths => "spark-quantized://master-part:" + poolFilesPaths.mainData
+        ).mkString(",")
       )
+      if (savedTrainPool.pairsData.isDefined) { // if train pool has pairs so do test pools
+        args += (
+          "--test-pairs",
+          savedEvalMainAndEstimatedPools.map(
+              poolFilesPaths => "dsv-grouped-with-idx://" + poolFilesPaths.pairsData.get.toString
+          ).mkString(",")
+        )
+      }
+      if (precomputedOnlineCtrMetaDataAsJsonString != null) {
+        args += (
+          "--test-precomputed-set",
+          savedEvalMainAndEstimatedPools.map(
+            poolFilesPaths => "spark-quantized://master-part:" + poolFilesPaths.estimatedCtrData.get.toString
+          ).mkString(",")
+        )
+      }
     }
 
     val masterAppProcess = RunClassInNewProcess(
@@ -165,10 +228,14 @@ private[spark] class Master(
       if (failedBecauseOfWorkerConnectionLost) {
         throw new CatBoostWorkersConnectionLostException("")
       }
-      throw new CatBoostError(s"Master process failed: exited with code $returnValue")
+      throw new CatBoostError(s"CatBoost Master process failed: exited with code $returnValue")
     }
+    
+    log.info("CatBoost Master process finished successfully.")
 
+    log.info("Trained model: start loading")
     nativeModelResult = native_impl.native_impl.ReadModelWrapper(resultModelFilePath.toString)
+    log.info("Trained model: finish loading")
 
     FileUtils.deleteDirectory(tmpDirPath.toFile)
   }

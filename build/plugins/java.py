@@ -85,6 +85,7 @@ def onjava_module(unit, *args):
         'MANAGED_PEERS': '${MANAGED_PEERS}',
         'MANAGED_PEERS_CLOSURE': '${MANAGED_PEERS_CLOSURE}',
         'NON_NAMAGEABLE_PEERS': '${NON_NAMAGEABLE_PEERS}',
+        'TEST_CLASSPATH_MANAGED': '${TEST_CLASSPATH_MANAGED}',
         'EXCLUDE': extract_macro_calls(unit, 'EXCLUDE_VALUE', args_delim),
         'JAVA_SRCS': extract_macro_calls(unit, 'JAVA_SRCS_VALUE', args_delim),
         'JAVAC_FLAGS': extract_macro_calls(unit, 'JAVAC_FLAGS_VALUE', args_delim),
@@ -134,6 +135,8 @@ def onjava_module(unit, *args):
             data['KOTLIN_JVM_TARGET'] = extract_macro_calls(unit, 'KOTLIN_JVM_TARGET', args_delim)
         if unit.get('KOTLINC_FLAGS_VALUE'):
             data['KOTLINC_FLAGS'] = extract_macro_calls(unit, 'KOTLINC_FLAGS_VALUE', args_delim)
+        if unit.get('KOTLINC_OPTS_VALUE'):
+            data['KOTLINC_OPTS'] = extract_macro_calls(unit, 'KOTLINC_OPTS_VALUE', args_delim)
 
     if unit.get('WITH_GROOVY_VALUE') == 'yes':
         if not common.strip_roots(unit.path()).startswith(('devtools/dummy_arcadia', 'junk')):
@@ -171,10 +174,6 @@ def onjava_module(unit, *args):
         if unit.get('MODULE_TYPE') != 'JAVA_PROGRAM':
             ymake.report_configure_error('{}: JDK export supported only for JAVA_PROGRAM module type'.format(unit.path()))
         data['WITH_JDK'] = extract_macro_calls(unit, 'WITH_JDK_VALUE', args_delim)
-
-    for dm_paths in data['DEPENDENCY_MANAGEMENT']:
-        for p in dm_paths:
-            unit.on_ghost_peerdir(p)
 
     if not data['EXTERNAL_JAR']:
         has_processor = extract_macro_calls(unit, 'GENERATE_VCS_JAVA_INFO_NODEP', args_delim)
@@ -245,3 +244,60 @@ def onjava_module(unit, *args):
             unit.onjava_test_deps(jdeps_val)
         if unit.get('LINT_LEVEL_VALUE') != "none":
             unit.onadd_check(['JAVA_STYLE', unit.get('LINT_LEVEL_VALUE')])
+
+
+# Ymake java modules related macroses
+
+
+def onexternal_jar(unit, *args):
+    args = list(args)
+    flat, kv = common.sort_by_keywords({'SOURCES': 1}, args)
+    if not flat:
+        ymake.report_configure_error('EXTERNAL_JAR requires exactly one resource URL of compiled jar library')
+    res = flat[0]
+    resid = res[4:] if res.startswith('sbr:') else res
+    unit.set(['JAR_LIB_RESOURCE', resid])
+    unit.set(['JAR_LIB_RESOURCE_URL', res])
+
+
+def on_check_java_srcdir(unit, *args):
+    args = list(args)
+    for arg in args:
+        srcdir = unit.resolve_arc_path(arg)
+        if not srcdir.startswith('$S'):
+            continue
+        abs_srcdir = unit.resolve(srcdir)
+        if not os.path.exists(abs_srcdir) or not os.path.isdir(abs_srcdir):
+            ymake.report_configure_error('SRCDIR {} does not exists or not a directory'.format(srcdir[3:]))
+
+
+def on_fill_jar_copy_resources_cmd(unit, *args):
+    if len(args) == 4:
+        varname, srcdir, base_classes_dir, reslist = tuple(args)
+        package = ''
+    else:
+        varname, srcdir, base_classes_dir, package, reslist = tuple(args)
+    dest_dir = os.path.join(base_classes_dir, *package.split('.')) if package else base_classes_dir
+    var = unit.get(varname)
+    var += ' && ${{cwd:CURDIR}} $FS_TOOLS copy_files {} {} {}'.format(srcdir, dest_dir, reslist)
+    unit.set([varname, var])
+
+def on_fill_jar_gen_srcs(unit, *args):
+    varname, srcdir, base_classes_dir, java_list, kt_list, groovy_list, res_list = tuple(args[0:7])
+    resolved_srcdir = unit.resolve_arc_path(srcdir)
+    if resolved_srcdir.startswith('$S'):
+        return
+
+    exclude_pos = args.index('EXCLUDE')
+    globs = args[7:exclude_pos]
+    excludes = args[exclude_pos + 1:]
+    var = unit.get(varname)
+    # TODO: devtools/ya/jbuild/resolve_java_srcs.py really bad script location
+    var += ' && $YMAKE_PYTHON ${{input:"build/scripts/resolve_java_srcs.py"}} --append -d {} -s {} -k {} -g {} -r {} --include-patterns {}'.format(srcdir, java_list, kt_list, groovy_list, res_list, ' '.join(globs))
+    if len(excludes) > 0:
+        var += ' --exclude-patterns {}'.format(' '.join(excludes))
+    if unit.get('WITH_KOTLIN_VALUE') == 'yes':
+        var += ' --resolve-kotlin'
+    if unit.get('WITH_GROOVY_VALUE') == 'yes':
+        var += ' --resolve-groovy'
+    unit.set([varname, var])

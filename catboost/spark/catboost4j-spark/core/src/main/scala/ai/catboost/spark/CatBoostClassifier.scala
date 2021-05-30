@@ -11,6 +11,7 @@ import org.apache.spark.ml.util._
 import org.apache.spark.sql._
 import org.apache.spark.sql.types._
 
+import ai.catboost.spark.impl.CtrsContext
 import ai.catboost.spark.params._
 
 import ru.yandex.catboost.spark.catboost4j_spark.core.src.native_impl
@@ -26,6 +27,8 @@ import ru.yandex.catboost.spark.catboost4j_spark.core.src.native_impl
  *   -`<path>/model` which contains model in usual CatBoost format which can be read using other local
  *     CatBoost APIs (if stored in a distributed filesystem it has to be copied to the local filesystem first).
  *
+ * Saving to and loading from local files in standard CatBoost model formats is also supported.
+ *
  * @example Save model
  * {{{
  *   val trainPool : Pool = ... init Pool ...
@@ -40,6 +43,24 @@ import ru.yandex.catboost.spark.catboost4j_spark.core.src.native_impl
  *   val dataFrameForPrediction : DataFrame = ... init DataFrame ...
  *   val path = "/home/user/catboost_spark_models/model0"
  *   val model = CatBoostClassificationModel.load(path)
+ *   val predictions = model.transform(dataFrameForPrediction)
+ *   predictions.show()
+ * }}}
+ *
+ * @example Save as a native model
+ * {{{
+ *   val trainPool : Pool = ... init Pool ...
+ *   val classifier = new CatBoostClassifier
+ *   val model = classifier.fit(trainPool)
+ *   val path = "/home/user/catboost_native_models/model0.cbm"
+ *   model.saveNativeModel(path)
+ * }}}
+ *
+ * @example Load native model
+ * {{{
+ *   val dataFrameForPrediction : DataFrame = ... init DataFrame ...
+ *   val path = "/home/user/catboost_native_models/model0.cbm"
+ *   val model = CatBoostClassificationModel.loadNativeModel(path)
  *   val predictions = model.transform(dataFrameForPrediction)
  *   predictions.show()
  * }}}
@@ -116,15 +137,15 @@ class CatBoostClassificationModel (
   }
 
   protected def getResultIteratorForApply(
-    rawObjectsDataProvider: native_impl.SWIGTYPE_p_NCB__TRawObjectsDataProviderPtr,
+    objectsDataProvider: native_impl.SWIGTYPE_p_NCB__TObjectsDataProviderPtr,
     dstRows: mutable.ArrayBuffer[Array[Any]], // guaranteed to be non-empty
-    threadCountForTask: Int
+    localExecutor: native_impl.TLocalExecutor
   ) : Iterator[Row] = {
     val applyResultIterator = new native_impl.TApplyResultIterator(
       nativeModel,
-      rawObjectsDataProvider,
+      objectsDataProvider,
       native_impl.EPredictionType.RawFormulaVal,
-      threadCountForTask
+      localExecutor
     )
 
     val rowLength = dstRows(0).length
@@ -224,6 +245,13 @@ object CatBoostClassificationModel extends MLReadable[CatBoostClassificationMode
         )
         new CatBoostClassificationModel(uid, nativeModel, nativeModel.GetDimensionsCount.toInt)
       }
+  }
+  
+  def loadNativeModel(
+    fileName: String, 
+    format: EModelType = native_impl.EModelType.CatboostBinary
+  ): CatBoostClassificationModel = {
+    new CatBoostClassificationModel(native_impl.native_impl.ReadModelWrapper(fileName, format))
   }
 }
 
@@ -343,7 +371,7 @@ class CatBoostClassifier (override val uid: String)
   protected override def preprocessBeforeTraining(
     quantizedTrainPool: Pool,
     quantizedEvalPools: Array[Pool]
-  ) : (Pool, Array[Pool], JObject) = {
+  ) : (Pool, Array[Pool], JObject, CtrsContext) = {
     val classNamesFromLabelData = if (ai.catboost.spark.params.Helpers.classNamesAreKnown(this)) {
       None
     } else {
@@ -364,10 +392,17 @@ class CatBoostClassifier (override val uid: String)
       log.info(s"lossFunction has been inferred as '${this.getLossFunction}'")
     }
 
+    val catBoostJsonParams = ai.catboost.spark.params.Helpers.sparkMlParamsToCatBoostJsonParams(
+      this, 
+      classNamesFromLabelData
+    )
+    val (preprocessedTrainPool, preprocessedEvalPools, ctrsContext) 
+        = addEstimatedCtrFeatures(quantizedTrainPool, quantizedEvalPools, catBoostJsonParams)
     (
-      quantizedTrainPool,
-      quantizedEvalPools,
-      ai.catboost.spark.params.Helpers.sparkMlParamsToCatBoostJsonParams(this, classNamesFromLabelData)
+      preprocessedTrainPool, 
+      preprocessedEvalPools, 
+      catBoostJsonParams, 
+      ctrsContext
     )
   }
 

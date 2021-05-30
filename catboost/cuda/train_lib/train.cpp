@@ -305,6 +305,7 @@ namespace NCatboostCuda {
             TMaybe<NCB::TPrecomputedOnlineCtrData> precomputedSingleOnlineCtrDataForSingleFold,
             const TLabelConverter& labelConverter,
             ITrainingCallbacks* trainingCallbacks,
+            ICustomCallbacks* /*customCallbacks*/,
             TMaybe<TFullModel*> initModel,
             THolder<TLearnProgress> initLearnProgress,
             NCB::TDataProviders initModelApplyCompatiblePools,
@@ -350,7 +351,8 @@ namespace NCatboostCuda {
                                                       trainingData.FeatureEstimators,
                                                       *trainingData.Learn->MetaInfo.FeaturesLayout,
                                                       exclusiveBundlesCopy,
-                                                      quantizedFeaturesInfo);
+                                                      quantizedFeaturesInfo,
+                                                      /*enableShuffling*/internalOptions.HaveLearnFeatureInMemory);
 
 
             SetDataDependentDefaultsForGpu(

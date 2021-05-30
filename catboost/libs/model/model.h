@@ -10,6 +10,7 @@
 
 #include <catboost/libs/helpers/exception.h>
 #include <catboost/libs/helpers/maybe_owning_array_holder.h>
+#include <catboost/libs/model/enums.h>
 
 #include <catboost/private/libs/options/enums.h>
 #include <catboost/private/libs/text_features/text_processing_collection.h>
@@ -69,6 +70,9 @@ struct TRepackedBin {
 };
 
 constexpr ui32 MAX_VALUES_PER_BIN = 254;
+
+constexpr double DEFAULT_BINCLASS_PROBABILITY_THRESHOLD = 0.5;
+constexpr double DEFAULT_BINCLASS_LOGIT_THRESHOLD = 0;
 
 // If selected diff is 0 we are in the last node in path
 struct TNonSymmetricTreeStepNode {
@@ -666,6 +670,16 @@ public:
         }
     }
 
+    void SetPredictionType(NCB::NModelEvaluation::EPredictionType predictionType) const {
+        with_lock(CurrentEvaluatorLock) {
+            Evaluator->SetPredictionType(predictionType);
+        }
+    }
+
+    EFormulaEvaluatorType GetEvaluatorType() const {
+        return FormulaEvaluatorType;
+    }
+
     bool operator==(const TFullModel& other) const {
         return *ModelTrees == *other.ModelTrees;
     }
@@ -997,6 +1011,41 @@ public:
     }
 
     /**
+     * Evaluate raw formula predictions on user data. Uses model trees for interval [treeStart, treeEnd)
+     * @param[in] floatFeatures
+     * @param[in] catFeatures hashed cat feature values
+     * @param[in] textFeatures
+     * @param[in] treeStart
+     * @param[in] treeEnd
+     * @param[out] results results indexation is [objectIndex * ApproxDimension + classId]
+     */
+    void CalcWithHashedCatAndText(
+        TConstArrayRef<TConstArrayRef<float>> floatFeatures,
+        TConstArrayRef<TConstArrayRef<int>> catFeatures,
+        TConstArrayRef<TVector<TStringBuf>> textFeatures,
+        size_t treeStart,
+        size_t treeEnd,
+        TArrayRef<double> results,
+        const TFeatureLayout* featureInfo = nullptr) const;
+
+    /**
+     * Evaluate raw formula predictions on user data. Uses all model trees
+     * @param floatFeatures
+     * @param catFeatures hashed cat feature values
+     * @param textFeatures
+     * @param results results indexation is [objectIndex * ApproxDimension + classId]
+     */
+    void CalcWithHashedCatAndText(
+        TConstArrayRef<TConstArrayRef<float>> floatFeatures,
+        TConstArrayRef<TConstArrayRef<int>> catFeatures,
+        TConstArrayRef<TVector<TStringBuf>> textFeatures,
+        TArrayRef<double> results,
+        const TFeatureLayout* featureInfo = nullptr
+    ) const {
+        CalcWithHashedCatAndText(floatFeatures, catFeatures, textFeatures, 0, GetTreeCount(), results, featureInfo);
+    }
+
+    /**
      * Evaluate raw formula prediction for one object. Uses all model trees
      * @param floatFeatures
      * @param catFeatures
@@ -1165,6 +1214,18 @@ public:
      * @return the name, or empty string if the model does not have this information
      */
     TString GetLossFunctionName() const;
+
+    /**
+     * Get the probability threshold for binary classification to separate classes.
+     * @return the value is stored in `binclass_probability_threshold` metadata or 0.5 as default value.
+     */
+    double GetBinClassProbabilityThreshold() const;
+
+    /**
+     * Get the logit threshold for binary classification to separate classes.
+     * @return Logit(GetBinClassProbabilityThreshold())
+     */
+    double GetBinClassLogitThreshold() const;
 
     /**
      * Get typed class labels than can be predicted.

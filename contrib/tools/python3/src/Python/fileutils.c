@@ -1,6 +1,6 @@
 #include "Python.h"
 #include "pycore_fileutils.h"
-#include "osdefs.h"
+#include "osdefs.h"               // SEP
 #include <locale.h>
 
 #ifdef MS_WINDOWS
@@ -32,6 +32,13 @@ extern int winerror_to_errno(int);
    and os.open(). */
 int _Py_open_cloexec_works = -1;
 #endif
+
+// The value must be the same in unicodeobject.c.
+#define MAX_UNICODE 0x10ffff
+
+// mbstowcs() and mbrtowc() errors
+static const size_t DECODE_ERROR = ((size_t)-1);
+static const size_t INCOMPLETE_CHARACTER = (size_t)-2;
 
 
 static int
@@ -84,6 +91,57 @@ _Py_device_encoding(int fd)
 #endif
     Py_RETURN_NONE;
 }
+
+
+static size_t
+is_valid_wide_char(wchar_t ch)
+{
+    if (Py_UNICODE_IS_SURROGATE(ch)) {
+        // Reject lone surrogate characters
+        return 0;
+    }
+    if (ch > MAX_UNICODE) {
+        // bpo-35883: Reject characters outside [U+0000; U+10ffff] range.
+        // The glibc mbstowcs() UTF-8 decoder does not respect the RFC 3629,
+        // it creates characters outside the [U+0000; U+10ffff] range:
+        // https://sourceware.org/bugzilla/show_bug.cgi?id=2373
+        return 0;
+    }
+    return 1;
+}
+
+
+static size_t
+_Py_mbstowcs(wchar_t *dest, const char *src, size_t n)
+{
+    size_t count = mbstowcs(dest, src, n);
+    if (dest != NULL && count != DECODE_ERROR) {
+        for (size_t i=0; i < count; i++) {
+            wchar_t ch = dest[i];
+            if (!is_valid_wide_char(ch)) {
+                return DECODE_ERROR;
+            }
+        }
+    }
+    return count;
+}
+
+
+#ifdef HAVE_MBRTOWC
+static size_t
+_Py_mbrtowc(wchar_t *pwc, const char *str, size_t len, mbstate_t *pmbs)
+{
+    assert(pwc != NULL);
+    size_t count = mbrtowc(pwc, str, len, pmbs);
+    if (count != 0 && count != DECODE_ERROR && count != INCOMPLETE_CHARACTER) {
+        if (!is_valid_wide_char(*pwc)) {
+            return DECODE_ERROR;
+        }
+    }
+    return count;
+}
+#endif
+
 
 #if !defined(_Py_FORCE_UTF8_FS_ENCODING) && !defined(MS_WINDOWS)
 
@@ -151,8 +209,8 @@ check_force_ascii(void)
         size_t res;
 
         ch = (unsigned char)0xA7;
-        res = mbstowcs(&wch, (char*)&ch, 1);
-        if (res != (size_t)-1 && wch == L'\xA7') {
+        res = _Py_mbstowcs(&wch, (char*)&ch, 1);
+        if (res != DECODE_ERROR && wch == L'\xA7') {
             /* On HP-UX withe C locale or the POSIX locale,
                nl_langinfo(CODESET) announces "roman8", whereas mbstowcs() uses
                Latin1 encoding in practice. Force ASCII in this case.
@@ -199,8 +257,8 @@ check_force_ascii(void)
 
         unsigned uch = (unsigned char)i;
         ch[0] = (char)uch;
-        res = mbstowcs(wch, ch, 1);
-        if (res != (size_t)-1) {
+        res = _Py_mbstowcs(wch, ch, 1);
+        if (res != DECODE_ERROR) {
             /* decoding a non-ASCII character from the locale encoding succeed:
                the locale encoding is not ASCII, force ASCII */
             return 1;
@@ -390,9 +448,9 @@ decode_current_locale(const char* arg, wchar_t **wstr, size_t *wlen,
      */
     argsize = strlen(arg);
 #else
-    argsize = mbstowcs(NULL, arg, 0);
+    argsize = _Py_mbstowcs(NULL, arg, 0);
 #endif
-    if (argsize != (size_t)-1) {
+    if (argsize != DECODE_ERROR) {
         if (argsize > PY_SSIZE_T_MAX / sizeof(wchar_t) - 1) {
             return -1;
         }
@@ -401,21 +459,13 @@ decode_current_locale(const char* arg, wchar_t **wstr, size_t *wlen,
             return -1;
         }
 
-        count = mbstowcs(res, arg, argsize + 1);
-        if (count != (size_t)-1) {
-            wchar_t *tmp;
-            /* Only use the result if it contains no
-               surrogate characters. */
-            for (tmp = res; *tmp != 0 &&
-                         !Py_UNICODE_IS_SURROGATE(*tmp); tmp++)
-                ;
-            if (*tmp == 0) {
-                if (wlen != NULL) {
-                    *wlen = count;
-                }
-                *wstr = res;
-                return 0;
+        count = _Py_mbstowcs(res, arg, argsize + 1);
+        if (count != DECODE_ERROR) {
+            *wstr = res;
+            if (wlen != NULL) {
+                *wlen = count;
             }
+            return 0;
         }
         PyMem_RawFree(res);
     }
@@ -439,13 +489,13 @@ decode_current_locale(const char* arg, wchar_t **wstr, size_t *wlen,
     out = res;
     memset(&mbs, 0, sizeof mbs);
     while (argsize) {
-        size_t converted = mbrtowc(out, (char*)in, argsize, &mbs);
+        size_t converted = _Py_mbrtowc(out, (char*)in, argsize, &mbs);
         if (converted == 0) {
             /* Reached end of string; null char stored. */
             break;
         }
 
-        if (converted == (size_t)-2) {
+        if (converted == INCOMPLETE_CHARACTER) {
             /* Incomplete character. This should never happen,
                since we provide everything that we have -
                unless there is a bug in the C library, or I
@@ -453,32 +503,22 @@ decode_current_locale(const char* arg, wchar_t **wstr, size_t *wlen,
             goto decode_error;
         }
 
-        if (converted == (size_t)-1) {
+        if (converted == DECODE_ERROR) {
             if (!surrogateescape) {
                 goto decode_error;
             }
 
-            /* Conversion error. Escape as UTF-8b, and start over
-               in the initial shift state. */
+            /* Decoding error. Escape as UTF-8b, and start over in the initial
+               shift state. */
             *out++ = 0xdc00 + *in++;
             argsize--;
             memset(&mbs, 0, sizeof mbs);
             continue;
         }
 
-        if (Py_UNICODE_IS_SURROGATE(*out)) {
-            if (!surrogateescape) {
-                goto decode_error;
-            }
+        // _Py_mbrtowc() reject lone surrogate characters
+        assert(!Py_UNICODE_IS_SURROGATE(*out));
 
-            /* Surrogate character.  Escape the original
-               byte sequence with surrogateescape. */
-            argsize -= converted;
-            while (converted--) {
-                *out++ = 0xdc00 + *in++;
-            }
-            continue;
-        }
         /* successfully converted some bytes */
         in += converted;
         argsize -= converted;
@@ -655,7 +695,7 @@ encode_current_locale(const wchar_t *text, char **str,
                 else {
                     converted = wcstombs(NULL, buf, 0);
                 }
-                if (converted == (size_t)-1) {
+                if (converted == DECODE_ERROR) {
                     goto encode_error;
                 }
                 if (bytes != NULL) {
@@ -1010,7 +1050,10 @@ _Py_stat(PyObject *path, struct stat *statbuf)
     struct _stat wstatbuf;
     const wchar_t *wpath;
 
+_Py_COMP_DIAG_PUSH
+_Py_COMP_DIAG_IGNORE_DEPR_DECLS
     wpath = _PyUnicode_AsUnicode(path);
+_Py_COMP_DIAG_POP
     if (wpath == NULL)
         return -2;
 
@@ -1165,6 +1208,13 @@ set_inheritable(int fd, int inheritable, int raise, int *atomic_flag_works)
             return 0;
         }
 
+#ifdef __linux__
+        if (errno == EBADF) {
+            // On Linux, ioctl(FIOCLEX) will fail with EBADF for O_PATH file descriptors
+            // Fall through to the fcntl() path
+        }
+        else
+#endif
         if (errno != ENOTTY && errno != EACCES) {
             if (raise)
                 PyErr_SetFromErrno(PyExc_OSError);
@@ -1364,7 +1414,7 @@ _Py_wfopen(const wchar_t *path, const wchar_t *mode)
     char cmode[10];
     size_t r;
     r = wcstombs(cmode, mode, 10);
-    if (r == (size_t)-1 || r >= 10) {
+    if (r == DECODE_ERROR || r >= 10) {
         errno = EINVAL;
         return NULL;
     }
@@ -1448,7 +1498,10 @@ _Py_fopen_obj(PyObject *path, const char *mode)
                      Py_TYPE(path));
         return NULL;
     }
+_Py_COMP_DIAG_PUSH
+_Py_COMP_DIAG_IGNORE_DEPR_DECLS
     wpath = _PyUnicode_AsUnicode(path);
+_Py_COMP_DIAG_POP
     if (wpath == NULL)
         return NULL;
 
@@ -1467,7 +1520,7 @@ _Py_fopen_obj(PyObject *path, const char *mode)
              && errno == EINTR && !(async_err = PyErr_CheckSignals()));
 #else
     PyObject *bytes;
-    char *path_bytes;
+    const char *path_bytes;
 
     assert(PyGILState_Check());
 
@@ -1684,8 +1737,9 @@ _Py_wreadlink(const wchar_t *path, wchar_t *buf, size_t buflen)
 {
     char *cpath;
     char cbuf[MAXPATHLEN];
+    size_t cbuf_len = Py_ARRAY_LENGTH(cbuf);
     wchar_t *wbuf;
-    int res;
+    Py_ssize_t res;
     size_t r1;
 
     cpath = _Py_EncodeLocaleRaw(path, NULL);
@@ -1693,11 +1747,12 @@ _Py_wreadlink(const wchar_t *path, wchar_t *buf, size_t buflen)
         errno = EINVAL;
         return -1;
     }
-    res = (int)readlink(cpath, cbuf, Py_ARRAY_LENGTH(cbuf));
+    res = readlink(cpath, cbuf, cbuf_len);
     PyMem_RawFree(cpath);
-    if (res == -1)
+    if (res == -1) {
         return -1;
-    if (res == Py_ARRAY_LENGTH(cbuf)) {
+    }
+    if ((size_t)res == cbuf_len) {
         errno = EINVAL;
         return -1;
     }
@@ -1761,6 +1816,103 @@ _Py_wrealpath(const wchar_t *path,
     return resolved_path;
 }
 #endif
+
+
+#ifndef MS_WINDOWS
+int
+_Py_isabs(const wchar_t *path)
+{
+    return (path[0] == SEP);
+}
+#endif
+
+
+/* Get an absolute path.
+   On error (ex: fail to get the current directory), return -1.
+   On memory allocation failure, set *abspath_p to NULL and return 0.
+   On success, return a newly allocated to *abspath_p to and return 0.
+   The string must be freed by PyMem_RawFree(). */
+int
+_Py_abspath(const wchar_t *path, wchar_t **abspath_p)
+{
+#ifdef MS_WINDOWS
+    wchar_t woutbuf[MAX_PATH], *woutbufp = woutbuf;
+    DWORD result;
+
+    result = GetFullPathNameW(path,
+                              Py_ARRAY_LENGTH(woutbuf), woutbuf,
+                              NULL);
+    if (!result) {
+        return -1;
+    }
+
+    if (result > Py_ARRAY_LENGTH(woutbuf)) {
+        if ((size_t)result <= (size_t)PY_SSIZE_T_MAX / sizeof(wchar_t)) {
+            woutbufp = PyMem_RawMalloc((size_t)result * sizeof(wchar_t));
+        }
+        else {
+            woutbufp = NULL;
+        }
+        if (!woutbufp) {
+            *abspath_p = NULL;
+            return 0;
+        }
+
+        result = GetFullPathNameW(path, result, woutbufp, NULL);
+        if (!result) {
+            PyMem_RawFree(woutbufp);
+            return -1;
+        }
+    }
+
+    if (woutbufp != woutbuf) {
+        *abspath_p = woutbufp;
+        return 0;
+    }
+
+    *abspath_p = _PyMem_RawWcsdup(woutbufp);
+    return 0;
+#else
+    if (_Py_isabs(path)) {
+        *abspath_p = _PyMem_RawWcsdup(path);
+        return 0;
+    }
+
+    wchar_t cwd[MAXPATHLEN + 1];
+    cwd[Py_ARRAY_LENGTH(cwd) - 1] = 0;
+    if (!_Py_wgetcwd(cwd, Py_ARRAY_LENGTH(cwd) - 1)) {
+        /* unable to get the current directory */
+        return -1;
+    }
+
+    size_t cwd_len = wcslen(cwd);
+    size_t path_len = wcslen(path);
+    size_t len = cwd_len + 1 + path_len + 1;
+    if (len <= (size_t)PY_SSIZE_T_MAX / sizeof(wchar_t)) {
+        *abspath_p = PyMem_RawMalloc(len * sizeof(wchar_t));
+    }
+    else {
+        *abspath_p = NULL;
+    }
+    if (*abspath_p == NULL) {
+        return 0;
+    }
+
+    wchar_t *abspath = *abspath_p;
+    memcpy(abspath, cwd, cwd_len * sizeof(wchar_t));
+    abspath += cwd_len;
+
+    *abspath = (wchar_t)SEP;
+    abspath++;
+
+    memcpy(abspath, path, path_len * sizeof(wchar_t));
+    abspath += path_len;
+
+    *abspath = 0;
+    return 0;
+#endif
+}
+
 
 /* Get the current directory. buflen is the buffer size in wide characters
    including the null character. Decode the path from the locale encoding.

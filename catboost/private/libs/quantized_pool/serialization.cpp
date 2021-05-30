@@ -267,13 +267,13 @@ static void WriteAsOneFile(const NCB::TQuantizedPool& pool, IOutputStream* slave
             pool.IgnoredColumnIndices);
         const ui32 poolMetainfoSize = poolMetainfo.ByteSizeLong();
         WriteLittleEndian(poolMetainfoSize, &output);
-        poolMetainfo.SerializeToStream(&output);
+        poolMetainfo.SerializeToArcadiaStream(&output);
     }
 
     const ui64 quantizationSchemaSizeOffset = output.Counter();
     const ui32 quantizationSchemaSize = pool.QuantizationSchema.ByteSizeLong();
     WriteLittleEndian(quantizationSchemaSize, &output);
-    pool.QuantizationSchema.SerializeToStream(&output);
+    pool.QuantizationSchema.SerializeToArcadiaStream(&output);
 
     const ui64 featureCountOffset = output.Counter();
     const ui32 featureCount = sortedTrueFeatureIndices.size();
@@ -507,6 +507,8 @@ namespace {
         {}
         NCB::TQuantizedPool LoadQuantizedPool(NCB::TLoadQuantizedPoolParameters params) override;
         TVector<ui8> LoadQuantizedColumn(ui32 columnIdx) override;
+        TVector<ui8> LoadQuantizedColumn(ui32 columnIdx, ui64 offset, ui64 count) override;
+        NCB::TPathWithScheme GetPoolPathWithScheme() const override;
     private:
         NCB::TPathWithScheme PathWithScheme;
     };
@@ -621,6 +623,13 @@ TVector<ui8> TFileQuantizedPoolLoader::LoadQuantizedColumn(ui32 /*columnIdx*/) {
     CB_ENSURE_INTERNAL(false, "Schema quantized does not support columnwise loading");
 }
 
+TVector<ui8> TFileQuantizedPoolLoader::LoadQuantizedColumn(ui32 /*columnIdx*/, ui64 /*offset*/, ui64 /*count*/) {
+    CB_ENSURE_INTERNAL(false, "Schema quantized does not support columnwise loading");
+}
+
+NCB::TPathWithScheme TFileQuantizedPoolLoader::GetPoolPathWithScheme() const {
+    return PathWithScheme;
+}
 
 NCB::TQuantizedPoolLoaderFactory::TRegistrator<TFileQuantizedPoolLoader> FileQuantizedPoolLoaderReg("quantized");
 
@@ -1022,24 +1031,14 @@ namespace NCB {
                 const auto catFeatureIdx =
                     featuresLayout->GetInternalFeatureIdx<EFeatureType::Categorical>(externalFeatureIdx);
 
-                TMap<ui32, TValueWithCount> dstCatFeaturePerfectHash;
-
                 TMaybeData<const IQuantizedCatValuesHolder*> feature =
                     quantizedObjectsData->GetCatFeature(*catFeatureIdx);
 
+                TMap<ui32, TValueWithCount> dstCatFeaturePerfectHash
+                    = quantizedFeaturesInfo->GetCategoricalFeaturesPerfectHash(catFeatureIdx).ToMap();
+
                 THolder<TSrcColumnBase> maybeFeatureColumn;
                 if (feature) {
-                    const auto& srcCatFeaturePerfectHash =
-                        quantizedFeaturesInfo->GetCategoricalFeaturesPerfectHash(catFeatureIdx);
-
-                    dstCatFeaturePerfectHash = srcCatFeaturePerfectHash.Map;
-                    if (srcCatFeaturePerfectHash.DefaultMap.Defined()) {
-                        dstCatFeaturePerfectHash.emplace(
-                            srcCatFeaturePerfectHash.DefaultMap->SrcValue,
-                            srcCatFeaturePerfectHash.DefaultMap->DstValueWithCount
-                       );
-                    }
-
                     if (dstCatFeaturePerfectHash.size() > ((size_t)Max<ui16>() + 1)) {
                         maybeFeatureColumn = GenerateSrcColumn<ui32>(**feature);
                     } else if (dstCatFeaturePerfectHash.size() > ((size_t)Max<ui8>() + 1)) {

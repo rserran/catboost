@@ -50,14 +50,26 @@
 #include <util/random/shuffle.h>
 #include <util/system/compiler.h>
 #include <util/system/hp_timer.h>
-
+#include <library/cpp/threading/local_executor/tbb_local_executor.h>
 #include <functional>
 
 using namespace NCB;
 
+static THolder<NPar::ILocalExecutor> CreateLocalExecutor(const NCatboostOptions::TCatBoostOptions& catBoostOptions) {
+    const bool isGpuDeviceType = catBoostOptions.GetTaskType() == ETaskType::GPU;
+    const int threadCount = catBoostOptions.SystemOptions.Get().NumThreads.Get();
+    if (isGpuDeviceType && TTrainerFactory::Has(ETaskType::GPU)) {
+        auto localExecutorHolder = MakeHolder<NPar::TLocalExecutor>();
+        localExecutorHolder->RunAdditionalThreads(threadCount - 1);
+        return localExecutorHolder;
+    } else {
+        return MakeHolder<NPar::TTbbLocalExecutor<>>(threadCount);
+    }
+}
 
 static void ShrinkModel(int itCount, const TCtrHelper& ctrsHelper, TLearnProgress* progress) {
     itCount += SafeIntegerCast<int>(progress->InitTreesSize);
+    Y_ASSERT(SafeIntegerCast<int>(progress->TreeStruct.size()) >= itCount);
     progress->LeafValues.resize(itCount);
     progress->TreeStruct.resize(itCount);
     progress->TreeStats.resize(itCount);
@@ -337,6 +349,7 @@ static void Train(
     const TTrainModelInternalOptions& internalOptions,
     const TTrainingDataProviders& data,
     ITrainingCallbacks* trainingCallbacks,
+    ICustomCallbacks* customCallbacks,
     TLearnContext* ctx,
     TVector<TVector<TVector<double>>>* testMultiApprox // [test][dim][docIdx]
 ) {
@@ -391,6 +404,18 @@ static void Train(
 
         TrainOneIteration(data, ctx);
 
+        if (HasInvalidValues(ctx->LearnProgress->LeafValues.back())) {
+            ctx->LearnProgress->LeafValues.pop_back();
+            ctx->LearnProgress->TreeStruct.pop_back();
+            if (!ctx->LearnProgress->ModelShrinkHistory.empty()) {
+                ctx->LearnProgress->ModelShrinkHistory.pop_back();
+            }
+            CATBOOST_WARNING_LOG << "Training has stopped (degenerate solution on iteration "
+                << iter << ", probably too small l2-regularization, try to increase it)" << Endl;
+            profile.FinishIteration();
+            break;
+        }
+
         CalcErrors(data, metricsData, iter, ctx);
 
         profile.AddOperation("Calc errors");
@@ -433,18 +458,8 @@ static void Train(
             &loggingData.Logger
         );
 
-        if (HasInvalidValues(ctx->LearnProgress->LeafValues.back())) {
-            ctx->LearnProgress->LeafValues.pop_back();
-            ctx->LearnProgress->TreeStruct.pop_back();
-            if (!ctx->LearnProgress->ModelShrinkHistory.empty()) {
-                ctx->LearnProgress->ModelShrinkHistory.pop_back();
-            }
-            CATBOOST_WARNING_LOG << "Training has stopped (degenerate solution on iteration "
-                << iter << ", probably too small l2-regularization, try to increase it)" << Endl;
-            break;
-        }
-
-        continueTraining = trainingCallbacks->IsContinueTraining(ctx->LearnProgress->MetricsAndTimeHistory);
+        continueTraining = trainingCallbacks->IsContinueTraining(ctx->LearnProgress->MetricsAndTimeHistory)
+                && customCallbacks->AfterIteration(ctx->LearnProgress->MetricsAndTimeHistory);
     }
 
     ctx->SaveProgress(onSaveSnapshotCallback);
@@ -699,6 +714,15 @@ static void SaveModel(
     }
 }
 
+TCustomCallbacks::TCustomCallbacks(TMaybe<TCustomCallbackDescriptor> callbackDescriptor)
+        : CallbackDescriptor(std::move(callbackDescriptor)) {
+}
+bool TCustomCallbacks::AfterIteration(const TMetricsAndTimeLeftHistory &history) {
+    if (!CallbackDescriptor.Empty()) {
+        return CallbackDescriptor->AfterIterationFunc(history, CallbackDescriptor->CustomData);
+    }
+    return true;
+}
 
 namespace {
     class TCPUModelTrainer : public IModelTrainer {
@@ -713,6 +737,7 @@ namespace {
             TMaybe<TPrecomputedOnlineCtrData> precomputedSingleOnlineCtrDataForSingleFold,
             const TLabelConverter& labelConverter,
             ITrainingCallbacks* trainingCallbacks,
+            ICustomCallbacks* customCallbacks,
             TMaybe<TFullModel*> initModel,
             THolder<TLearnProgress> initLearnProgress,
             TDataProviders initModelApplyCompatiblePools,
@@ -817,14 +842,16 @@ namespace {
                     = (trainingData.Learn->ObjectsData->GetQuantizedFeaturesInfo()
                         ->CalcMaxCategoricalFeaturesUniqueValuesCountOnLearn()
                        > ctx.Params.CatFeatureParams->OneHotMaxSize.Get());
-                CB_ENSURE(!calcCtrs, "CTRs are not yet supported in distributed training on CPU");
+                CB_ENSURE(
+                    !calcCtrs || (ctx.Params.CatFeatureParams->MaxTensorComplexity.Get() == 1),
+                    "MaxTensorComplexity > 1 is not yet supported in distributed training on CPU");
 
                 MapBuildPlainFold(&ctx);
             }
             TVector<TVector<double>> oneRawValues(ctx.LearnProgress->ApproxDimension);
             TVector<TVector<TVector<double>>> rawValues(trainingData.Test.size(), oneRawValues);
 
-            Train(internalOptions, trainingData, trainingCallbacks, &ctx, &rawValues);
+            Train(internalOptions, trainingData, trainingCallbacks, customCallbacks, &ctx, &rawValues);
 
             if (!dstLearnProgress) {
                 // Save memory as it is no longer needed
@@ -873,6 +900,7 @@ static void TrainModel(
     TQuantizedFeaturesInfoPtr quantizedFeaturesInfo,
     const TMaybe<TCustomObjectiveDescriptor>& objectiveDescriptor,
     const TMaybe<TCustomMetricDescriptor>& evalMetricDescriptor,
+    const TMaybe<TCustomCallbackDescriptor>& callbackDescriptor,
     TDataProviders pools,
 
     // can be non-empty only if there is single fold
@@ -1038,8 +1066,11 @@ static void TrainModel(
     }
 
     const auto defaultTrainingCallbacks = MakeHolder<ITrainingCallbacks>();
+    const auto customCallbacks = MakeHolder<TCustomCallbacks>(callbackDescriptor);
+    TTrainModelInternalOptions trainModelInternalOptions;
+    trainModelInternalOptions.HaveLearnFeatureInMemory = haveLearnFeaturesInMemory;
     modelTrainerHolder->TrainModel(
-        TTrainModelInternalOptions(),
+        trainModelInternalOptions,
         catBoostOptions,
         updatedOutputOptions,
         objectiveDescriptor,
@@ -1048,6 +1079,7 @@ static void TrainModel(
         std::move(precomputedSingleOnlineCtrDataForSingleFold),
         labelConverter,
         defaultTrainingCallbacks.Get(),
+        customCallbacks.Get(),
         std::move(initModel),
         std::move(initLearnProgress),
         needInitModelApplyCompatiblePools ? std::move(pools) : TDataProviders(),
@@ -1115,10 +1147,6 @@ void TrainModel(
         );
     }
 
-
-    NPar::TLocalExecutor executor;
-    executor.RunAdditionalThreads(catBoostOptions.SystemOptions.Get().NumThreads.Get() - 1);
-
     TVector<NJson::TJsonValue> classLabels = catBoostOptions.DataProcessingOptions->ClassLabels;
     const auto objectsOrder = catBoostOptions.DataProcessingOptions->HasTimeFlag.Get() ?
         EObjectsOrder::Ordered : EObjectsOrder::Undefined;
@@ -1137,7 +1165,7 @@ void TrainModel(
             << pathScheme << ";" << " fstr type is set to " << EFstrType::PredictionValuesChange << Endl;
         fstrType = EFstrType::PredictionValuesChange;
     }
-
+    THolder<NPar::ILocalExecutor> localExecutorHolder = CreateLocalExecutor(catBoostOptions);
     TDataProviders pools = LoadPools(
         loadOptions,
         catBoostOptions.GetTaskType(),
@@ -1145,7 +1173,7 @@ void TrainModel(
         objectsOrder,
         TDatasetSubset::MakeColumns(haveLearnFeaturesInMemory),
         &classLabels,
-        &executor,
+        localExecutorHolder.Get(),
         &profile);
 
     const bool hasEmbeddingFeatures = pools.Learn->MetaInfo.FeaturesLayout->GetEmbeddingFeatureCount() > 0;
@@ -1154,6 +1182,14 @@ void TrainModel(
     }
 
     TMaybe<TPrecomputedOnlineCtrData> precomputedSingleOnlineCtrDataForSingleFold;
+    if (loadOptions.PrecomputedMetadataFile) {
+        precomputedSingleOnlineCtrDataForSingleFold = ReadPrecomputedOnlineCtrData(
+            catBoostOptions.GetTaskType(),
+            loadOptions,
+            localExecutorHolder.Get(),
+            &profile
+        );
+    }
 
     TVector<TString> outputColumns;
     if (!evalOutputFileName.empty() && !pools.Test.empty()) {
@@ -1202,6 +1238,7 @@ void TrainModel(
         quantizedFeaturesInfo,
         /*objectiveDescriptor*/ Nothing(),
         /*evalMetricDescriptor*/ Nothing(),
+        /*callbackDescriptor*/ Nothing(),
         needPoolAfterTrain ? pools : std::move(pools),
         std::move(precomputedSingleOnlineCtrDataForSingleFold),
         /*initModel*/ Nothing(),
@@ -1212,7 +1249,7 @@ void TrainModel(
         GetMutablePointers(evalResults),
         /*metricsAndTimeHistory*/ nullptr,
         /*dstLearnProgress*/ nullptr,
-        &executor
+        localExecutorHolder.Get()
     );
 
     const auto fullModelPath = NCatboostOptions::AddExtension(
@@ -1234,7 +1271,7 @@ void TrainModel(
             const NCB::TPathWithScheme& testSetPath = testIdx < loadOptions.TestSetPaths.ysize() ? loadOptions.TestSetPaths[testIdx] : NCB::TPathWithScheme();
             OutputEvalResultToFile(
                 evalResults[testIdx],
-                &executor,
+                localExecutorHolder.Get(),
                 outputColumns,
                 model.GetLossFunctionName(),
                 visibleLabelsHelper,
@@ -1267,7 +1304,7 @@ void TrainModel(
         CalcAndOutputFstr(
             model,
             useLearnToCalcFstr ? pools.Learn : nullptr,
-            &executor,
+            localExecutorHolder.Get(),
             &fstrRegularFileName,
             &fstrInternalFileName,
             fstrType);
@@ -1474,6 +1511,7 @@ void TrainModel(
     NCB::TQuantizedFeaturesInfoPtr quantizedFeaturesInfo, // can be nullptr
     const TMaybe<TCustomObjectiveDescriptor>& objectiveDescriptor,
     const TMaybe<TCustomMetricDescriptor>& evalMetricDescriptor,
+    const TMaybe<TCustomCallbackDescriptor>& callbackDescriptor,
     NCB::TDataProviders pools, // not rvalue reference because Cython does not support them
     TMaybe<TFullModel*> initModel,
     THolder<TLearnProgress>* initLearnProgress,
@@ -1493,17 +1531,14 @@ void TrainModel(
 
     NCatboostOptions::TOutputFilesOptions outputOptions;
     outputOptions.Load(outputFilesOptionsJson);
-
-    NPar::TLocalExecutor executor;
-    executor.RunAdditionalThreads(
-        NCatboostOptions::GetThreadCount(trainOptionsJson) - 1);
-
+    THolder<NPar::ILocalExecutor> localExecutorHolder = CreateLocalExecutor(NCatboostOptions::LoadOptions(trainOptionsJson));
     TrainModel(
         trainOptionsJson,
         outputOptions,
         quantizedFeaturesInfo,
         objectiveDescriptor,
         evalMetricDescriptor,
+        callbackDescriptor,
         std::move(pools),
         /*precomputedSingleOnlineCtrDataForSingleFold*/ Nothing(),
         std::move(initModel),
@@ -1514,5 +1549,5 @@ void TrainModel(
         evalResultPtrs,
         metricsAndTimeHistory,
         dstLearnProgress,
-        &executor);
+        localExecutorHolder.Get());
 }

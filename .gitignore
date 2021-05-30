@@ -25,3 +25,13 @@ test-results
 
 /msvs/Debug/*
 /msvs/Release/*
+
+# R build artifacts
+catboost*.tar.gz
+catboost.Rcheck/
+
+# widget build artefacts
+node_modules/
+**/widget/js/dist/
+**/widget/labextension
+**/widget/nbextension

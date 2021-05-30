@@ -94,6 +94,8 @@ public:
 
     void ReSchedule() noexcept;
 
+    void Switch() noexcept;
+
     void SwitchTo(TExceptionSafeContext* ctx) {
         Trampoline_.SwitchTo(ctx);
     }
@@ -127,6 +129,15 @@ static void ContHelperMemberFunc(TCont* c, void* arg) {
     ((reinterpret_cast<T*>(arg))->*M)(c);
 }
 
+class IUserEvent
+    : public TIntrusiveListItem<IUserEvent>
+{
+public:
+    virtual ~IUserEvent() = default;
+
+    virtual void Execute() = 0;
+};
+
 /// Central coroutine class.
 /// Note, coroutines are single-threaded, and all methods must be called from the single thread
 class TContExecutor {
@@ -156,10 +167,6 @@ public:
     template <typename T, void (T::*M)(TCont*)>
     void Execute(T* obj) noexcept {
         Execute(ContHelperMemberFunc<T, M>, obj);
-    }
-
-    TExceptionSafeContext* SchedContext() noexcept {
-        return &SchedContext_;
     }
 
     template <class Functor>
@@ -239,6 +246,9 @@ public:
         RegisterInWaitQueue(event);
     }
 
+    void ScheduleUserEvent(IUserEvent* event) {
+        UserEvents_.PushBack(event);
+    }
 private:
     void Release(TCont* cont) noexcept;
 
@@ -251,8 +261,6 @@ private:
     void ScheduleExecution(TCont* cont) noexcept;
 
     void ScheduleExecutionNow(TCont* cont) noexcept;
-
-    void Activate(TCont* cont) noexcept;
 
     void DeleteScheduled() noexcept;
 
@@ -272,8 +280,10 @@ private:
     TContList ReadyNext_;
     NCoro::TEventWaitQueue WaitQueue_;
     NCoro::TContPoller Poller_;
-    NCoro::TContPoller::TEvents Events_;
+    NCoro::TContPoller::TEvents PollerEvents_;
     TInstant LastPoll_;
+
+    TIntrusiveList<IUserEvent> UserEvents_;
 
     size_t Allocated_ = 0;
     TCont* Current_ = nullptr;

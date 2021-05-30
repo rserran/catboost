@@ -100,35 +100,7 @@ namespace {
 }
 
 size_t BackTrace(void** p, size_t len) {
-#if defined(pg_sanitizer_enabled)
-    struct TStackFrame {
-        const TStackFrame* Next;
-        void* Ret;
-    };
-
-    const TStackFrame* frame = (const TStackFrame*)__builtin_frame_address(0);
-    const TStackFrame* bound = frame + 4096;
-
-    size_t cnt = 0;
-
-    while (frame && cnt < len) {
-        p[cnt++] = frame->Ret;
-
-        if (frame->Next < frame || frame->Next > bound) {
-            if (cnt < 5) {
-                return NGCCBacktrace::BackTrace(p, len);
-            } else {
-                return cnt;
-            }
-        }
-
-        frame = frame->Next;
-    }
-
-    return cnt;
-#else
     return NGCCBacktrace::BackTrace(p, len);
-#endif
 }
 #endif
 
@@ -269,22 +241,18 @@ void FormatBackTrace(IOutputStream* out, void* const* backtrace, size_t backtrac
     }
 }
 
-void FormatBackTraceImpl(IOutputStream* out) {
-    void* array[300];
-    const size_t s = BackTrace(array, Y_ARRAY_SIZE(array));
-    FormatBackTrace(out, array, s);
-}
-
-TFormatBackTraceFn FormatBackTraceFn = FormatBackTraceImpl;
-
-void FormatBackTrace(IOutputStream* out) {
-    FormatBackTraceFn(out);
-}
+TFormatBackTraceFn FormatBackTraceFn = FormatBackTrace;
 
 TFormatBackTraceFn SetFormatBackTraceFn(TFormatBackTraceFn f) {
     TFormatBackTraceFn prevFn = FormatBackTraceFn;
     FormatBackTraceFn = f;
     return prevFn;
+}
+
+void FormatBackTrace(IOutputStream* out) {
+    void* array[300];
+    const size_t s = BackTrace(array, Y_ARRAY_SIZE(array));
+    FormatBackTraceFn(out, array, s);
 }
 
 TFormatBackTraceFn GetFormatBackTraceFn() {
@@ -305,11 +273,21 @@ void TBackTrace::Capture() {
 }
 
 void TBackTrace::PrintTo(IOutputStream& out) const {
-    FormatBackTrace(&out, Data, Size);
+    FormatBackTraceFn(&out, Data, Size);
 }
 
 TString TBackTrace::PrintToString() const {
     TStringStream ss;
     PrintTo(ss);
     return ss.Str();
+}
+
+TBackTrace TBackTrace::FromCurrentException() {
+#ifdef _YNDX_LIBUNWIND_EXCEPTION_BACKTRACE_SIZE
+    TBackTrace result;
+    result.Size = __cxxabiv1::__cxa_collect_current_exception_backtrace(result.Data, CAPACITY);
+    return result;
+#else
+    return TBackTrace();
+#endif
 }

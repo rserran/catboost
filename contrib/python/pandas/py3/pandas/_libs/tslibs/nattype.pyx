@@ -1,4 +1,7 @@
+import warnings
+
 from cpython.datetime cimport (
+    PyDate_Check,
     PyDateTime_Check,
     PyDateTime_IMPORT,
     PyDelta_Check,
@@ -121,9 +124,28 @@ cdef class _NaT(datetime):
                 result.fill(_nat_scalar_rules[op])
             elif other.dtype.kind == "O":
                 result = np.array([PyObject_RichCompare(self, x, op) for x in other])
+            elif op == Py_EQ:
+                result = np.zeros(other.shape, dtype=bool)
+            elif op == Py_NE:
+                result = np.ones(other.shape, dtype=bool)
             else:
                 return NotImplemented
             return result
+
+        elif PyDate_Check(other):
+            # GH#39151 don't defer to datetime.date object
+            if op == Py_EQ:
+                return False
+            if op == Py_NE:
+                return True
+            warnings.warn(
+                "Comparison of NaT with datetime.date is deprecated in "
+                "order to match the standard library behavior.  "
+                "In a future version these will be considered non-comparable.",
+                FutureWarning,
+                stacklevel=1,
+            )
+            return False
 
         return NotImplemented
 

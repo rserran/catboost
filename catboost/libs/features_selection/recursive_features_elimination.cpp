@@ -17,6 +17,8 @@
 
 #include <util/generic/hash_set.h>
 
+#include <limits>
+
 using namespace NCatboostOptions;
 
 
@@ -165,6 +167,8 @@ namespace NCB {
         const ECalcTypeShapValues shapCalcType,
         double currentLossValue,
         const TCalcLoss& calcLoss,
+        const EMetricBestValue lossBestValueType,
+        const float lossBestValue,
         TVector<TVector<double>> approx,
         THashSet<ui32>* featuresForSelectSet,
         TFeaturesSelectionSummary* summary,
@@ -204,10 +208,27 @@ namespace NCB {
                 }, blockParams, NPar::TLocalExecutor::WAIT_COMPLETE);
             }
             ui32 worstFeatureIdx = featureToLossValueChange.begin()->first;
+            double worstFeatureScore = std::numeric_limits<double>::max();
             for (auto [featureIdx, featureLossValueChange] : featureToLossValueChange) {
-                CATBOOST_DEBUG_LOG << "Feature #" << featureIdx << " has loss function change " << featureLossValueChange << Endl;
-                if (featureLossValueChange < featureToLossValueChange[worstFeatureIdx]) {
+                double featureScore = featureLossValueChange;
+                switch(lossBestValueType) {
+                    case EMetricBestValue::Min:
+                        break;
+                    case EMetricBestValue::Max:
+                        featureScore = -featureScore;
+                        break;
+                    case EMetricBestValue::FixedValue:
+                        featureScore = abs(currentLossValue + featureLossValueChange - lossBestValue)
+                                     - abs(currentLossValue - lossBestValue);
+                        break;
+                    default:
+                        ythrow TCatBoostException() << "unsupported bestValue metric type";
+                }
+                CATBOOST_DEBUG_LOG << "Feature #" << featureIdx << " has score " << featureScore << Endl;
+
+                if (featureScore < worstFeatureScore) {
                     worstFeatureIdx = featureIdx;
+                    worstFeatureScore = featureScore;
                 }
             }
             executor->ExecRange([&](ui32 docIdx) {
@@ -232,6 +253,7 @@ namespace NCB {
         const EFstrType fstrType,
         const ECalcTypeShapValues shapCalcType,
         double currentLossValue,
+        const EMetricBestValue lossBestValueType,
         THashSet<ui32>* featuresForSelectSet,
         TFeaturesSelectionSummary* summary,
         TFeaturesSelectionLossGraphBuilder* lossGraphBuilder,
@@ -260,8 +282,13 @@ namespace NCB {
                 CATBOOST_NOTICE_LOG << "Feature #" << featureIdx << " eliminated" << Endl;
                 featuresForSelectSet->erase(featureIdx);
                 summary->EliminatedFeatures.push_back(featureIdx);
-                if (fstrType == EFstrType::LossFunctionChange) {
-                    currentLossValue += featureEffect[featureIdx];
+                if (fstrType == EFstrType::LossFunctionChange && lossBestValueType != EMetricBestValue::FixedValue) {
+                    if (lossBestValueType == EMetricBestValue::Min) {
+                        currentLossValue += featureEffect[featureIdx];
+                    } else {
+                        Y_ASSERT(lossBestValueType == EMetricBestValue::Max);
+                        currentLossValue -= featureEffect[featureIdx];
+                    }
                     lossGraphBuilder->AddEstimatedPoint(summary->EliminatedFeatures.size(), currentLossValue);
                 }
                 if (++eliminatedFeaturesCount == numFeaturesToEliminateAtThisStep) {
@@ -284,6 +311,7 @@ namespace NCB {
         TVector<TEvalResult> evalResults(trainingData.Test.ysize());
         THolder<IModelTrainer> modelTrainerHolder(TTrainerFactory::Construct(catBoostOptions.GetTaskType()));
         TRestorableFastRng64 rnd(catBoostOptions.RandomSeed);
+        const auto defaultCustomCallbacks = MakeHolder<TCustomCallbacks>(Nothing());
         modelTrainerHolder->TrainModel(
             TTrainModelInternalOptions(),
             catBoostOptions,
@@ -294,6 +322,7 @@ namespace NCB {
             /*precomputedSingleOnlineCtrDataForSingleFold*/ Nothing(),
             labelConverter,
             callbacks,
+            defaultCustomCallbacks.Get(),
             /*initModel*/ Nothing(),
             /*initLearnProgress*/ nullptr,
             TDataProviders(),
@@ -315,6 +344,7 @@ namespace NCB {
         const NCB::TDataProviders& pools,
         const TLabelConverter& labelConverter,
         TTrainingDataProviders trainingData,
+        TFullModel* dstModel,
         NPar::ILocalExecutor* executor
     ) {
         auto outputFileOptions = initialOutputFileOptions;
@@ -402,8 +432,13 @@ namespace NCB {
             );
         };
 
+        EMetricBestValue lossBestValueType;
+        float lossBestValue;
+        loss->GetBestValue(&lossBestValueType, &lossBestValue);
+
         for (auto step : xrange(alreadyPassedSteps, featuresSelectOptions.Steps.Get())) {
             CATBOOST_NOTICE_LOG << "Step #" << step + 1 << " out of " << featuresSelectOptions.Steps.Get() << Endl;
+            outputFileOptions.SetTrainDir(initialOutputFileOptions.GetTrainDir() + "/model-" + ToString(step));
             const TFullModel model = trainModel();
             TVector<TVector<double>> approx = applyModel(model);
             double currentLossValue = calcLoss(approx);
@@ -419,6 +454,8 @@ namespace NCB {
                         featuresSelectOptions.ShapCalcType,
                         currentLossValue,
                         calcLoss,
+                        lossBestValueType,
+                        lossBestValue,
                         std::move(approx),
                         &featuresForSelectSet,
                         &summary,
@@ -439,6 +476,7 @@ namespace NCB {
                         fstrType,
                         featuresSelectOptions.ShapCalcType,
                         currentLossValue,
+                        lossBestValueType,
                         &featuresForSelectSet,
                         &summary,
                         &lossGraphBuilder,
@@ -455,18 +493,23 @@ namespace NCB {
 
         if (featuresSelectOptions.TrainFinalModel.Get()) {
             CATBOOST_NOTICE_LOG << "Train final model" << Endl;
+            outputFileOptions.SetTrainDir(initialOutputFileOptions.GetTrainDir() + "/model-final");
             const TFullModel finalModel = trainModel();
             const double lossValue = calcLoss(applyModel(finalModel));
 
             lossGraphBuilder.AddPrecisePoint(summary.EliminatedFeatures.size(), lossValue);
 
-            CATBOOST_NOTICE_LOG << "Save final model" << Endl;
-            ExportFullModel(
-                finalModel,
-                initialOutputFileOptions.GetResultModelFilename(),
-                dynamic_cast<const TObjectsDataProvider*>(trainingData.Learn->ObjectsData.Get()),
-                outputFileOptions.GetModelFormats()
-            );
+            if (dstModel != nullptr) {
+                *dstModel = finalModel;
+            } else {
+                CATBOOST_NOTICE_LOG << "Save final model" << Endl;
+                ExportFullModel(
+                    finalModel,
+                    initialOutputFileOptions.GetResultModelFilename(),
+                    dynamic_cast<const TObjectsDataProvider*>(trainingData.Learn->ObjectsData.Get()),
+                    outputFileOptions.GetModelFormats()
+                );
+            }
         }
 
         summary.SelectedFeatures = TVector<ui32>(featuresForSelectSet.begin(), featuresForSelectSet.end());

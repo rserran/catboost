@@ -1016,6 +1016,19 @@ void TFullModel::Calc(
     GetCurrentEvaluator()->Calc(floatFeatures, catFeatures, treeStart, treeEnd, results, featureInfo);
 }
 
+void TFullModel::CalcWithHashedCatAndText(
+    TConstArrayRef<TConstArrayRef<float>> floatFeatures,
+    TConstArrayRef<TConstArrayRef<int>> catFeatures,
+    TConstArrayRef<TVector<TStringBuf>> textFeatures,
+    size_t treeStart,
+    size_t treeEnd,
+    TArrayRef<double> results,
+    const TFeatureLayout* featureInfo
+) const {
+    TVector<TConstArrayRef<TStringBuf>> stringbufTextVecRefs{textFeatures.begin(), textFeatures.end()};
+    GetCurrentEvaluator()->CalcWithHashedCatAndText(floatFeatures, catFeatures, stringbufTextVecRefs, treeStart, treeEnd, results, featureInfo);
+}
+
 void TFullModel::Calc(
     TConstArrayRef<TConstArrayRef<float>> floatFeatures,
     TConstArrayRef<TVector<TStringBuf>> catFeatures,
@@ -1327,6 +1340,22 @@ TString TFullModel::GetLossFunctionName() const {
         return ToString(lossDescription->GetLossFunction());
     }
     return {};
+}
+
+
+double TFullModel::GetBinClassProbabilityThreshold() const {
+    double threshold = DEFAULT_BINCLASS_PROBABILITY_THRESHOLD;
+    if (ModelInfo.contains("binclass_probability_threshold")) {
+        if (!TryFromString<double>(ModelInfo.at("binclass_probability_threshold"), threshold)) {
+            CATBOOST_WARNING_LOG << "Float number at metadata key binclass_probability_threshold cannot be parsed" << Endl;
+        }
+    }
+    return threshold;
+}
+
+
+double TFullModel::GetBinClassLogitThreshold() const {
+    return NCB::Logit(GetBinClassProbabilityThreshold());
 }
 
 

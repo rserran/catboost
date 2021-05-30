@@ -1,14 +1,12 @@
 LIBRARY()
 
-LICENSE(
-    BSD
-)
+LICENSE(MIT BSD-2-Clause)
 
 
 
 PEERDIR(contrib/libs/cppdemangle)
 
-IF (CXX_UNWIND STREQUAL "glibcxx_dynamic" OR ARCH_PPC64LE)
+IF (CXX_UNWIND == "glibcxx_dynamic" OR ARCH_PPC64LE)
     LDFLAGS(-lgcc_s)
 ELSE()
     PEERDIR(contrib/libs/libunwind)
@@ -21,7 +19,7 @@ ADDINCL(
 NO_RUNTIME()
 NO_COMPILER_WARNINGS()
 
-IF (SANITIZER_TYPE STREQUAL undefined)
+IF (SANITIZER_TYPE == undefined)
     NO_SANITIZE()
 ENDIF ()
 

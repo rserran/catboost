@@ -1,5 +1,7 @@
 LIBRARY()
 
+LICENSE(BSD-3-Clause)
+
 
 
 NO_PLATFORM()
@@ -8,7 +10,7 @@ NO_UTIL()
 
 DISABLE(NEED_PLATFORM_PEERDIRS)
 
-IF (OS_SDK STREQUAL "ubuntu-14")
+IF (OS_SDK == "ubuntu-14")
     PEERDIR(build/platform/linux_sdk)
 
     SRCS(

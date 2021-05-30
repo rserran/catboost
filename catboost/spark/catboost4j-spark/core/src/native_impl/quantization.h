@@ -3,44 +3,72 @@
 #include <catboost/libs/data/objects.h>
 #include <catboost/libs/data/quantized_features_info.h>
 
+#include <library/cpp/grid_creator/binarization.h>
+
 #include <util/generic/fwd.h>
 #include <util/generic/array_ref.h>
 #include <util/generic/vector.h>
 #include <util/generic/yexception.h>
 #include <util/system/types.h>
 
+namespace NPar {
+    class TLocalExecutor;
+}
+
+namespace NCB {
+    class TFeaturesLayout;
+}
+
+
+NCB::TQuantizedFeaturesInfoPtr PrepareQuantizationParameters(
+    const NCB::TFeaturesLayout& featuresLayout,
+    const TString& plainJsonParamsAsString
+) throw (yexception);
+
 
 class TNanModeAndBordersBuilder {
 public:
-    TNanModeAndBordersBuilder(
-        const TString& plainJsonParamsAsString,
-        i32 featureCount,
-        const TVector<TString>& featureNames,
-        i32 sampleSize
-    ) throw (yexception);
+    TNanModeAndBordersBuilder(NCB::TQuantizedFeaturesInfoPtr quantizedFeaturesInfo) throw (yexception);
+
+    bool HasFeaturesToCalc() const {
+        return !FeatureIndicesToCalc.empty();
+    }
+
+    // call before Finish and preferably before adding samples
+    void SetSampleSize(i32 sampleSize) throw (yexception);
 
     void AddSample(TConstArrayRef<double> objectData) throw (yexception);
 
-    // returns with updated parameters
-    NCB::TQuantizedFeaturesInfoPtr Finish(i32 threadCount) throw (yexception);
+    void CalcBordersWithoutNans(i32 threadCount) throw (yexception);
+
+    /* updates parameters in quantizedFeaturesInfo passed to constructor
+     * @param hasNans is an array with flatFeatureIdx index, can be empty
+     */
+    void Finish(TConstArrayRef<i8> hasNans) throw (yexception);
 
 private:
-    size_t SampleSize;
+    size_t SampleSize = 0;
     TVector<ui32> FeatureIndicesToCalc;
     NCB::TQuantizedFeaturesInfoPtr QuantizedFeaturesInfo;
     TVector<TVector<float>> Data; // [featureIdxToCalc]
+
+    // need to save them until full hasNans information becomes available
+    TVector<NSplitSelection::TQuantization> QuantizationWithoutNans; // [featureIdxToCalc]
+    TVector<bool> HasNans; // [featureIdxToCalc]
 };
 
 
 NCB::TQuantizedObjectsDataProviderPtr Quantize(
     NCB::TQuantizedFeaturesInfoPtr quantizedFeaturesInfo,
     NCB::TRawObjectsDataProviderPtr* rawObjectsDataProvider, // moved into
-    int threadCount
+    NPar::TLocalExecutor* localExecutor
 ) throw (yexception);
 
 
-void GetActiveFloatFeaturesIndices(
+void GetActiveFeaturesIndices(
+    NCB::TFeaturesLayoutPtr featuresLayout,
     NCB::TQuantizedFeaturesInfoPtr quantizedFeaturesInfo,
-    TVector<i32>* ui8Indices,
-    TVector<i32>* ui16Indices
+    TVector<i32>* ui8FlatIndices,
+    TVector<i32>* ui16FlatIndices,
+    TVector<i32>* ui32FlatIndices
 ) throw (yexception);

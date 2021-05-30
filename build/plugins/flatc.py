@@ -15,7 +15,6 @@ class FlatcBase(iw.CustomCommand):
     def __init__(self, path, unit):
         self._path = path
         self._incl_dirs = ['$S', '$B']
-        self._reflect_names = unit.get('FLATBUF_REFLECTION') == 'yes'
         self._user_extra_args = split_args(unit.get('FLATBUF_FLAGS'))
 
     def input(self):
@@ -44,6 +43,7 @@ class FlatcBase(iw.CustomCommand):
 
 
 class Flatc(FlatcBase):
+    OUTPUT_SUFFIX = '.fbs'
 
     def __init__(self, path, unit):
         super(Flatc, self).__init__(path, unit)
@@ -55,16 +55,21 @@ class Flatc(FlatcBase):
         return ['contrib/tools/flatc']
 
     def extensions(self):
-        return [".fbs.h", ".iter.fbs.h"]
+        return [self.OUTPUT_SUFFIX + ".h", ".iter.fbs.h"]
 
     def schema_extension(self):
         return ".bfbs"
 
     def extra_arguments(self):
-        return ['--yandex-maps-iter'] + (['--reflect-names'] if self._reflect_names else [])
+        return [
+            '--yandex-maps-iter',
+            '--gen-object-api',
+            '--filename-suffix', self.OUTPUT_SUFFIX,
+        ]
 
 
 class Flatc64(FlatcBase):
+    OUTPUT_SUFFIX = ".fbs64"
 
     def __init__(self, path, unit):
         super(Flatc64, self).__init__(path, unit)
@@ -76,13 +81,15 @@ class Flatc64(FlatcBase):
         return ['contrib/tools/flatc64']
 
     def extensions(self):
-        return [".fbs64.h"]
+        return [self.OUTPUT_SUFFIX + ".h"]
 
     def schema_extension(self):
         return ".bfbs64"
 
     def extra_arguments(self):
-        return []
+        return [
+            '--filename-suffix', self.OUTPUT_SUFFIX,
+        ]
 
 
 def init():

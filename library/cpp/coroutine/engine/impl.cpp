@@ -47,7 +47,7 @@ bool TCont::Join(TCont* c, TInstant deadLine) noexcept {
                 c->Cancel();
 
                 do {
-                    SwitchTo(Executor()->SchedContext());
+                    Switch();
                 } while (!ev.Empty());
             }
 
@@ -64,6 +64,10 @@ int TCont::SleepD(TInstant deadline) noexcept {
     return ExecuteEvent(&event);
 }
 
+void TCont::Switch() noexcept {
+    Executor()->RunScheduler();
+}
+
 void TCont::Yield() noexcept {
     if (SleepD(TInstant::Zero())) {
         ReScheduleAndSwitch();
@@ -72,7 +76,7 @@ void TCont::Yield() noexcept {
 
 void TCont::ReScheduleAndSwitch() noexcept {
     ReSchedule();
-    SwitchTo(Executor()->SchedContext());
+    Switch();
 }
 
 void TCont::Terminate() {
@@ -141,6 +145,14 @@ void TContExecutor::WaitForIO() {
         // Waking a coroutine puts it into ReadyNext_ list
         const auto next = WaitQueue_.WakeTimedout(now);
 
+        if (!UserEvents_.Empty()) {
+            TIntrusiveList<IUserEvent> userEvents;
+            userEvents.Swap(UserEvents_);
+            do {
+                userEvents.PopFront()->Execute();
+            } while (!userEvents.Empty());
+        }
+
         // Polling will return as soon as there is an event to process or a timeout.
         // If there are woken coroutines we do not want to sleep in the poller
         //      yet still we want to check for new io
@@ -157,11 +169,11 @@ void TContExecutor::WaitForIO() {
 }
 
 void TContExecutor::Poll(TInstant deadline) {
-    Poller_.Wait(Events_, deadline);
+    Poller_.Wait(PollerEvents_, deadline);
     LastPoll_ = Now();
 
     // Waking a coroutine puts it into ReadyNext_ list
-    for (auto event : Events_) {
+    for (auto event : PollerEvents_) {
         auto* lst = (NCoro::TPollEventList*)event.Data;
         const int status = event.Status;
 
@@ -235,12 +247,6 @@ namespace {
     }
 }
 
-void TContExecutor::Activate(TCont* cont) noexcept {
-    Current_ = cont;
-    cont->Scheduled_ = false;
-    SchedContext_.SwitchTo(cont->Trampoline_.Context());
-}
-
 void TContExecutor::DeleteScheduled() noexcept {
     ToDelete_.ForEach([this](TCont* c) {
         Release(c);
@@ -256,14 +262,26 @@ void TContExecutor::RunScheduler() noexcept {
     try {
         TContExecutor* const prev = ThisThreadExecutor();
         ThisThreadExecutor() = this;
+        TCont* caller = Current_;
+        TExceptionSafeContext* context = caller ? caller->Trampoline_.Context() : &SchedContext_;
         Y_DEFER {
             ThisThreadExecutor() = prev;
         };
 
         while (true) {
+            if (CallbackPtr_ && Current_) {
+                CallbackPtr_->OnUnschedule(*this);
+            }
+
+            WaitForIO();
+            DeleteScheduled();
             Ready_.Append(ReadyNext_);
 
             if (Ready_.Empty()) {
+                Current_ = nullptr;
+                if (caller) {
+                    context->SwitchTo(&SchedContext_);
+                }
                 break;
             }
 
@@ -272,15 +290,19 @@ void TContExecutor::RunScheduler() noexcept {
             if (CallbackPtr_) {
                 CallbackPtr_->OnSchedule(*this, *cont);
             }
-            Activate(cont);
-            if (CallbackPtr_) {
-                CallbackPtr_->OnUnschedule(*this);
-            }
 
-            WaitForIO();
-            DeleteScheduled();
+            Current_ = cont;
+            cont->Scheduled_ = false;
+            if (cont == caller) {
+                break;
+            }
+            context->SwitchTo(cont->Trampoline_.Context());
+            if (caller) {
+                break;
+            }
         }
     } catch (...) {
+        TBackTrace::FromCurrentException().PrintTo(Cerr);
         Y_FAIL("Uncaught exception in the scheduler: %s", CurrentExceptionMessage().c_str());
     }
 }

@@ -26,7 +26,7 @@ class Swig(iw.CustomCommand):
         self._main_out = os.path.join(
             self._bindir,
             '' if relpath == '.' else relpath.replace('..', '__'),
-            self._input_name + '_wrap.c')
+            self._input_name + '_wrap.swg.c')
 
         if not path.endswith('.c.swg'):
             self._flags += ['-c++']
@@ -36,7 +36,9 @@ class Swig(iw.CustomCommand):
 
         lang_specific_incl_dir = 'perl5' if self._swig_lang == 'perl' else self._swig_lang
         incl_dirs = [
+            "FOR", "swig",
             posixpath.join(self._library_dir, lang_specific_incl_dir),
+            "FOR", "swig",
             self._library_dir
         ]
         self._incl_dirs = ['$S', '$B'] + [posixpath.join('$S', d) for d in incl_dirs]

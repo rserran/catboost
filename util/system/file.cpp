@@ -15,6 +15,7 @@
 
 #include <util/random/random.h>
 
+#include <util/generic/size_literals.h>
 #include <util/generic/string.h>
 #include <util/generic/ylimits.h>
 #include <util/generic/yexception.h>
@@ -25,6 +26,11 @@
 
 #if defined(_unix_)
 #include <fcntl.h>
+
+#if defined(_linux_) && !defined(_android_) && !defined(FALLOC_FL_KEEP_SIZE)
+#include <linux/falloc.h>
+#endif
+
 #include <stdlib.h>
 #include <unistd.h>
 #include <sys/mman.h>
@@ -50,11 +56,6 @@
 #define HAVE_POSIX_FADVISE 0
 #define HAVE_SYNC_FILE_RANGE 0
 #endif
-
-// Maximum amount of bytes to be read or written via single system call.
-// Some libraries fail when it is greater than max int.
-// FreeBSD has performance loss when it is greater than 1GB.
-const size_t MaxPortion = size_t(1 << 30);
 
 static bool IsStupidFlagCombination(EOpenMode oMode) {
     // ForAppend will actually not be applied in the following combinations:
@@ -384,6 +385,18 @@ bool TFileHandle::Reserve(i64 length) noexcept {
 #error unsupported platform
 #endif
     return true;
+}
+
+bool TFileHandle::FallocateNoResize(i64 length) noexcept {
+    if (!IsOpen()) {
+        return false;
+    }
+#if defined(_linux_) && !defined(_android_)
+    return !fallocate(Fd_, FALLOC_FL_KEEP_SIZE, 0, length);
+#else
+    Y_UNUSED(length);
+    return true;
+#endif
 }
 
 bool TFileHandle::Flush() noexcept {
@@ -872,6 +885,12 @@ public:
         }
     }
 
+    void FallocateNoResize(i64 length) {
+        if (!Handle_.FallocateNoResize(length)) {
+            ythrow TFileError() << "can't allocate " << length << "bytes of space for file " << FileName_.Quote();
+        }
+    }
+
     void Flush() {
         if (!Handle_.Flush()) {
             ythrow TFileError() << "can't flush " << FileName_.Quote();
@@ -894,20 +913,31 @@ public:
         return res;
     }
 
+    // Maximum amount of bytes to be read via single system call.
+    // Some libraries fail when it is greater than max int.
+    // Syscalls can cause contention if they operate on very large data blocks.
+    static constexpr size_t MaxReadPortion = 1_GB;
+
     i32 RawRead(void* bufferIn, size_t numBytes) {
-        return Handle_.Read(bufferIn, numBytes);
+        const size_t toRead = Min(MaxReadPortion, numBytes);
+        return Handle_.Read(bufferIn, toRead);
+    }
+
+    size_t ReadOrFail(void* buf, size_t numBytes) {
+        const i32 reallyRead = RawRead(buf, numBytes);
+
+        if (reallyRead < 0) {
+            ythrow TFileError() << "can not read data from " << FileName_.Quote();
+        }
+
+        return reallyRead;
     }
 
     size_t Read(void* bufferIn, size_t numBytes) {
         ui8* buf = (ui8*)bufferIn;
 
         while (numBytes) {
-            const i32 toRead = (i32)Min(MaxPortion, numBytes);
-            const i32 reallyRead = RawRead(buf, toRead);
-
-            if (reallyRead < 0) {
-                ythrow TFileError() << "can not read data from " << FileName_.Quote();
-            }
+            const size_t reallyRead = ReadOrFail(buf, numBytes);
 
             if (reallyRead == 0) {
                 // file exhausted
@@ -927,11 +957,16 @@ public:
         }
     }
 
+    // Maximum amount of bytes to be written via single system call.
+    // Some libraries fail when it is greater than max int.
+    // Syscalls can cause contention if they operate on very large data blocks.
+    static constexpr size_t MaxWritePortion = 1_GB;
+
     void Write(const void* buffer, size_t numBytes) {
         const ui8* buf = (const ui8*)buffer;
 
         while (numBytes) {
-            const i32 toWrite = (i32)Min(MaxPortion, numBytes);
+            const i32 toWrite = (i32)Min(MaxWritePortion, numBytes);
             const i32 reallyWritten = Handle_.Write(buf, toWrite);
 
             if (reallyWritten < 0) {
@@ -947,7 +982,7 @@ public:
         ui8* buf = (ui8*)bufferIn;
 
         while (numBytes) {
-            const i32 toRead = (i32)Min(MaxPortion, numBytes);
+            const i32 toRead = (i32)Min(MaxReadPortion, numBytes);
             const i32 reallyRead = RawPread(buf, toRead, offset);
 
             if (reallyRead < 0) {
@@ -981,7 +1016,7 @@ public:
         const ui8* buf = (const ui8*)buffer;
 
         while (numBytes) {
-            const i32 toWrite = (i32)Min(MaxPortion, numBytes);
+            const i32 toWrite = (i32)Min(MaxWritePortion, numBytes);
             const i32 reallyWritten = Handle_.Pwrite(buf, toWrite, offset);
 
             if (reallyWritten < 0) {
@@ -1091,6 +1126,10 @@ void TFile::Reserve(i64 length) {
     Impl_->Reserve(length);
 }
 
+void TFile::FallocateNoResize(i64 length) {
+    Impl_->FallocateNoResize(length);
+}
+
 void TFile::Flush() {
     Impl_->Flush();
 }
@@ -1111,6 +1150,10 @@ size_t TFile::Read(void* buf, size_t len) {
 
 i32 TFile::RawRead(void* buf, size_t len) {
     return Impl_->RawRead(buf, len);
+}
+
+size_t TFile::ReadOrFail(void* buf, size_t len) {
+    return Impl_->ReadOrFail(buf, len);
 }
 
 void TFile::Load(void* buf, size_t len) {

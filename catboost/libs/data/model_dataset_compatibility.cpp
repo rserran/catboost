@@ -179,14 +179,9 @@ namespace NCB {
 
     void CheckModelAndDatasetCompatibility(
         const TFullModel& model,
-        const TObjectsDataProvider& objectsData,
+        const TFeaturesLayout& datasetFeaturesLayout,
         THashMap<ui32, ui32>* columnIndexesReorderMap)
     {
-        if (dynamic_cast<const TQuantizedForCPUObjectsDataProvider*>(&objectsData)) {
-            CB_ENSURE(model.GetUsedCatFeaturesCount() == 0, "Quantized datasets with categorical features are not currently supported");
-        }
-        const auto& datasetFeaturesLayout = *objectsData.GetFeaturesLayout();
-
         const auto datasetFloatFeatureInternalIdxToExternalIdx =
             datasetFeaturesLayout.GetFloatFeatureInternalIdxToExternalIdx();
 
@@ -262,6 +257,14 @@ namespace NCB {
 
     void CheckModelAndDatasetCompatibility(
         const TFullModel& model,
+        const TObjectsDataProvider& objectsData,
+        THashMap<ui32, ui32>* columnIndexesReorderMap)
+    {
+        CheckModelAndDatasetCompatibility(model, *objectsData.GetFeaturesLayout(), columnIndexesReorderMap);
+    }
+
+    void CheckModelAndDatasetCompatibility(
+        const TFullModel& model,
         const TObjectsDataProvider& objectsData)
     {
         THashMap<ui32, ui32> columnReorderMap;
@@ -270,18 +273,23 @@ namespace NCB {
 
     TVector<ui8> GetFloatFeatureBordersRemap(
         const TFloatFeature& feature,
+        ui32 datasetFlatFeatureIdx,
         const TQuantizedFeaturesInfo& quantizedFeaturesInfo) {
         CB_ENSURE(
             !feature.Borders.empty(),
             "Feature " << feature.Position.FlatIndex <<  ": model does not have border information for it"
         );
+        const auto& featuresLayout = *(quantizedFeaturesInfo.GetFeaturesLayout());
+        NCB::TFloatFeatureIdx floatFeatureIdx
+            = featuresLayout.GetInternalFeatureIdx<EFeatureType::Float>(datasetFlatFeatureIdx);
+
         CB_ENSURE(
-            quantizedFeaturesInfo.HasBorders(NCB::TFloatFeatureIdx(feature.Position.FlatIndex)),
+            quantizedFeaturesInfo.HasBorders(floatFeatureIdx),
             "Feature " << feature.Position.FlatIndex <<  ": dataset does not have border information for it"
         );
 
         TVector<ui8> floatBinsRemap;
-        auto& quantizedBorders = quantizedFeaturesInfo.GetBorders(NCB::TFloatFeatureIdx(feature.Position.FlatIndex));
+        auto& quantizedBorders = quantizedFeaturesInfo.GetBorders(floatFeatureIdx);
         ui32 poolBucketIdx = 0;
         auto addRemapBinIdx = [&] (ui8 bucketIdx) {
             floatBinsRemap.push_back(bucketIdx);
@@ -312,16 +320,63 @@ namespace NCB {
 
     TVector<TVector<ui8>> GetFloatFeaturesBordersRemap(
         const TFullModel& model,
+        const THashMap<ui32, ui32>& columnIndexesReorderMap,
         const TQuantizedFeaturesInfo& quantizedFeaturesInfo)
     {
-        TVector<TVector<ui8>> floatBinsRemap(model.ModelTrees->GetFloatFeatures().size());
+        TVector<TVector<ui8>> floatBinsRemap(model.ModelTrees->GetFlatFeatureVectorExpectedSize());
         for (const auto& feature: model.ModelTrees->GetFloatFeatures()) {
             if (feature.Borders.empty()) {
                 continue;
             }
-            floatBinsRemap[feature.Position.FlatIndex] =
-                GetFloatFeatureBordersRemap(feature, quantizedFeaturesInfo);
+            floatBinsRemap[feature.Position.FlatIndex] = GetFloatFeatureBordersRemap(
+                feature,
+                columnIndexesReorderMap.at(feature.Position.FlatIndex),
+                quantizedFeaturesInfo
+            );
         }
         return floatBinsRemap;
+    }
+
+    TVector<ui32> GetCatFeatureBinToHashedValueRemap(
+        ui32 datasetFlatFeatureIdx,
+        const NCB::TQuantizedFeaturesInfo& quantizedFeaturesInfo)
+    {
+        const auto& featuresLayout = *(quantizedFeaturesInfo.GetFeaturesLayout());
+        NCB::TCatFeatureIdx catFeatureIdx
+            = featuresLayout.GetInternalFeatureIdx<EFeatureType::Categorical>(datasetFlatFeatureIdx);
+
+        const NCB::TCatFeaturePerfectHash& catFeaturePerfectHash
+            = quantizedFeaturesInfo.GetCategoricalFeaturesPerfectHash(catFeatureIdx);
+
+        TVector<ui32> result;
+        result.yresize(quantizedFeaturesInfo.GetUniqueValuesCounts(catFeatureIdx).OnAll);
+
+        if (catFeaturePerfectHash.DefaultMap) {
+            result[catFeaturePerfectHash.DefaultMap->DstValueWithCount.Value]
+                = catFeaturePerfectHash.DefaultMap->SrcValue;
+        }
+        for (const auto& [srcValue, dstValueWithCount] : catFeaturePerfectHash.Map) {
+            result[dstValueWithCount.Value] = srcValue;
+        }
+
+        return result;
+    }
+
+    TVector<TVector<ui32>> GetCatFeaturesBinToHashedValueRemap(
+        const TFullModel& model,
+        const THashMap<ui32, ui32>& columnIndexesReorderMap,
+        const TQuantizedFeaturesInfo& quantizedFeaturesInfo)
+    {
+        TVector<TVector<ui32>> result(model.ModelTrees->GetFlatFeatureVectorExpectedSize());
+        for (const auto& feature: model.ModelTrees->GetCatFeatures()) {
+            if (!feature.UsedInModel()) {
+                continue;
+            }
+            result[feature.Position.FlatIndex] = GetCatFeatureBinToHashedValueRemap(
+                columnIndexesReorderMap.at(feature.Position.FlatIndex),
+                quantizedFeaturesInfo
+            );
+        }
+        return result;
     }
 }

@@ -1,7 +1,8 @@
-PY_LIBRARY() # Backport from Python 3.
+PY2_LIBRARY() # Backport from Python 3.
+
+LICENSE(MIT)
 
 VERSION(4.0.2)
-LICENSE(MIT)
 
 
 

@@ -87,6 +87,7 @@ def preprocess_args(args):
     assert args.output is None or args.output_root == os.path.dirname(args.output)
     assert args.output_root.startswith(args.build_root_dir)
     args.module_path = args.output_root[len(args.build_root_dir):]
+    args.source_module_dir = os.path.join(args.source_root, args.test_import_path or args.module_path) + os.path.sep
     assert len(args.module_path) > 0
     args.import_path, args.is_std = get_import_path(args.module_path)
 
@@ -200,6 +201,24 @@ def create_import_config(peers, gen_importmap, import_map={}, module_map={}):
     return None
 
 
+def create_embed_config(args):
+    data = {
+        'Patterns': {},
+        'Files': {},
+    }
+    for info in args.embed:
+        pattern = info[0]
+        if pattern.endswith('/**/*'):
+            pattern = pattern[:-3]
+        files = {os.path.relpath(f, args.source_module_dir).replace('\\', '/'): f for f in info[1:]}
+        data['Patterns'][pattern] = list(files.keys())
+        data['Files'].update(files)
+    # sys.stderr.write('{}\n'.format(json.dumps(data, indent=4)))
+    with tempfile.NamedTemporaryFile(delete=False, suffix='.embedcfg') as f:
+        f.write(json.dumps(data))
+        return f.name
+
+
 def vet_info_output_name(path, ext=None):
     return '{}{}'.format(path, ext or vet_info_ext)
 
@@ -261,9 +280,9 @@ def decode_vet_report(json_report):
             messages = []
             for _, module_diags in six.iteritems(full_diags):
                 for _, type_diags in six.iteritems(module_diags):
-                     for diag in type_diags:
-                         messages.append(u'{}: {}'.format(diag['posn'], diag['message']))
-            report = '\n'.join(sorted(messages)).encode('UTF-8')
+                    for diag in type_diags:
+                        messages.append(u'{}: {}'.format(diag['posn'], diag['message']))
+            report = '\n'.join(messages).encode('UTF-8')
 
     return report
 
@@ -332,15 +351,19 @@ def _do_compile_go(args):
             pass
         else:
             cmd.append('-complete')
+    if args.embed and compare_versions('1.16', args.goversion) >= 0:
+        embed_config_name = create_embed_config(args)
+        cmd.extend(['-embedcfg', embed_config_name])
     if args.asmhdr:
         cmd += ['-asmhdr', args.asmhdr]
-    if compare_versions('1.12', args.goversion) >= 0:
-        if args.symabis:
-            cmd += ['-symabis'] + args.symabis
-        if compare_versions('1.13', args.goversion) >= 0:
-            pass
-        elif import_path in ('runtime', 'runtime/internal/atomic'):
-            cmd.append('-allabis')
+    # Use .symabis (starting from 1.12 version)
+    if args.symabis:
+        cmd += ['-symabis'] + args.symabis
+    # If 1.12 <= version < 1.13 we have to pass -allabis for 'runtime' and 'runtime/internal/atomic'
+    # if compare_versions('1.13', args.goversion) >= 0:
+    #     pass
+    # elif import_path in ('runtime', 'runtime/internal/atomic'):
+    #     cmd.append('-allabis')
     compile_workers = '4'
     if args.compile_flags:
         if import_path == 'runtime' or import_path.startswith('runtime/'):
@@ -386,6 +409,9 @@ def do_compile_go(args):
 
 
 def do_compile_asm(args):
+    def need_compiling_runtime(import_path):
+        return import_path in ('runtime', 'reflect', 'syscall') or import_path.startswith('runtime/internal/')
+
     assert(len(args.srcs) == 1 and len(args.asm_srcs) == 1)
     cmd = [args.go_asm]
     cmd += get_trimpath_args(args)
@@ -393,7 +419,8 @@ def do_compile_asm(args):
     cmd += ['-D', 'GOOS_' + args.targ_os, '-D', 'GOARCH_' + args.targ_arch, '-o', args.output]
     # TODO: This is just a quick fix to start work on 1.16 support
     if compare_versions('1.16', args.goversion) >= 0:
-        if args.import_path in ('runtime', 'reflect') or args.import_path.startswith('runtime/internal/'):
+        cmd += ['-p', args.import_path]
+        if need_compiling_runtime(args.import_path):
             cmd += ['-compiling-runtime']
     if args.asm_flags:
         cmd += args.asm_flags
@@ -655,6 +682,8 @@ def do_link_test(args):
 
     test_lib_args = copy_args(args) if args.srcs else None
     xtest_lib_args = copy_args(args) if args.xtest_srcs else None
+    if xtest_lib_args is not None:
+        xtest_lib_args.embed = args.embed_xtest if args.embed_xtest else None
 
     ydx_file_name = None
     xtest_ydx_file_name = None
@@ -700,6 +729,7 @@ def do_link_test(args):
     with open(test_main_name, "w") as f:
         f.write(test_main_content)
     test_args = copy_args(args)
+    test_args.embed = None
     test_args.srcs = [test_main_name]
     if test_args.test_import_path is None:
         # it seems that we can do it unconditionally, but this kind
@@ -737,9 +767,9 @@ if __name__ == '__main__':
     parser.add_argument('++output-root', required=True)
     parser.add_argument('++toolchain-root', required=True)
     parser.add_argument('++host-os', choices=['linux', 'darwin', 'windows'], required=True)
-    parser.add_argument('++host-arch', choices=['amd64'], required=True)
+    parser.add_argument('++host-arch', choices=['amd64', 'arm64'], required=True)
     parser.add_argument('++targ-os', choices=['linux', 'darwin', 'windows'], required=True)
-    parser.add_argument('++targ-arch', choices=['amd64', 'x86'], required=True)
+    parser.add_argument('++targ-arch', choices=['amd64', 'x86', 'arm64'], required=True)
     parser.add_argument('++peers', nargs='*')
     parser.add_argument('++non-local-peers', nargs='*')
     parser.add_argument('++cgo-peers', nargs='*')
@@ -748,6 +778,7 @@ if __name__ == '__main__':
     parser.add_argument('++test-miner', nargs='?')
     parser.add_argument('++arc-project-prefix', nargs='?', default=arc_project_prefix)
     parser.add_argument('++std-lib-prefix', nargs='?', default=std_lib_prefix)
+    parser.add_argument('++vendor-prefix', nargs='?', default=vendor_prefix)
     parser.add_argument('++extld', nargs='?', default=None)
     parser.add_argument('++extldflags', nargs='+', default=None)
     parser.add_argument('++goversion', required=True)
@@ -763,10 +794,13 @@ if __name__ == '__main__':
     parser.add_argument('++skip-tests', nargs='*', default=None)
     parser.add_argument('++ydx-file', default='')
     parser.add_argument('++debug-root-map', default=None)
+    parser.add_argument('++embed', action='append', nargs='*')
+    parser.add_argument('++embed_xtest', action='append', nargs='*')
     args = parser.parse_args(args)
 
     arc_project_prefix = args.arc_project_prefix
     std_lib_prefix = args.std_lib_prefix
+    vendor_prefix = args.vendor_prefix
     vet_info_ext = args.vet_info_ext
     vet_report_ext = args.vet_report_ext
 

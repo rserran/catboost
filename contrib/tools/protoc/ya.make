@@ -5,25 +5,10 @@ IF (USE_PREBUILT_TOOLS)
 ENDIF()
 
 IF (NOT PREBUILT)
-    PROGRAM()
-
-    LICENSE(
-        BSD3
-    )
-
-    NO_COMPILER_WARNINGS()
-
-    PEERDIR(
-        contrib/libs/protoc
-    )
-    SRCDIR(
-        contrib/libs/protoc
-    )
-
-    SRCS(
-        src/google/protobuf/compiler/main.cc
-    )
-
-    INCLUDE(${ARCADIA_ROOT}/build/prebuilt/contrib/tools/protoc/ya.make.induced_deps)
-    END()
+    INCLUDE(${ARCADIA_ROOT}/contrib/tools/protoc/bin/ya.make)
 ENDIF()
+
+RECURSE(
+    bin
+    plugins
+)

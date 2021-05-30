@@ -11,6 +11,9 @@
     "test.test_approximate_shap_feature_importance_multiclass[CPU]": {
         "uri": "file://test.test_approximate_shap_feature_importance_multiclass_CPU_/feature_importance.npy"
     },
+    "test.test_approximate_shap_feature_importance_multirmse[CPU]": {
+        "uri": "file://test.test_approximate_shap_feature_importance_multirmse_CPU_/feature_importance.npy"
+    },
     "test.test_approximate_shap_feature_importance_ranking[CPU]": {
         "uri": "file://test.test_approximate_shap_feature_importance_ranking_CPU_/feature_importance.npy"
     },
@@ -353,6 +356,9 @@
     },
     "test.test_exact_shap_feature_importance_multiclass[CPU]": {
         "uri": "file://test.test_exact_shap_feature_importance_multiclass_CPU_/feature_importance.npy"
+    },
+    "test.test_exact_shap_feature_importance_multirmse[CPU]": {
+        "uri": "file://test.test_exact_shap_feature_importance_multirmse_CPU_/feature_importance.npy"
     },
     "test.test_exact_shap_feature_importance_ranking[CPU]": {
         "uri": "file://test.test_exact_shap_feature_importance_ranking_CPU_/feature_importance.npy"
@@ -771,6 +777,12 @@
     "test.test_shap_feature_importance_multiclass[CPU-TreeSHAP]": {
         "uri": "file://test.test_shap_feature_importance_multiclass_CPU-TreeSHAP_/feature_importance.npy"
     },
+    "test.test_shap_feature_importance_multirmse[CPU-IndependentTreeSHAP]": {
+        "uri": "file://test.test_shap_feature_importance_multirmse_CPU-IndependentTreeSHAP_/feature_importance.npy"
+    },
+    "test.test_shap_feature_importance_multirmse[CPU-TreeSHAP]": {
+        "uri": "file://test.test_shap_feature_importance_multirmse_CPU-TreeSHAP_/feature_importance.npy"
+    },
     "test.test_shap_feature_importance_ranking[CPU]": {
         "uri": "file://test.test_shap_feature_importance_ranking_CPU_/feature_importance.npy"
     },
@@ -809,6 +821,18 @@
     },
     "test.test_uncertainty_prediction_types[Logloss-VirtEnsembles-5]": {
         "uri": "file://test.test_uncertainty_prediction_types_Logloss-VirtEnsembles-5_/predictions.txt"
+    },
+    "test.test_uncertainty_prediction_types[MultiClass-TotalUncertainty-1]": {
+        "uri": "file://test.test_uncertainty_prediction_types_MultiClass-TotalUncertainty-1_/predictions.txt"
+    },
+    "test.test_uncertainty_prediction_types[MultiClass-TotalUncertainty-5]": {
+        "uri": "file://test.test_uncertainty_prediction_types_MultiClass-TotalUncertainty-5_/predictions.txt"
+    },
+    "test.test_uncertainty_prediction_types[MultiClass-VirtEnsembles-1]": {
+        "uri": "file://test.test_uncertainty_prediction_types_MultiClass-VirtEnsembles-1_/predictions.txt"
+    },
+    "test.test_uncertainty_prediction_types[MultiClass-VirtEnsembles-5]": {
+        "uri": "file://test.test_uncertainty_prediction_types_MultiClass-VirtEnsembles-5_/predictions.txt"
     },
     "test.test_uncertainty_prediction_types[RMSE-TotalUncertainty-1]": {
         "uri": "file://test.test_uncertainty_prediction_types_RMSE-TotalUncertainty-1_/predictions.txt"

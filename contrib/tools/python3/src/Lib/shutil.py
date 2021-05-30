@@ -744,8 +744,20 @@ def rmtree(path, ignore_errors=False, onerror=None):
 rmtree.avoids_symlink_attacks = _use_fd_functions
 
 def _basename(path):
-    # A basename() variant which first strips the trailing slash, if present.
-    # Thus we always get the last component of the path, even for directories.
+    """A basename() variant which first strips the trailing slash, if present.
+    Thus we always get the last component of the path, even for directories.
+
+    path: Union[PathLike, str]
+
+    e.g.
+    >>> os.path.basename('/bar/foo')
+    'foo'
+    >>> os.path.basename('/bar/foo/')
+    ''
+    >>> _basename('/bar/foo/')
+    'foo'
+    """
+    path = os.fspath(path)
     sep = os.path.sep + (os.path.altsep or '')
     return os.path.basename(path.rstrip(sep))
 
@@ -784,7 +796,10 @@ def move(src, dst, copy_function=copy2):
             os.rename(src, dst)
             return
 
+        # Using _basename instead of os.path.basename is important, as we must
+        # ignore any trailing slash to avoid the basename returning ''
         real_dst = os.path.join(dst, _basename(src))
+
         if os.path.exists(real_dst):
             raise Error("Destination path '%s' already exists" % real_dst)
     try:
@@ -798,6 +813,12 @@ def move(src, dst, copy_function=copy2):
             if _destinsrc(src, dst):
                 raise Error("Cannot move a directory '%s' into itself"
                             " '%s'." % (src, dst))
+            if (_is_immutable(src)
+                    or (not os.access(src, os.W_OK) and os.listdir(src)
+                        and sys.platform == 'darwin')):
+                raise PermissionError("Cannot move the non-empty directory "
+                                      "'%s': Lacking write permission to '%s'."
+                                      % (src, src))
             copytree(src, real_dst, copy_function=copy_function,
                      symlinks=True)
             rmtree(src)
@@ -814,6 +835,11 @@ def _destinsrc(src, dst):
     if not dst.endswith(os.path.sep):
         dst += os.path.sep
     return dst.startswith(src)
+
+def _is_immutable(src):
+    st = _stat(src)
+    immutable_states = [stat.UF_IMMUTABLE, stat.SF_IMMUTABLE]
+    return hasattr(st, 'st_flags') and st.st_flags in immutable_states
 
 def _get_gid(name):
     """Returns a gid, given a group name."""

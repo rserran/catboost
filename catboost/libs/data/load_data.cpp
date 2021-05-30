@@ -23,6 +23,7 @@ namespace NCB {
         const TPathWithScheme& timestampsFilePath, // can be uninited
         const TPathWithScheme& baselineFilePath, // can be uninited
         const TPathWithScheme& featureNamesPath, // can be uninited
+        const TPathWithScheme& poolMetaInfoPath, // can be uninited
         const NCatboostOptions::TColumnarPoolFormatParams& columnarPoolFormatParams,
         const TVector<ui32>& ignoredFeatures,
         EObjectsOrder objectsOrder,
@@ -47,6 +48,7 @@ namespace NCB {
                     baselineFilePath,
                     timestampsFilePath,
                     featureNamesPath,
+                    poolMetaInfoPath,
                     classLabels ? **classLabels : TVector<NJson::TJsonValue>(),
                     columnarPoolFormatParams.DsvFormat,
                     MakeCdProviderFromFile(columnarPoolFormatParams.CdFilePath),
@@ -89,6 +91,7 @@ namespace NCB {
         const TPathWithScheme& timestampsFilePath, // can be uninited
         const TPathWithScheme& baselineFilePath, // can be uninited
         const TPathWithScheme& featureNamesPath, // can be uninited
+        const TPathWithScheme& poolMetaInfoPath, // can be uninited
         const NCatboostOptions::TColumnarPoolFormatParams& columnarPoolFormatParams,
         const TVector<ui32>& ignoredFeatures,
         EObjectsOrder objectsOrder,
@@ -109,6 +112,7 @@ namespace NCB {
             timestampsFilePath,
             baselineFilePath,
             featureNamesPath,
+            poolMetaInfoPath,
             columnarPoolFormatParams,
             ignoredFeatures,
             objectsOrder,
@@ -128,6 +132,7 @@ namespace NCB {
         const TPathWithScheme& timestampsFilePath, // can be uninited
         const TPathWithScheme& baselineFilePath, // can be uninited
         const TPathWithScheme& featureNamesPath, // can be uninited
+        const TPathWithScheme& poolMetaInfoPath, // can be uninited
         const TDsvFormatOptions& poolFormat,
         const TVector<TColumn>& columnsDescription, // TODO(smirnovpavel): TVector<EColumn>
         const TVector<ui32>& ignoredFeatures,
@@ -157,6 +162,7 @@ namespace NCB {
                     baselineFilePath,
                     timestampsFilePath,
                     featureNamesPath,
+                    poolMetaInfoPath,
                     classLabels ? **classLabels : TVector<NJson::TJsonValue>(),
                     poolFormat,
                     MakeCdProviderFromArray(columnsDescription),
@@ -201,6 +207,7 @@ namespace NCB {
                 loadOptions.TimestampsFilePath,
                 loadOptions.BaselineFilePath,
                 loadOptions.FeatureNamesPath,
+                loadOptions.PoolMetaInfoPath,
                 loadOptions.ColumnarPoolFormatParams,
                 loadOptions.IgnoredFeatures,
                 objectsOrder,
@@ -236,6 +243,7 @@ namespace NCB {
                     testTimestampsFilePath,
                     testBaselineFilePath,
                     loadOptions.FeatureNamesPath,
+                    loadOptions.PoolMetaInfoPath,
                     loadOptions.ColumnarPoolFormatParams,
                     loadOptions.IgnoredFeatures,
                     objectsOrder,
@@ -251,6 +259,56 @@ namespace NCB {
         }
 
         return dataProviders;
+    }
+
+    TPrecomputedOnlineCtrData ReadPrecomputedOnlineCtrData(
+        TMaybe<ETaskType> taskType,
+        const NCatboostOptions::TPoolLoadParams& loadOptions,
+        NPar::ILocalExecutor* executor,
+        TProfileInfo* profile
+    ) {
+        CATBOOST_DEBUG_LOG << "Loading precomputed data..." << Endl;
+
+        TPrecomputedOnlineCtrData result;
+        result.Meta = TPrecomputedOnlineCtrMetaData::DeserializeFromJson(
+            TIFStream(loadOptions.PrecomputedMetadataFile).ReadAll()
+        );
+
+        TVector<ui32> emptyVector;
+        TDatasetSubset fullDatasetSubset;
+        NCatboostOptions::TColumnarPoolFormatParams columnarPoolFormatParams;
+
+        for (const auto& testPrecomputedSetPath : loadOptions.TestPrecomputedSetPaths) {
+            auto datasetPtr = ReadDataset(
+                taskType,
+                testPrecomputedSetPath,
+                /*pairsFilePath*/ TPathWithScheme(),
+                /*groupWeightsFilePath*/ TPathWithScheme(),
+                /*timestampsFilePath*/ TPathWithScheme(),
+                /*baselineFilePath*/ TPathWithScheme(),
+                /*featureNamesPath*/ TPathWithScheme(),
+                /*poolMetaInfoPath*/ TPathWithScheme(),
+                columnarPoolFormatParams,
+                /*ignoredFeatures*/ emptyVector,
+                EObjectsOrder::Ordered,
+                fullDatasetSubset,
+                /*classLabels*/ Nothing(),
+                executor
+            );
+            result.DataProviders.Test.push_back(
+               TQuantizedObjectsDataProviderPtr(
+                   dynamic_cast<TQuantizedObjectsDataProvider*>(datasetPtr->ObjectsData.Get())
+               )
+            );
+            CB_ENSURE(
+                result.DataProviders.Test.back(),
+                "Precomputed data: Non-quantized objects data loaded"
+            );
+        }
+        if (profile && !loadOptions.TestPrecomputedSetPaths.empty()) {
+            profile->AddOperation("Build precomputed test data");
+        }
+        return result;
     }
 
 } // NCB

@@ -8,14 +8,20 @@ from catboost.libs.monoforest._monoforest cimport *
 
 import atexit
 import six
-from six import iteritems, string_types, PY3
+from six import iteritems, string_types
+from cpython.version cimport PY_MAJOR_VERSION
+import warnings
+
 from six.moves import range
 from json import dumps, loads, JSONEncoder
 from copy import deepcopy
 from collections import defaultdict
 import functools
-import traceback
+import inspect
 import numbers
+import os
+import traceback
+import types
 
 import sys
 if sys.version_info >= (3, 3):
@@ -33,6 +39,7 @@ import scipy.sparse
 np.import_array()
 
 cimport cython
+from cpython cimport PyList_GET_ITEM, PyTuple_GET_ITEM, PyFloat_AsDouble
 from cython.operator cimport dereference, preincrement
 
 from libc.math cimport isnan, modf
@@ -47,12 +54,21 @@ from cpython.ref cimport PyObject
 
 from util.generic.array_ref cimport TArrayRef, TConstArrayRef
 from util.generic.hash cimport THashMap
+from util.generic.hash_set cimport THashSet
 from util.generic.maybe cimport TMaybe
 from util.generic.ptr cimport THolder, TIntrusivePtr, MakeHolder
 from util.generic.string cimport TString, TStringBuf
 from util.generic.vector cimport TVector
 from util.system.types cimport ui8, ui16, ui32, ui64, i32, i64
 from util.string.cast cimport StrToD, TryFromString, ToString
+
+
+def fspath(path):
+    if path is None:
+        return None
+    if sys.version_info >= (3, 6):
+        return os.fspath(path)
+    return str(path)
 
 
 SPARSE_MATRIX_TYPES = (
@@ -98,9 +114,20 @@ numpy_num_dtype_list = [
     np.float64
 ]
 
+custom_objective_methods_to_optimize = [
+    'calc_ders_range',
+    'calc_ders_multi',
+]
+
+custom_metric_methods_to_optimize = [
+    'evaluate',
+    'get_final_error'
+]
+
 from catboost.private.libs.cython cimport *
 from catboost.libs.helpers.cython cimport *
 from catboost.libs.data.cython cimport *
+from catboost.private.libs.data_util.cython cimport TPathWithScheme
 
 class _NumpyAwareEncoder(JSONEncoder):
     bool_types = (np.bool_)
@@ -197,9 +224,12 @@ class MultiRegressionCustomObjective:
         """
         raise CatBoostError("calc_ders_multi method is not implemented")
 
+cdef extern from "Python.h":
+    char* PyUnicode_AsUTF8AndSize(object s, Py_ssize_t* l)
 
 cdef extern from "catboost/libs/logging/logging.h":
-    cdef void SetCustomLoggingFunction(void(*func)(const char*, size_t len) except * with gil, void(*func)(const char*, size_t len) except * with gil)
+    ctypedef void(*TCustomLoggingFunctionPtr)(const char *, size_t len, void *) except * with gil
+    cdef void SetCustomLoggingFunction(TCustomLoggingFunctionPtr, TCustomLoggingFunctionPtr, void*, void*)
     cdef void RestoreOriginalLogger()
     cdef void ResetTraceBackend(const TString&)
 
@@ -367,14 +397,6 @@ cdef extern from "catboost/private/libs/quantized_pool/serialization.h" namespac
     cdef void SaveQuantizedPool(const TDataProviderPtr& dataProvider, TString fileName) except +ProcessException
 
 
-cdef extern from "catboost/private/libs/data_util/path_with_scheme.h" namespace "NCB":
-    cdef cppclass TPathWithScheme:
-        TString Scheme
-        TString Path
-        TPathWithScheme() except +ProcessException
-        TPathWithScheme(const TStringBuf& pathWithScheme, const TStringBuf& defaultScheme) except +ProcessException
-        bool_t Inited() except +ProcessException
-
 cdef extern from "catboost/private/libs/data_util/line_data_reader.h" namespace "NCB":
     cdef cppclass TDsvFormatOptions:
         bool_t HasHeader
@@ -455,6 +477,7 @@ cdef extern from "catboost/libs/data/load_data.h" namespace "NCB":
         const TPathWithScheme& timestampsFilePath,
         const TPathWithScheme& baselineFilePath,
         const TPathWithScheme& featureNamesPath,
+        const TPathWithScheme& poolMetaInfoPath,
         const TColumnarPoolFormatParams& columnarPoolFormatParams,
         const TVector[ui32]& ignoredFeatures,
         EObjectsOrder objectsOrder,
@@ -471,6 +494,7 @@ cdef extern from "catboost/libs/data/load_and_quantize_data.h" namespace "NCB":
         const TPathWithScheme& timestampsFilePath,
         const TPathWithScheme& baselineFilePath,
         const TPathWithScheme& featureNamesPath,
+        const TPathWithScheme& poolMetaInfoPath,
         const TPathWithScheme& inputBordersPath,
         const TColumnarPoolFormatParams& columnarPoolFormatParams,
         const TVector[ui32]& ignoredFeatures,
@@ -538,7 +562,10 @@ cdef extern from "catboost/libs/metrics/metric.h":
 
 cdef extern from "catboost/libs/metrics/metric.h":
     cdef bool_t IsMaxOptimal(const IMetric& metric) except +ProcessException
+    cdef TJsonValue ExportAllMetricsParamsToJson() except +ProcessException
 
+def AllMetricsParams():
+    return loads(to_native_str(WriteTJsonValue(ExportAllMetricsParamsToJson())))
 
 cdef extern from "catboost/private/libs/algo/tree_print.h":
     TVector[TString] GetTreeSplitsDescriptions(
@@ -633,6 +660,7 @@ cdef extern from "catboost/private/libs/options/cross_validation_params.h":
         double MetricUpdateInterval
         ui32 DevMaxIterationsBatchSize
         bool_t IsCalledFromSearchHyperparameters
+        bool_t ReturnModels
 
 cdef extern from "catboost/private/libs/options/split_params.h":
     cdef cppclass TTrainTestSplitParams:
@@ -665,6 +693,7 @@ cdef extern from "catboost/libs/train_lib/train_model.h":
         TQuantizedFeaturesInfoPtr quantizedFeaturesInfo,
         const TMaybe[TCustomObjectiveDescriptor]& objectiveDescriptor,
         const TMaybe[TCustomMetricDescriptor]& evalMetricDescriptor,
+        const TMaybe[TCustomCallbackDescriptor]& callbackDescriptor,
         TDataProviders pools,
         TMaybe[TFullModel*] initModel,
         THolder[TLearnProgress]* initLearnProgress,
@@ -674,6 +703,14 @@ cdef extern from "catboost/libs/train_lib/train_model.h":
         TMetricsAndTimeLeftHistory* metricsAndTimeHistory,
         THolder[TLearnProgress]* dstLearnProgress
     ) nogil except +ProcessException
+
+    cdef cppclass TCustomCallbackDescriptor:
+        void* CustomData
+
+        bool_t (*AfterIterationFunc)(
+            const TMetricsAndTimeLeftHistory& history,
+            void *customData
+        ) except * with gil
 
 cdef extern from "catboost/libs/data/quantization.h"  namespace "NCB":
     cdef TQuantizedObjectsDataProviderPtr ConstructQuantizedPoolFromRawPool(
@@ -690,6 +727,7 @@ cdef extern from "catboost/libs/train_lib/cross_validation.h":
         TVector[double] StdDevTrain
         TVector[double] AverageTest
         TVector[double] StdDevTest
+        TVector[TFullModel] CVFullModels
 
     cdef void CrossValidate(
         TJsonValue jsonParams,
@@ -803,13 +841,6 @@ cdef extern from "catboost/private/libs/algo/roc_curve.h":
         void Output(const TString& outputPath) except +ProcessException
 
 cdef extern from "catboost/libs/eval_result/eval_helpers.h" namespace "NCB":
-    cdef TVector[TVector[double]] PrepareEval(
-        const EPredictionType predictionType,
-        const TMaybe[TString]& lossFunctionName,
-        const TVector[TVector[double]]& approx,
-        int threadCount
-    ) nogil except +ProcessException
-
     cdef TVector[TVector[double]] PrepareEvalForInternalApprox(
         const EPredictionType predictionType,
         const TFullModel& model,
@@ -1064,6 +1095,14 @@ cdef extern from "catboost/private/libs/hyperparameter_tuning/hyperparameter_tun
         int verbose) nogil except +ProcessException
 
 
+cdef extern from "catboost/libs/features_selection/select_features.h" namespace "NCB":
+    cdef TJsonValue SelectFeatures(
+        const TJsonValue& params,
+        const TDataProviders& pools,
+        TFullModel* dstModel
+    ) nogil except +ProcessException
+
+
 cpdef run_atexit_finalizers():
     ManualRunAtExitFinalizers()
 
@@ -1073,24 +1112,28 @@ if not getattr(sys, "is_standalone_binary", False) and platform.system() == 'Win
 
 
 cdef inline float _FloatOrNan(object obj) except *:
+    # here lies fastpath
+    cdef type obj_type = type(obj)
+    if obj is None:
+        return _FLOAT_NAN
+    elif obj_type is float:
+        return <float>obj
+    elif obj_type is str or obj_type is unicode or obj_type is bytes or obj_type is _npbytes_ or obj_type is _npunicode_ or isinstance(obj, string_types + (_npbytes_, _npunicode_)):
+        return _FloatOrNanFromString(to_arcadia_string(obj))
     try:
         return float(obj)
     except:
-        pass
-
-    cdef float res
-    if obj is None:
-        res = _FLOAT_NAN
-    elif isinstance(obj, string_types + (np.string_,)):
-        res = _FloatOrNanFromString(to_arcadia_string(obj))
-    else:
         raise TypeError("Cannot convert obj {} to float".format(str(obj)))
-    return res
+
+
+cpdef _float_or_nan(obj):
+    return _FloatOrNan(obj)
+
 
 cdef TString _MetricGetDescription(void* customData) except * with gil:
     cdef metricObject = <object>customData
     name = metricObject.__class__.__name__
-    if PY3:
+    if PY_MAJOR_VERSION >= 3:
         name = name.encode()
     return TString(<const char*>name)
 
@@ -1103,6 +1146,19 @@ cdef double _MetricGetFinalError(const TMetricHolder& error, void *customData) e
     cdef metricObject = <object>customData
     return metricObject.get_final_error(error.Stats[0], error.Stats[1])
 
+cdef bool_t _CallbackAfterIteration(
+        const TMetricsAndTimeLeftHistory& history,
+        void* customData
+    ) except * with gil:
+    cdef callbackObject = <object>customData
+    if PY_MAJOR_VERSION >= 3:
+        info = types.SimpleNamespace()
+    else:
+        from argparse import Namespace
+        info = Namespace()
+    info.iteration = history.LearnMetricsHistory.size()
+    info.metrics = _get_metrics_evals_pydict(history)
+    return callbackObject.after_iteration(info)
 
 cdef _constarrayref_of_double_to_np_array(const TConstArrayRef[double] arr):
     result = np.empty(arr.size(), dtype=_npfloat64)
@@ -1169,17 +1225,20 @@ cdef _reorder_axes_for_python_4d_shap_values(TVector[TVector[TVector[TVector[dou
                     result[doc][dim][feature1][feature2] = vectors[feature1][feature2][dim][doc]
     return result
 
+
 cdef _vector_of_uints_to_np_array(const TVector[ui32]& vec):
     result = np.empty(vec.size(), dtype=np.uint32)
     for i in xrange(vec.size()):
         result[i] = vec[i]
     return result
 
+
 cdef _vector_of_ints_to_np_array(const TVector[int]& vec):
     result = np.empty(vec.size(), dtype=np.int)
     for i in xrange(vec.size()):
         result[i] = vec[i]
     return result
+
 
 cdef _vector_of_uints_to_2d_np_array(const TVector[ui32]& vec, int row_count, int column_count):
     assert vec.size() == row_count * column_count
@@ -1189,11 +1248,13 @@ cdef _vector_of_uints_to_2d_np_array(const TVector[ui32]& vec, int row_count, in
             result[row_num][col_num] = vec[row_num * column_count + col_num]
     return result
 
+
 cdef _vector_of_floats_to_np_array(const TVector[float]& vec):
     result = np.empty(vec.size(), dtype=_npfloat32)
     for i in xrange(vec.size()):
         result[i] = vec[i]
     return result
+
 
 cdef _vector_of_size_t_to_np_array(const TVector[size_t]& vec):
     result = np.empty(vec.size(), dtype=np.uint32)
@@ -1201,47 +1262,33 @@ cdef _vector_of_size_t_to_np_array(const TVector[size_t]& vec):
         result[i] = vec[i]
     return result
 
-cdef class _FloatArrayWrapper:
-    cdef const float* _arr
-    cdef int _count
 
-    @staticmethod
-    cdef create(const float* arr, int count):
-        wrapper = _FloatArrayWrapper()
-        wrapper._arr = arr
-        wrapper._count = count
-        return wrapper
-
-    def __getitem__(self, key):
-        if key >= self._count:
-            raise IndexError()
-
-        return self._arr[key]
-
-    def __len__(self):
-        return self._count
+cdef np.ndarray _CreateNumpyFloatArrayView(const float* array, int count):
+    cdef np.npy_intp dims[1]
+    dims[0] = count
+    return np.PyArray_SimpleNewFromData(1, dims, np.NPY_FLOAT, <void*>array)
 
 
-# Cython does not have generics so using small copy-paste here and below
-cdef class _DoubleArrayWrapper:
-    cdef const double* _arr
-    cdef int _count
+cdef np.ndarray _CreateNumpyDoubleArrayView(const double* array, int count):
+    cdef np.npy_intp dims[1]
+    dims[0] = count
+    return np.PyArray_SimpleNewFromData(1, dims, np.NPY_DOUBLE, <void*>array)
 
-    @staticmethod
-    cdef create(const double* arr, int count):
-        wrapper = _DoubleArrayWrapper()
-        wrapper._arr = arr
-        wrapper._count = count
-        return wrapper
 
-    def __getitem__(self, key):
-        if key >= self._count:
-            raise IndexError()
+cdef np.ndarray _CreateNumpyUI64ArrayView(const ui64* array, int count):
+    cdef np.npy_intp dims[1]
+    dims[0] = count
+    return np.PyArray_SimpleNewFromData(1, dims, np.NPY_UINT64, <void*>array)
 
-        return self._arr[key]
 
-    def __len__(self):
-        return self._count
+cdef _ToPythonObjArrayOfArraysOfDoubles(const TVector[double]* values, int size, int begin, int end):
+    # https://numba.pydata.org/numba-doc/latest/reference/deprecation.html#deprecation-of-reflection-for-list-and-set-types
+    # numba doesn't like python lists, so using tuple instead
+    return tuple(_CreateNumpyDoubleArrayView(values[i].data() + begin, end - begin) for i in xrange(size))
+
+cdef _ToPythonObjArrayOfArraysOfFloats(const TConstArrayRef[float]* values, int size, int begin, int end):
+    # using tuple as in _ToPythonObjArrayOfArraysOfDoubles
+    return tuple(_CreateNumpyFloatArrayView(values[i].data() + begin, end - begin) for i in xrange(size))
 
 cdef TMetricHolder _MetricEval(
     const TVector[TVector[double]]& approx,
@@ -1256,13 +1303,13 @@ cdef TMetricHolder _MetricEval(
     cdef TMetricHolder holder
     holder.Stats.resize(2)
 
-    approxes = [_DoubleArrayWrapper.create(approx[i].data() + begin, end - begin) for i in xrange(approx.size())]
-    targets = _FloatArrayWrapper.create(target.data() + begin, end - begin)
+    approxes = _ToPythonObjArrayOfArraysOfDoubles(approx.data(), approx.size(), begin, end)
+    targets = _CreateNumpyFloatArrayView(target.data() + begin, end - begin)
 
     if weight.size() == 0:
         weights = None
     else:
-        weights = _FloatArrayWrapper.create(weight.data() + begin, end - begin)
+        weights = _CreateNumpyFloatArrayView(weight.data() + begin, end - begin)
 
     try:
         error, weight_ = metricObject.evaluate(approxes, targets, weights)
@@ -1288,13 +1335,13 @@ cdef TMetricHolder _MultiregressionMetricEval(
     cdef TMetricHolder holder
     holder.Stats.resize(2)
 
-    approxes = [_DoubleArrayWrapper.create(approx[i].data() + begin, end - begin) for i in xrange(approx.size())]
-    targets = [_FloatArrayWrapper.create(target[i].data() + begin, end - begin) for i in xrange(target.size())]
+    approxes = _ToPythonObjArrayOfArraysOfDoubles(approx.data(), approx.size(), begin, end)
+    targets = _ToPythonObjArrayOfArraysOfFloats(target.data(), target.size(), begin, end)
 
     if weight.size() == 0:
         weights = None
     else:
-        weights = _FloatArrayWrapper.create(weight.data() + begin, end - begin)
+        weights = _CreateNumpyFloatArrayView(weight.data() + begin, end - begin)
 
     try:
         error, weight_ = metricObject.evaluate(approxes, targets, weights)
@@ -1330,12 +1377,15 @@ cdef void _ObjectiveCalcDersRange(
 ) with gil:
     cdef objectiveObject = <object>(customData)
     cdef TString errorMessage
+    cdef Py_ssize_t index
+    cdef np.float32_t[:,:] pairs_np_float
+    cdef np.float64_t[:,:] pairs_np_double
 
-    approx = _DoubleArrayWrapper.create(approxes, count)
-    target = _FloatArrayWrapper.create(targets, count)
+    approx = _CreateNumpyDoubleArrayView(approxes, count)
+    target = _CreateNumpyFloatArrayView(targets, count)
 
     if weights:
-        weight = _FloatArrayWrapper.create(weights, count)
+        weight = _CreateNumpyFloatArrayView(weights, count)
     else:
         weight = None
 
@@ -1346,11 +1396,27 @@ cdef void _ObjectiveCalcDersRange(
         with nogil:
             ThrowCppExceptionWithMessage(errorMessage)
 
-    index = 0
-    for der1, der2 in result:
-        ders[index].Der1 = der1
-        ders[index].Der2 = der2
-        index += 1
+    if len(result) == 0:
+        return
+
+    if (type(result) == np.ndarray and len(result.shape) == 2 and result.shape[1] == 2 and
+          result.dtype in [np.float32, np.float64]):
+        if result.dtype == np.float32:
+            pairs_np_float = result
+            for index in range(len(pairs_np_float)):
+                ders[index].Der1 = pairs_np_float[index, 0]
+                ders[index].Der2 = pairs_np_float[index, 1]
+        elif result.dtype == np.float64:
+            pairs_np_double = result
+            for index in range(len(pairs_np_double)):
+                ders[index].Der1 = pairs_np_double[index, 0]
+                ders[index].Der2 = pairs_np_double[index, 1]
+    else:
+        index = 0
+        for der1, der2 in result:
+            ders[index].Der1 = <double>der1
+            ders[index].Der2 = <double>der2
+            index += 1
 
 cdef void _ObjectiveCalcDersMultiClass(
     const TVector[double]& approx,
@@ -1363,7 +1429,7 @@ cdef void _ObjectiveCalcDersMultiClass(
     cdef objectiveObject = <object>(customData)
     cdef TString errorMessage
 
-    approxes = _DoubleArrayWrapper.create(approx.data(), approx.size())
+    approxes = _CreateNumpyDoubleArrayView(approx.data(), approx.size())
 
     try:
         ders_vector, second_ders_matrix = objectiveObject.calc_ders_multi(approxes, target, weight)
@@ -1393,8 +1459,8 @@ cdef void _ObjectiveCalcDersMultiRegression(
     cdef objectiveObject = <object>(customData)
     cdef TString errorMessage
 
-    approxes = _DoubleArrayWrapper.create(approx.data(), approx.size())
-    targetes = _FloatArrayWrapper.create(target.data(), target.size())
+    approxes = _CreateNumpyDoubleArrayView(approx.data(), approx.size())
+    targetes = _CreateNumpyFloatArrayView(target.data(), target.size())
 
     try:
         ders_vector, second_ders_matrix = objectiveObject.calc_ders_multi(approxes, targetes, weight)
@@ -1413,6 +1479,82 @@ cdef void _ObjectiveCalcDersMultiRegression(
                 dereference(der2).Data[index] = num
                 index += 1
 
+def _is_self_unused_in_method(method):
+    args = inspect.getfullargspec(method)
+    if not args.args:
+        return False
+    self_arg_name = args.args[0]
+    return inspect.getsource(method).count(self_arg_name) == 1
+
+def _check_object_and_class_methods_match(object_method, class_method):
+    return inspect.getsource(object_method) == inspect.getsource(class_method)
+
+def _try_jit_method(obj, method_name):
+    import numba
+
+    object_method = getattr(obj, method_name, None)
+    class_method = getattr(obj.__class__, method_name, None)
+
+    if not object_method:
+        warnings.warn("Can't find method \"{}\" in the passed object".format(method_name))
+        return
+    if not class_method:
+        warnings.warn("Can't find method \"{}\" in the class of the passed object".format(method_name))
+        return
+    if type(object_method) != types.MethodType:
+        warnings.warn("Got unexpected type for method \"{}\" in the passed object: {}".format(method_name, type(object_method)))
+        return
+    if not _check_object_and_class_methods_match(object_method, class_method):
+        warnings.warn("Methods \"{}\" in the passed object and its class don't match".format(method_name))
+        return
+    if not _is_self_unused_in_method(object_method):
+        warnings.warn("Can't optimze method \"{}\" because self argument is used".format(method_name))
+        return
+
+    try:
+        optimized = numba.njit(class_method)
+    except numba.core.errors.NumbaError as err:
+        warnings.warn("Failed to optimize method \"{}\" in the passed object:\n{}".format(method_name, err))
+        return
+
+    def new_method(*args):
+        if not new_method.initialized:
+            try:
+                value = optimized(0, *args)
+                return value
+            except numba.core.errors.NumbaError as err:
+                warnings.warn("Failed to optimize method \"{}\" in the passed object:\n{}".format(method_name, err))
+                new_method.use_optimized = False
+                return object_method(*args)
+            finally:
+                new_method.initialized = True
+        elif new_method.use_optimized:
+            return optimized(0, *args)
+        else:
+            return object_method(*args)
+    setattr(new_method, "initialized", False)
+    setattr(new_method, "use_optimized", True)
+    setattr(obj, method_name, new_method)
+
+def _try_jit_methods(obj, method_names):
+    if hasattr(obj, "no_jit"):
+        return
+
+    if hasattr(obj, "_jited"): # everything already done
+        return
+
+    setattr(obj, "_jited", True)
+
+    try:
+        import numba
+    except:
+        #  warnings.warn('Failed to import numba for optimizing custom metrics and objectives')
+        return
+
+    for method_name in method_names:
+        if hasattr(obj, method_name):
+            _try_jit_method(obj, method_name)
+
 
 # customGenerator should have method rvs()
 cdef TCustomRandomDistributionGenerator _BuildCustomRandomDistributionGenerator(object customGenerator):
@@ -1423,6 +1565,7 @@ cdef TCustomRandomDistributionGenerator _BuildCustomRandomDistributionGenerator(
 
 cdef TCustomMetricDescriptor _BuildCustomMetricDescriptor(object metricObject):
     cdef TCustomMetricDescriptor descriptor
+    _try_jit_methods(metricObject, custom_metric_methods_to_optimize)
     descriptor.CustomData = <void*>metricObject
     if (issubclass(metricObject.__class__, MultiRegressionCustomMetric)):
         descriptor.EvalMultiregressionFunc = &_MultiregressionMetricEval
@@ -1433,8 +1576,15 @@ cdef TCustomMetricDescriptor _BuildCustomMetricDescriptor(object metricObject):
     descriptor.GetFinalErrorFunc = &_MetricGetFinalError
     return descriptor
 
+cdef TCustomCallbackDescriptor _BuildCustomCallbackDescritor(object callbackObject):
+    cdef TCustomCallbackDescriptor descriptor
+    descriptor.CustomData = <void*>callbackObject
+    descriptor.AfterIterationFunc = &_CallbackAfterIteration
+    return descriptor
+
 cdef TCustomObjectiveDescriptor _BuildCustomObjectiveDescriptor(object objectiveObject):
     cdef TCustomObjectiveDescriptor descriptor
+    _try_jit_methods(objectiveObject, custom_objective_methods_to_optimize)
     descriptor.CustomData = <void*>objectiveObject
     descriptor.CalcDersRange = &_ObjectiveCalcDersRange
     descriptor.CalcDersMultiRegression = &_ObjectiveCalcDersMultiRegression
@@ -1495,7 +1645,7 @@ cdef ECalcTypeShapValues string_to_calc_type(shap_calc_type) except *:
 cdef EExplainableModelOutput string_to_model_output(model_output_str) except *:
     cdef EExplainableModelOutput model_output
     if not TryFromString[EExplainableModelOutput](to_arcadia_string(model_output_str), model_output):
-        raise CatBoostError("Unknown shap values mode {}.".format(model_output_str))
+        raise CatBoostError("Unknown shap values model output {}.".format(model_output_str))
     return model_output
 
 
@@ -1503,12 +1653,15 @@ cdef class _PreprocessParams:
     cdef TJsonValue tree
     cdef TMaybe[TCustomObjectiveDescriptor] customObjectiveDescriptor
     cdef TMaybe[TCustomMetricDescriptor] customMetricDescriptor
+    cdef TMaybe[TCustomCallbackDescriptor] customCallbackDescriptor
     def __init__(self, dict params):
         eval_metric = params.get("eval_metric")
         objective = params.get("loss_function")
+        callback = params.get("callbacks")
 
         is_custom_eval_metric = eval_metric is not None and not isinstance(eval_metric, string_types)
         is_custom_objective = objective is not None and not isinstance(objective, string_types)
+        is_custom_callback = callback is not None
 
         devices = params.get('devices')
         if devices is not None and isinstance(devices, list):
@@ -1519,14 +1672,16 @@ cdef class _PreprocessParams:
 
         params_to_json = params
 
-        if is_custom_objective or is_custom_eval_metric:
+        if is_custom_objective or is_custom_eval_metric or is_custom_callback:
             if params.get("task_type") == "GPU":
-                raise CatBoostError("User defined loss functions and metrics are not supported for GPU")
+                raise CatBoostError("User defined loss functions, metrics and callbacks are not supported for GPU")
             keys_to_replace = set()
             if is_custom_objective:
                 keys_to_replace.add("loss_function")
             if is_custom_eval_metric:
                 keys_to_replace.add("eval_metric")
+            if is_custom_callback:
+                keys_to_replace.add("callbacks")
 
             params_to_json = {}
 
@@ -1547,6 +1702,9 @@ cdef class _PreprocessParams:
             self.customMetricDescriptor = _BuildCustomMetricDescriptor(params["eval_metric"])
             if (issubclass(params["eval_metric"].__class__, MultiRegressionCustomMetric)):
                 params_to_json["eval_metric"] = "PythonUserDefinedMultiRegression"
+
+        if params_to_json.get("callbacks") == "PythonUserDefinedPerObject":
+            self.customCallbackDescriptor = _BuildCustomCallbackDescritor(params["callbacks"])
 
         dumps_params = dumps(params_to_json, cls=_NumpyAwareEncoder)
 
@@ -1584,31 +1742,40 @@ cdef class _PreprocessGrids:
 
 cdef TString to_arcadia_string(s) except *:
     cdef const unsigned char[:] bytes_s
+    cdef const char* utf8_str_pointer
+    cdef Py_ssize_t utf8_str_size
     cdef type s_type = type(s)
     if len(s) == 0:
         return TString()
-    if s_type is unicode:
+    if s_type is unicode or s_type is _npunicode_:
         # Fast path for most common case(s).
-        tmp = (<unicode>s).encode('utf8')
-        return TString(<const char*>tmp, len(tmp))
-    elif s_type is bytes:
+        if PY_MAJOR_VERSION >= 3:
+            # we fallback to calling .encode method to properly report error
+            utf8_str_pointer = PyUnicode_AsUTF8AndSize(s, &utf8_str_size)
+            if utf8_str_pointer != nullptr:
+                return TString(utf8_str_pointer, utf8_str_size)
+        else:
+            tmp = (<unicode>s).encode('utf8')
+            return TString(<const char*>tmp, len(tmp))
+    elif s_type is bytes or s_type is _npbytes_:
         return TString(<const char*>s, len(s))
 
-    if PY3 and hasattr(s, 'encode'):
+    if PY_MAJOR_VERSION >= 3 and hasattr(s, 'encode'):
         # encode to the specific encoding used inside of the module
-        bytes_s = s.encode()
+        bytes_s = s.encode('utf8')
     else:
         bytes_s = s
     return TString(<const char*>&bytes_s[0], len(bytes_s))
 
 cdef to_native_str(binary):
-    if PY3 and hasattr(binary, 'decode'):
+    if PY_MAJOR_VERSION >= 3 and hasattr(binary, 'decode'):
         return binary.decode()
     return binary
 
 cdef all_string_types_plus_bytes = string_types + (bytes,)
 
-cdef _npstring_ = np.string_
+cdef _npbytes_ = np.bytes_
+cdef _npunicode_ = np.unicode_
 cdef _npint32 = np.int32
 cdef _npint64 = np.int64
 cdef _npuint32 = np.uint32
@@ -1654,7 +1821,7 @@ cdef inline get_id_object_bytes_string_representation(
 
     # For some reason Cython does not allow assignment to dereferenced pointer, so we are using ptr[0] trick
     # Here we have shortcuts for most of base types
-    if obj_type is str or obj_type is unicode or obj_type is bytes or obj_type is _npstring_:
+    if obj_type is str or obj_type is unicode or obj_type is bytes or obj_type is _npbytes_ or obj_type is _npunicode_:
         bytes_string_buf_representation[0] = to_arcadia_string(id_object)
     elif obj_type is int or obj_type is long or obj_type is _npint32 or obj_type is _npint64:
         bytes_string_buf_representation[0] = ToString[i64](<i64>id_object)
@@ -1819,6 +1986,7 @@ cdef TFeaturesLayout* _init_features_layout(
     cdef TVector[ui32] text_features_vector
     cdef TVector[ui32] embedding_features_vector
     cdef TVector[TString] feature_names_vector
+    cdef THashMap[TString, TTagDescription] feature_tags_map
     cdef bool_t all_features_are_sparse
 
     if isinstance(data, FeaturesData):
@@ -1846,6 +2014,7 @@ cdef TFeaturesLayout* _init_features_layout(
         text_features_vector,
         embedding_features_vector,
         feature_names_vector,
+        feature_tags_map,
         all_features_are_sparse)
 
 cdef TVector[bool_t] _get_is_feature_type_mask(const TFeaturesLayout* featuresLayout, EFeatureType featureType) except *:
@@ -2060,7 +2229,7 @@ cdef get_text_factor_bytes_representation(
     TString* factor_strbuf
 ):
     cdef type obj_type = type(factor)
-    if obj_type is str or obj_type is unicode or obj_type is bytes or obj_type is _npstring_:
+    if obj_type is str or obj_type is unicode or obj_type is bytes or obj_type is _npbytes_ or obj_type is _npunicode_:
         factor_strbuf[0] = to_arcadia_string(factor)
     else:
         if non_default_doc_idx == -1:
@@ -2688,7 +2857,7 @@ def _set_data_from_scipy_csr_sparse(
             builder_visitor,
             <ILocalExecutor*>&py_builder_visitor.local_executor)
 
-    if numpy_num_dtype == np.float64_t:
+    elif numpy_num_dtype == np.float64_t:
         data_np = cast_to_nparray(data, np.float64)
         return SetDataFromScipyCsrSparse[np.float64_t](
             indptr_i32_ref,
@@ -2698,7 +2867,7 @@ def _set_data_from_scipy_csr_sparse(
             builder_visitor,
             <ILocalExecutor*>&py_builder_visitor.local_executor)
 
-    if numpy_num_dtype == np.int8_t:
+    elif numpy_num_dtype == np.int8_t:
         data_np = cast_to_nparray(data, np.int8)
         return SetDataFromScipyCsrSparse[np.int8_t](
             indptr_i32_ref,
@@ -2708,7 +2877,7 @@ def _set_data_from_scipy_csr_sparse(
             builder_visitor,
             <ILocalExecutor*>&py_builder_visitor.local_executor)
 
-    if numpy_num_dtype == np.uint8_t:
+    elif numpy_num_dtype == np.uint8_t:
         data_np = cast_to_nparray(data, np.uint8)
         return SetDataFromScipyCsrSparse[np.uint8_t](
             indptr_i32_ref,
@@ -2718,7 +2887,7 @@ def _set_data_from_scipy_csr_sparse(
             builder_visitor,
             <ILocalExecutor*>&py_builder_visitor.local_executor)
 
-    if numpy_num_dtype == np.int16_t:
+    elif numpy_num_dtype == np.int16_t:
         data_np = cast_to_nparray(data, np.int16)
         return SetDataFromScipyCsrSparse[np.int16_t](
             indptr_i32_ref,
@@ -2728,7 +2897,7 @@ def _set_data_from_scipy_csr_sparse(
             builder_visitor,
             <ILocalExecutor*>&py_builder_visitor.local_executor)
 
-    if numpy_num_dtype == np.uint16_t:
+    elif numpy_num_dtype == np.uint16_t:
         data_np = cast_to_nparray(data, np.uint16)
         return SetDataFromScipyCsrSparse[np.uint16_t](
             indptr_i32_ref,
@@ -2738,7 +2907,7 @@ def _set_data_from_scipy_csr_sparse(
             builder_visitor,
             <ILocalExecutor*>&py_builder_visitor.local_executor)
 
-    if numpy_num_dtype == np.int32_t:
+    elif numpy_num_dtype == np.int32_t:
         data_np = cast_to_nparray(data, np.int32)
         return SetDataFromScipyCsrSparse[np.int32_t](
             indptr_i32_ref,
@@ -2748,7 +2917,7 @@ def _set_data_from_scipy_csr_sparse(
             builder_visitor,
             <ILocalExecutor*>&py_builder_visitor.local_executor)
 
-    if numpy_num_dtype == np.uint32_t:
+    elif numpy_num_dtype == np.uint32_t:
         data_np = cast_to_nparray(data, np.uint32)
         return SetDataFromScipyCsrSparse[np.uint32_t](
             indptr_i32_ref,
@@ -2758,7 +2927,7 @@ def _set_data_from_scipy_csr_sparse(
             builder_visitor,
             <ILocalExecutor*>&py_builder_visitor.local_executor)
 
-    if numpy_num_dtype == np.int64_t:
+    elif numpy_num_dtype == np.int64_t:
         data_np = cast_to_nparray(data, np.int64)
         return SetDataFromScipyCsrSparse[np.int64_t](
             indptr_i32_ref,
@@ -2768,7 +2937,7 @@ def _set_data_from_scipy_csr_sparse(
             builder_visitor,
             <ILocalExecutor*>&py_builder_visitor.local_executor)
 
-    if numpy_num_dtype == np.uint64_t:
+    elif numpy_num_dtype == np.uint64_t:
         data_np = cast_to_nparray(data, np.uint64)
         return SetDataFromScipyCsrSparse[np.uint64_t](
             indptr_i32_ref,
@@ -2777,8 +2946,8 @@ def _set_data_from_scipy_csr_sparse(
             is_cat_feature_ref,
             builder_visitor,
             <ILocalExecutor*>&py_builder_visitor.local_executor)
-
-    assert False, "CSR sparse arrays support only numeric data types"
+    else:
+        assert False, "CSR sparse arrays support only numeric data types"
 
 
 cdef _set_data_from_scipy_lil_sparse(
@@ -3086,7 +3255,7 @@ cdef TString obj_to_arcadia_string(obj) except *:
         return ToString[double](<double>obj)
     elif ((obj_type is int or obj_type is long) and (INT64_MIN <= obj <= INT64_MAX)) or obj_type is _npint32 or obj_type is _npint64:
         return ToString[i64](<i64>obj)
-    elif obj_type is str or obj_type is unicode or obj_type is bytes or obj_type is _npstring_:
+    elif obj_type is str or obj_type is unicode or obj_type is bytes or obj_type is _npbytes_ or obj_type is _npunicode_:
         return to_arcadia_string(obj)
     else:
         return to_arcadia_string(str(obj))
@@ -3328,22 +3497,22 @@ cdef class _PoolBase:
 
     cpdef _read_pool(self, pool_file, cd_file, pairs_file, feature_names_file, delimiter, bool_t has_header, bool_t ignore_csv_quoting, int thread_count, dict quantization_params):
         cdef TPathWithScheme pool_file_path
-        pool_file_path = TPathWithScheme(<TStringBuf>to_arcadia_string(pool_file), TStringBuf(<char*>'dsv'))
+        pool_file_path = TPathWithScheme(<TStringBuf>to_arcadia_string(fspath(pool_file)), TStringBuf(<char*>'dsv'))
 
         cdef TPathWithScheme pairs_file_path
-        if len(pairs_file):
-            pairs_file_path = TPathWithScheme(<TStringBuf>to_arcadia_string(pairs_file), TStringBuf(<char*>'dsv-flat'))
+        if pairs_file:
+            pairs_file_path = TPathWithScheme(<TStringBuf>to_arcadia_string(fspath(pairs_file)), TStringBuf(<char*>'dsv-flat'))
 
         cdef TPathWithScheme feature_names_file_path
-        if len(feature_names_file):
-            feature_names_file_path = TPathWithScheme(<TStringBuf>to_arcadia_string(feature_names_file), TStringBuf(<char*>'dsv'))
+        if feature_names_file:
+            feature_names_file_path = TPathWithScheme(<TStringBuf>to_arcadia_string(fspath(feature_names_file)), TStringBuf(<char*>'dsv'))
 
         cdef TColumnarPoolFormatParams columnarPoolFormatParams
         columnarPoolFormatParams.DsvFormat.HasHeader = has_header
         columnarPoolFormatParams.DsvFormat.Delimiter = ord(delimiter)
         columnarPoolFormatParams.DsvFormat.IgnoreCsvQuoting = ignore_csv_quoting
-        if len(cd_file):
-            columnarPoolFormatParams.CdFilePath = TPathWithScheme(<TStringBuf>to_arcadia_string(cd_file), TStringBuf(<char*>'dsv'))
+        if cd_file:
+            columnarPoolFormatParams.CdFilePath = TPathWithScheme(<TStringBuf>to_arcadia_string(fspath(cd_file)), TStringBuf(<char*>'dsv'))
 
         thread_count = UpdateThreadCount(thread_count)
 
@@ -3354,7 +3523,7 @@ cdef class _PoolBase:
             block_size = quantization_params.pop("dev_block_size", None)
             prep_params = _PreprocessParams(quantization_params)
             if input_borders:
-                input_borders_file_path = TPathWithScheme(<TStringBuf>to_arcadia_string(input_borders), TStringBuf(<char*>'dsv'))
+                input_borders_file_path = TPathWithScheme(<TStringBuf>to_arcadia_string(fspath(input_borders)), TStringBuf(<char*>'dsv'))
             self.__pool = ReadAndQuantizeDataset(
                 pool_file_path,
                 pairs_file_path,
@@ -3362,6 +3531,7 @@ cdef class _PoolBase:
                 TPathWithScheme(),
                 TPathWithScheme(),
                 feature_names_file_path,
+                TPathWithScheme(),
                 input_borders_file_path,
                 columnarPoolFormatParams,
                 emptyIntVec,
@@ -3381,6 +3551,7 @@ cdef class _PoolBase:
                 TPathWithScheme(),
                 TPathWithScheme(),
                 feature_names_file_path,
+                TPathWithScheme(),
                 columnarPoolFormatParams,
                 emptyIntVec,
                 EObjectsOrder_Undefined,
@@ -3623,7 +3794,7 @@ cdef class _PoolBase:
             )
 
     cpdef _save(self, fname):
-        cdef TString file_name = to_arcadia_string(fname)
+        cdef TString file_name = to_arcadia_string(fspath(fname))
         SaveQuantizedPool(self.__pool, file_name)
 
 
@@ -3715,7 +3886,7 @@ cdef class _PoolBase:
         cdef TQuantizedFeaturesInfoPtr quantizedFeaturesInfo
         cdef TQuantizedObjectsDataProviderPtr quantizedObjects
 
-        if (_input_borders):
+        if _input_borders:
             quantizedFeaturesInfo = _init_quantized_feature_info(self.__pool, _input_borders)
 
         with nogil:
@@ -3958,6 +4129,25 @@ cdef class _PoolBase:
             return [weight for weight in non_trivial_data]
 
 
+    cpdef get_group_id_hash(self):
+        """
+        Get hashes generated from group_id.
+
+        Returns
+        -------
+        group_id : np.array with dtype==np.uint64 if group_id was defined or None otherwise.
+        """
+        cdef TMaybeData[TConstArrayRef[TGroupId]] arr_group_ids = self.__pool.Get()[0].ObjectsData.Get()[0].GetGroupIds()
+        cdef const TGroupId* groupIdsPtr
+        if arr_group_ids.Defined():
+            result_group_ids = np.empty(arr_group_ids.GetRef().size(), dtype=np.uint64)
+            groupIdsPtr = arr_group_ids.GetRef().data()
+            for i in xrange(arr_group_ids.GetRef().size()):
+                result_group_ids[i] = groupIdsPtr[i]
+            return result_group_ids
+        return None
+
+
     cpdef get_baseline(self):
         """
         Get baseline from Pool.
@@ -4003,7 +4193,7 @@ cdef class _PoolBase:
 
         Parameters
         ----------
-        output_file : string
+        output_file : string or pathlib.Path
             Output file name.
 
         Examples
@@ -4018,7 +4208,7 @@ cdef class _PoolBase:
         if not quantized_objects_data_provider:
             raise CatBoostError("Pool is not quantized")
 
-        cdef TString fname = to_arcadia_string(output_file)
+        cdef TString fname = to_arcadia_string(fspath(output_file))
         cdef TQuantizedFeaturesInfoPtr quantized_features_info = quantized_objects_data_provider[0].GetQuantizedFeaturesInfo()
 
         with nogil:
@@ -4083,7 +4273,7 @@ cdef TQuantizedFeaturesInfoPtr _init_quantized_feature_info(TDataProviderPtr poo
         TConstArrayRef[ui32](),
         TBinarizationOptions()
     )
-    input_borders_str = to_arcadia_string(_input_borders)
+    input_borders_str = to_arcadia_string(fspath(_input_borders))
     with nogil:
         LoadBordersAndNanModesFromFromFileInMatrixnetFormat(
             input_borders_str,
@@ -4207,6 +4397,7 @@ cdef class _CatBoost:
                     quantizedFeaturesInfo,
                     prep_params.customObjectiveDescriptor,
                     prep_params.customMetricDescriptor,
+                    prep_params.customCallbackDescriptor,
                     dataProviders,
                     init_model_param,
                     init_learn_progress_param,
@@ -4242,24 +4433,7 @@ cdef class _CatBoost:
         return test_evals
 
     cpdef _get_metrics_evals(self):
-        metrics_evals = defaultdict(functools.partial(defaultdict, list))
-        iteration_count = self.__metrics_history.LearnMetricsHistory.size()
-        for iteration_num in range(iteration_count):
-            for metric, value in self.__metrics_history.LearnMetricsHistory[iteration_num]:
-                metrics_evals["learn"][to_native_str(metric)].append(value)
-
-        if not self.__metrics_history.TestMetricsHistory.empty():
-            test_count = 0
-            for i in range(iteration_count):
-                test_count = max(test_count, self.__metrics_history.TestMetricsHistory[i].size())
-            for iteration_num in range(iteration_count):
-                for test_index in range(self.__metrics_history.TestMetricsHistory[iteration_num].size()):
-                    eval_set_name = "validation"
-                    if test_count > 1:
-                        eval_set_name += "_" + str(test_index)
-                    for metric, value in self.__metrics_history.TestMetricsHistory[iteration_num][test_index]:
-                        metrics_evals[eval_set_name][to_native_str(metric)].append(value)
-        return {k: dict(v) for k, v in iteritems(metrics_evals)}
+        return _get_metrics_evals_pydict(self.__metrics_history)
 
     cpdef _get_best_score(self):
         if self.__metrics_history.LearnBestError.empty():
@@ -4305,10 +4479,12 @@ cdef class _CatBoost:
         cdef TConstArrayRef[TFloatFeature] arrayView = self.__model.ModelTrees.Get().GetFloatFeatures()
         return dict([(feature.Position.FlatIndex, feature.Borders) for feature in arrayView])
 
-    cpdef _base_predict(self, _PoolBase pool, str prediction_type, int ntree_start, int ntree_end, int thread_count, bool_t verbose):
+    cpdef _base_predict(self, _PoolBase pool, str prediction_type, int ntree_start, int ntree_end, int thread_count, bool_t verbose, str task_type):
         cdef TVector[TVector[double]] pred
         cdef EPredictionType predictionType = string_to_prediction_type(prediction_type)
+        cdef EFormulaEvaluatorType formulaEvaluatorType = EFormulaEvaluatorType_GPU if task_type == 'GPU' else EFormulaEvaluatorType_CPU
         thread_count = UpdateThreadCount(thread_count);
+        dereference(self.__model).SetEvaluatorType(formulaEvaluatorType);
         with nogil:
             pred = ApplyModelMulti(
                 dereference(self.__model),
@@ -4381,8 +4557,8 @@ cdef class _CatBoost:
             ntree_end,
             eval_period,
             thread_count,
-            to_arcadia_string(result_dir),
-            to_arcadia_string(tmp_dir)
+            to_arcadia_string(fspath(result_dir)),
+            to_arcadia_string(fspath(tmp_dir))
         )
         cdef TVector[TString] metric_names = GetMetricNames(dereference(self.__model), metricDescriptions)
         return metrics, [to_native_str(name) for name in metric_names]
@@ -4533,7 +4709,7 @@ cdef class _CatBoost:
     cpdef _load_model(self, model_file, format):
         cdef TFullModel tmp_model
         cdef EModelType modelType = string_to_model_type(format)
-        tmp_model = ReadModel(to_arcadia_string(model_file), modelType)
+        tmp_model = ReadModel(to_arcadia_string(fspath(model_file)), modelType)
         self.model_blob = None
         self.__model.Swap(tmp_model)
 
@@ -4551,7 +4727,7 @@ cdef class _CatBoost:
 
         ExportModel(
             dereference(self.__model),
-            to_arcadia_string(output_file),
+            to_arcadia_string(fspath(output_file)),
             modelType,
             to_arcadia_string(export_parameters),
             False,
@@ -4562,7 +4738,7 @@ cdef class _CatBoost:
     cpdef _serialize_model(self):
         cdef TString tstr = SerializeModel(dereference(self.__model))
         cdef const char* c_serialized_model_string = tstr.c_str()
-        cpdef bytes py_serialized_model_str = c_serialized_model_string[:tstr.size()]
+        cdef bytes py_serialized_model_str = c_serialized_model_string[:tstr.size()]
         return py_serialized_model_str
 
     cpdef _deserialize_model(self, serialized_model_str):
@@ -4635,7 +4811,7 @@ cdef class _CatBoost:
         self.__model.Swap(tmp_model)
 
     cpdef _save_borders(self, output_file):
-        SaveModelBorders( to_arcadia_string(output_file), dereference(self.__model))
+        SaveModelBorders(to_arcadia_string(fspath(output_file)), dereference(self.__model))
 
     cpdef _check_model_and_dataset_compatibility(self, _PoolBase pool):
         if pool:
@@ -4775,6 +4951,27 @@ cdef class _CatBoost:
             search_result["cv_results"] = cv_results
         return search_result
 
+    cpdef _select_features(self, _PoolBase train_pool, _PoolBase test_pool, dict params):
+        prep_params = _PreprocessParams(params)
+
+        cdef TDataProviders dataProviders
+        dataProviders.Learn = train_pool.__pool
+        if test_pool:
+            dataProviders.Test.push_back(test_pool.__pool)
+
+        cdef TJsonValue summary_json
+        with nogil:
+            SetPythonInterruptHandler()
+            try:
+                summary_json = SelectFeatures(
+                    prep_params.tree,
+                    dataProviders,
+                    self.__model
+                )
+            finally:
+                ResetPythonInterruptHandler()
+        return loads(to_native_str(WriteTJsonValue(summary_json)))
+
     cpdef _get_binarized_statistics(self, _PoolBase pool, catFeaturesNums, floatFeaturesNums, predictionType, int thread_count):
         thread_count = UpdateThreadCount(thread_count)
         cdef TVector[TBinarizedFeatureStatistics] statistics
@@ -4874,6 +5071,9 @@ cdef class _CatBoost:
                 nanTreatments[pair.first] = 'AsTrue'
         return nanTreatments
 
+    cpdef _get_binclass_probability_threshold(self):
+        return self.__model.GetBinClassProbabilityThreshold()
+
 
 cdef class _MetadataHashProxy:
     cdef _CatBoost _catboost
@@ -4928,18 +5128,6 @@ cdef class _MetadataHashProxy:
         return ((to_native_str(kv.first), to_native_str(kv.second)) for kv in self._catboost.__model.ModelInfo)
 
 
-cdef object _get_hash_group_id(_PoolBase pool):
-    cdef TMaybeData[TConstArrayRef[TGroupId]] arr_group_ids = pool.__pool.Get()[0].ObjectsData.Get()[0].GetGroupIds()
-    if arr_group_ids.Defined():
-        result_group_ids = []
-        for group_id in arr_group_ids.GetRef():
-            result_group_ids.append(group_id)
-
-        return result_group_ids
-
-    return None
-
-
 cdef TCustomTrainTestSubsets _make_train_test_subsets(_PoolBase pool, folds) except *:
     num_data = pool.num_row()
 
@@ -4947,11 +5135,11 @@ cdef TCustomTrainTestSubsets _make_train_test_subsets(_PoolBase pool, folds) exc
         raise AttributeError("folds should be a generator or iterator of (train_idx, test_idx) tuples "
                              "or scikit-learn splitter object with split method")
 
-    group_info = _get_hash_group_id(pool)
+    cdef TMaybeData[TConstArrayRef[TGroupId]] arr_group_ids = pool.__pool.Get()[0].ObjectsData.Get()[0].GetGroupIds()
 
     if hasattr(folds, 'split'):
-        if group_info is not None:
-            flatted_group = group_info
+        if arr_group_ids.Defined():
+            flatted_group = _CreateNumpyUI64ArrayView(arr_group_ids.GetRef().data(), arr_group_ids.GetRef().size())
         else:
             flatted_group = np.zeros(num_data, dtype=int)
         folds = folds.split(X=np.zeros(num_data), y=pool.get_label(), groups=flatted_group)
@@ -4959,7 +5147,13 @@ cdef TCustomTrainTestSubsets _make_train_test_subsets(_PoolBase pool, folds) exc
     cdef TVector[TVector[ui32]] custom_train_subsets
     cdef TVector[TVector[ui32]] custom_test_subsets
 
-    if group_info is None:
+    cdef THashSet[ui64] train_group_ids
+    cdef THashMap[TGroupId, ui64] map_group_id_to_group_number
+    cdef ui64 current_num
+    cdef const TGroupId* group_id_ptr
+    cdef TGroupId current_group
+
+    if not arr_group_ids.Defined():
         for train_test in folds:
             train = train_test[0]
             test = train_test[1]
@@ -4972,36 +5166,35 @@ cdef TCustomTrainTestSubsets _make_train_test_subsets(_PoolBase pool, folds) exc
             for subset in test:
                 custom_test_subsets.back().push_back(subset)
     else:
-        map_group_id_to_group_number = {}
         current_num = 0
-        for idx in range(len(group_info)):
-            if idx == 0 or group_info[idx] != group_info[idx - 1]:
-                map_group_id_to_group_number[group_info[idx]] = current_num
+        group_id_ptr = arr_group_ids.GetRef().data()
+        for idx in range(arr_group_ids.GetRef().size()):
+            if idx == 0 or group_id_ptr[idx] != group_id_ptr[idx - 1]:
+                map_group_id_to_group_number[group_id_ptr[idx]] = current_num
                 current_num = current_num + 1
 
         for train_test in folds:
             train = train_test[0]
             test = train_test[1]
-
-            train_group = []
+            train_group_ids.clear()
 
             custom_train_subsets.emplace_back()
 
             for idx in range(len(train)):
-                current_group = group_info[train[idx]]
-                if idx == 0 or current_group != group_info[train[idx - 1]]:
+                current_group = group_id_ptr[train[idx]]
+                if idx == 0 or current_group != group_id_ptr[train[idx - 1]]:
                     custom_train_subsets.back().push_back(map_group_id_to_group_number[current_group])
-                    train_group.append(map_group_id_to_group_number[current_group])
+                    train_group_ids.insert(map_group_id_to_group_number[current_group])
 
             custom_test_subsets.emplace_back()
 
             for idx in range(len(test)):
-                current_group = group_info[test[idx]]
+                current_group = group_id_ptr[test[idx]]
 
-                if map_group_id_to_group_number[current_group] in train_group:
+                if train_group_ids.contains(map_group_id_to_group_number[current_group]):
                     raise CatBoostError('Objects with the same group id must be in the same fold.')
 
-                if idx == 0 or current_group != group_info[test[idx - 1]]:
+                if idx == 0 or current_group != group_id_ptr[test[idx - 1]]:
                     custom_test_subsets.back().push_back(map_group_id_to_group_number[current_group])
 
     cdef TCustomTrainTestSubsets result
@@ -5012,16 +5205,19 @@ cdef TCustomTrainTestSubsets _make_train_test_subsets(_PoolBase pool, folds) exc
 
 
 cpdef _cv(dict params, _PoolBase pool, int fold_count, bool_t inverted, int partition_random_seed,
-          bool_t shuffle, bool_t stratified, float metric_update_interval, bool_t as_pandas, folds, type):
+          bool_t shuffle, bool_t stratified, float metric_update_interval, bool_t as_pandas, folds,
+          type, bool_t return_models):
     prep_params = _PreprocessParams(params)
     cdef TCrossValidationParams cvParams
     cdef TVector[TCVResult] results
+    cdef TVector[TFullModel] cvFullModels
 
     cvParams.FoldCount = fold_count
     cvParams.PartitionRandSeed = partition_random_seed
     cvParams.Shuffle = shuffle
     cvParams.Stratified = stratified
     cvParams.MetricUpdateInterval = metric_update_interval
+    cvParams.ReturnModels = return_models
 
     if type == 'Classical':
         cvParams.Type = ECrossValidation_Classical
@@ -5068,8 +5264,18 @@ cpdef _cv(dict params, _PoolBase pool, int fold_count, bool_t inverted, int part
         )
         result_metrics.add(name)
     if as_pandas:
-        return pd.DataFrame.from_dict(cv_results)
-    return cv_results
+        results_output = pd.DataFrame.from_dict(cv_results)
+    else:
+        results_output = cv_results
+    if return_models:
+        cv_models = []
+        cvFullModels = results.front().CVFullModels
+        for i in range(<int>cvFullModels.size()):
+            catboost_model = _CatBoost()
+            catboost_model.__model.Swap(cvFullModels[i])
+            cv_models.append(catboost_model)
+        return results_output, cv_models
+    return results_output
 
 
 cdef _convert_to_visible_labels(EPredictionType predictionType, TVector[TVector[double]] raws, int thread_count, TFullModel* model):
@@ -5091,6 +5297,29 @@ cdef _convert_to_visible_labels(EPredictionType predictionType, TVector[TVector[
         return result
 
     return _2d_vector_of_double_to_np_array(raws)
+
+
+cdef _get_metrics_evals_pydict(TMetricsAndTimeLeftHistory history):
+    metrics_evals = defaultdict(functools.partial(defaultdict, list))
+
+    iteration_count = history.LearnMetricsHistory.size()
+    for iteration_num in range(iteration_count):
+        for metric, value in history.LearnMetricsHistory[iteration_num]:
+            metrics_evals["learn"][to_native_str(metric)].append(value)
+
+    if not history.TestMetricsHistory.empty():
+        test_count = 0
+        for i in range(iteration_count):
+            test_count = max(test_count, history.TestMetricsHistory[i].size())
+        for iteration_num in range(iteration_count):
+            for test_index in range(history.TestMetricsHistory[iteration_num].size()):
+                eval_set_name = "validation"
+                if test_count > 1:
+                    eval_set_name += "_" + str(test_index)
+                for metric, value in history.TestMetricsHistory[iteration_num][test_index]:
+                    metrics_evals[eval_set_name][to_native_str(metric)].append(value)
+    return {k: dict(v) for k, v in iteritems(metrics_evals)}
+
 
 
 cdef class _StagedPredictIterator:
@@ -5233,7 +5462,7 @@ class EvalMetricsResult:
 
     def get_metric(self, metric_description):
         key = _metric_description_or_str_to_str(metric_description)
-        return self._metric_descriptions[metric_description]
+        return self._metric_descriptions[key]
 
     def get_result(self, metric_description):
         key = _metric_description_or_str_to_str(metric_description)
@@ -5253,7 +5482,7 @@ cdef class _MetricCalcerBase:
 
         self.__calcer = new TMetricsPlotCalcerPythonWrapper(metricsDescription, dereference(self.__catboost.__model),
                                                             ntree_start, ntree_end, eval_period, thread_count,
-                                                            to_arcadia_string(tmp_dir), delete_temp_dir_on_exit)
+                                                            to_arcadia_string(fspath(tmp_dir)), delete_temp_dir_on_exit)
 
         self._metric_descriptions = list()
 
@@ -5414,26 +5643,14 @@ cpdef _select_threshold(model, data, curve, FPR, FNR, thread_count):
     return rocCurve.SelectDecisionBoundaryByIntersection()
 
 
-log_cout = None
-log_cerr = None
-
-
-cdef void _CoutLogPrinter(const char* str, size_t len) except * with gil:
+cdef void _WriteLog(const char* str, size_t len, void* targetObject) except * with gil:
+    cdef streamLikeObject = <object> targetObject
     cdef bytes bytes_str = str[:len]
-    log_cout.write(to_native_str(bytes_str))
-
-
-cdef void _CerrLogPrinter(const char* str, size_t len) except * with gil:
-    cdef bytes bytes_str = str[:len]
-    log_cerr.write(to_native_str(bytes_str))
+    streamLikeObject.write(to_native_str(bytes_str))
 
 
 cpdef _set_logger(cout, cerr):
-    global log_cout
-    global log_cerr
-    log_cout = cout
-    log_cerr = cerr
-    SetCustomLoggingFunction(&_CoutLogPrinter, &_CerrLogPrinter)
+    SetCustomLoggingFunction(&_WriteLog, &_WriteLog, <void*>cout, <void*>cerr)
 
 
 cpdef _reset_logger():
@@ -5494,6 +5711,10 @@ cpdef is_multiregression_objective(loss_name):
     return IsMultiRegressionObjective(to_arcadia_string(loss_name))
 
 
+cpdef is_survivalregression_objective(loss_name):
+    return IsSurvivalRegressionObjective(to_arcadia_string(loss_name))
+
+
 cpdef is_groupwise_metric(metric_name):
     return IsGroupwiseMetric(to_arcadia_string(metric_name))
 
@@ -5504,6 +5725,10 @@ cpdef is_multiclass_metric(metric_name):
 
 cpdef is_pairwise_metric(metric_name):
     return IsPairwiseMetric(to_arcadia_string(metric_name))
+
+
+cpdef is_ranking_metric(metric_name):
+    return IsRankingMetric(to_arcadia_string(metric_name))
 
 
 cpdef is_minimizable_metric(metric_name):
@@ -5521,8 +5746,26 @@ cpdef is_user_defined_metric(metric_name):
 cpdef get_experiment_name(ui32 feature_set_idx, ui32 fold_idx):
     cdef TString experiment_name = GetExperimentName(feature_set_idx, fold_idx)
     cdef const char* c_experiment_name_string = experiment_name.c_str()
-    cpdef bytes py_experiment_name_str = c_experiment_name_string[:experiment_name.size()]
+    cdef bytes py_experiment_name_str = c_experiment_name_string[:experiment_name.size()]
     return py_experiment_name_str
+
+
+cpdef convert_features_to_indices(indices_or_names, cd_path, pool_metainfo_path):
+    cdef TJsonValue indices_or_names_as_json = ReadTJsonValue(
+        to_arcadia_string(
+            dumps(indices_or_names, cls=_NumpyAwareEncoder)
+        )
+    )
+    cdef TPathWithScheme cd_path_with_scheme
+    if cd_path is not None:
+        cd_path_with_scheme = TPathWithScheme(<TStringBuf>to_arcadia_string(fspath(cd_path)), TStringBuf(<char*>'dsv'))
+
+    cdef TPathWithScheme pool_metainfo_path_with_scheme
+    if pool_metainfo_path is not None:
+        pool_metainfo_path_with_scheme = TPathWithScheme(<TStringBuf>to_arcadia_string(fspath(pool_metainfo_path)), TStringBuf(<char*>''))
+
+    ConvertFeaturesFromStringToIndices(cd_path_with_scheme, pool_metainfo_path_with_scheme, &indices_or_names_as_json)
+    return loads(to_native_str(WriteTJsonValue(indices_or_names_as_json)))
 
 
 cpdef _check_train_params(dict params):
@@ -5555,7 +5798,7 @@ cpdef _get_gpu_device_count():
 
 
 cpdef _reset_trace_backend(file):
-    ResetTraceBackend(to_arcadia_string(file))
+    ResetTraceBackend(to_arcadia_string(fspath(file)))
 
 
 @cython.embedsignature(True)
@@ -5612,6 +5855,7 @@ cpdef _get_onnx_model(model, export_parameters):
     cdef const char* result_ptr = result.c_str()
     cdef size_t result_len = result.size()
     return bytes(result_ptr[:result_len])
+
 
 include "_monoforest.pxi"
 include "_text_processing.pxi"

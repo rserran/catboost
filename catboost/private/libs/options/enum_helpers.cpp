@@ -22,13 +22,14 @@ namespace {
         /** regression **/
         IsRegression                   = 1 << 2,
         IsMultiRegression              = 1 << 3,
+        IsSurvivalRegression           = 1 << 4,
         /** ranking **/
-        IsGroupwise                    = 1 << 4,
-        IsPairwise                     = 1 << 5,
+        IsGroupwise                    = 1 << 5,
+        IsPairwise                     = 1 << 6,
 
         /* various */
-        IsUserDefined                  = 1 << 6,
-        IsCombination                  = 1 << 7
+        IsUserDefined                  = 1 << 7,
+        IsCombination                  = 1 << 8
     };
 
     using EMetricAttributes = TFlags<EMetricAttribute>;
@@ -50,7 +51,8 @@ namespace {
                       || HasFlags(EMetricAttribute::IsPairwise)
                       || HasFlags(EMetricAttribute::IsUserDefined)
                       || HasFlags(EMetricAttribute::IsCombination)
-                      || HasFlags(EMetricAttribute::IsMultiRegression),
+                      || HasFlags(EMetricAttribute::IsMultiRegression)
+                      || HasFlags(EMetricAttribute::IsSurvivalRegression),
                       "no type (regression, classification, ranking) for [" + ToString(loss) + "]");
         }
 
@@ -66,7 +68,8 @@ namespace {
                       || HasFlags(EMetricAttribute::IsPairwise)
                       || HasFlags(EMetricAttribute::IsUserDefined)
                       || HasFlags(EMetricAttribute::IsCombination)
-                      || HasFlags(EMetricAttribute::IsMultiRegression),
+                      || HasFlags(EMetricAttribute::IsMultiRegression)
+                      || HasFlags(EMetricAttribute::IsSurvivalRegression),
                       "no type (regression, classification, ranking) for [" + ToString(loss) + "]");
         }
 
@@ -137,10 +140,16 @@ MakeRegister(LossInfos,
     Registree(MultiRMSE,
         EMetricAttribute::IsMultiRegression
     ),
+    Registree(SurvivalAft,
+        EMetricAttribute::IsSurvivalRegression
+    ),
     Registree(RMSEWithUncertainty,
         EMetricAttribute::IsRegression
     ),
     Registree(RMSE,
+        EMetricAttribute::IsRegression
+    ),
+    Registree(Cox, 
         EMetricAttribute::IsRegression
     ),
     Registree(Lq,
@@ -203,6 +212,11 @@ MakeRegister(LossInfos,
     RankingRegistree(QueryRMSE, ERankingType::AbsoluteValue,
         EMetricAttribute::IsGroupwise
     ),
+    RankingRegistree(QueryAUC, ERankingType::AbsoluteValue,
+        EMetricAttribute::IsBinaryClassCompatible
+        | EMetricAttribute::IsMultiClassCompatible
+        | EMetricAttribute::IsGroupwise
+    ),
     RankingRegistree(QuerySoftMax, ERankingType::CrossEntropy,
         EMetricAttribute::IsBinaryClassCompatible
         | EMetricAttribute::IsGroupwise
@@ -216,6 +230,9 @@ MakeRegister(LossInfos,
         | EMetricAttribute::IsGroupwise
     ),
     RankingRegistree(StochasticRank, ERankingType::Order,
+        EMetricAttribute::IsGroupwise
+    ),
+    RankingRegistree(LambdaMart, ERankingType::Order,
         EMetricAttribute::IsGroupwise
     ),
     Registree(PythonUserDefinedPerObject,
@@ -351,6 +368,14 @@ MakeRegister(LossInfos,
         EMetricAttribute::IsBinaryClassCompatible
         | EMetricAttribute::IsGroupwise
     ),
+    RankingRegistree(MRR, ERankingType::Order,
+        EMetricAttribute::IsBinaryClassCompatible
+        | EMetricAttribute::IsGroupwise
+    ),
+    RankingRegistree(ERR, ERankingType::Order,
+        EMetricAttribute::IsBinaryClassCompatible
+        | EMetricAttribute::IsGroupwise
+    ),
     Registree(Tweedie,
         EMetricAttribute::IsRegression
     )
@@ -412,6 +437,7 @@ bool ShouldSkipCalcOnTrainByDefault(ELossFunction loss) {
         loss == ELossFunction::YetiRank ||
         loss == ELossFunction::YetiRankPairwise ||
         loss == ELossFunction::AUC ||
+        loss == ELossFunction::QueryAUC ||
         loss == ELossFunction::PFound ||
         loss == ELossFunction::NDCG ||
         loss == ELossFunction::DCG ||
@@ -443,12 +469,17 @@ static const TVector<ELossFunction> RegressionObjectives = {
     ELossFunction::Poisson,
     ELossFunction::Lq,
     ELossFunction::Huber,
-    ELossFunction::Tweedie
+    ELossFunction::Tweedie,
+    ELossFunction::Cox
 };
 
 static const TVector<ELossFunction> MultiRegressionObjectives = {
     ELossFunction::MultiRMSE,
     ELossFunction::PythonUserDefinedMultiRegression
+};
+
+static const TVector<ELossFunction> SurvivalRegressionObjectives = {
+    ELossFunction::SurvivalAft
 };
 
 static const TVector<ELossFunction> ClassificationObjectives = {
@@ -464,9 +495,11 @@ static const TVector<ELossFunction> RankingObjectives = {
     ELossFunction::YetiRank,
     ELossFunction::YetiRankPairwise,
     ELossFunction::QueryRMSE,
+    ELossFunction::QueryAUC,
     ELossFunction::QuerySoftMax,
     ELossFunction::QueryCrossEntropy,
     ELossFunction::StochasticFilter,
+    ELossFunction::LambdaMart,
     ELossFunction::StochasticRank,
     ELossFunction::UserPerObjMetric,
     ELossFunction::UserQuerywiseMetric,
@@ -478,6 +511,7 @@ static const TVector<ELossFunction> Objectives = []() {
     TVector<const TVector<ELossFunction>*> objectiveLists = {
         &RegressionObjectives,
         &MultiRegressionObjectives,
+        &SurvivalRegressionObjectives,
         &ClassificationObjectives,
         &RankingObjectives
     };
@@ -501,6 +535,7 @@ ERankingType GetRankingType(ELossFunction loss) {
 
 static bool IsFromAucFamily(ELossFunction loss) {
     return loss == ELossFunction::AUC
+        || loss == ELossFunction::QueryAUC
         || loss == ELossFunction::NormalizedGini;
 }
 
@@ -558,6 +593,14 @@ bool IsMultiRegressionObjective(TStringBuf loss) {
     return IsMultiRegressionObjective(ParseLossType(loss));
 }
 
+bool IsSurvivalRegressionObjective(ELossFunction loss) {
+    return IsIn(SurvivalRegressionObjectives, loss);
+}
+
+bool IsSurvivalRegressionObjective(TStringBuf loss) {
+    return IsSurvivalRegressionObjective(ParseLossType(loss));
+}
+
 bool IsMultiRegressionMetric(ELossFunction loss) {
     return GetInfo(loss)->HasFlags(EMetricAttribute::IsMultiRegression);
 }
@@ -612,6 +655,11 @@ bool IsGroupwiseMetric(TStringBuf metricName) {
 bool IsPairwiseMetric(TStringBuf lossFunction) {
     const ELossFunction lossType = ParseLossType(lossFunction);
     return IsPairwiseMetric(lossType);
+}
+
+bool IsRankingMetric(TStringBuf metricName) {
+    const ELossFunction lossType = ParseLossType(metricName);
+    return IsRankingMetric(lossType);
 }
 
 bool IsPlainMode(EBoostingType boostingType) {

@@ -16,6 +16,8 @@ import org.apache.spark.ml.param._;
 import org.apache.spark.ml.util.Identifiable
 import ai.catboost.CatBoostError
 
+import ru.yandex.catboost.spark.catboost4j_spark.core.src.native_impl.EOverfittingDetectorType
+
 
 // copied from org.apache.spark.ml.param because it's private there
 private[spark] object ParamValidators {
@@ -85,7 +87,7 @@ class DurationParam(
   }
 }
 
-/** supported V types are String, Long, Float or Boolean */
+/** supported V types are String, Long, Double or Boolean */
 class OrderedStringMapParam[V](
   parent: String,
   name: String,
@@ -113,7 +115,7 @@ class OrderedStringMapParam[V](
           (acc, kv) => {
             val jValue = kv._2 match {
               case s : String => JString(s)
-              case num: Float => JDouble(num)
+              case num: Double => JDouble(num)
               case num: Long => JLong(num)
               case value: Boolean => JBool(value)
               case _ => throw new RuntimeException("Unsupported map value type")
@@ -131,7 +133,7 @@ class OrderedStringMapParam[V](
     for ((key, jValue) <- jObject.obj) {
       jValue match {
         case JString(s) =>  result.put(key, s.asInstanceOf[V])
-        case JDouble(num) =>  result.put(key, num.toFloat.asInstanceOf[V])
+        case JDouble(num) =>  result.put(key, num.asInstanceOf[V])
         case JLong(num) =>  result.put(key, num.asInstanceOf[V])
         case JBool(value) =>  result.put(key, value.asInstanceOf[V])
         case _ => throw new RuntimeException("Unexpected JSON object value type for map")
@@ -193,7 +195,7 @@ private[spark] object Helpers {
     }
     var classWeightsSize : Option[Int] = None
     if (params.contains("classWeightsMap")) {
-      classWeightsSize = Some(params("classWeightsMap").asInstanceOf[java.util.LinkedHashMap[String, Float]].size)
+      classWeightsSize = Some(params("classWeightsMap").asInstanceOf[java.util.LinkedHashMap[String, Double]].size)
     }
     if (params.contains("classWeightsList")) {
       classWeightsSize = Some(params("classWeightsList").asInstanceOf[Array[Double]].length)
@@ -229,7 +231,7 @@ private[spark] object Helpers {
     classNamesFromLabelData: Option[Array[String]]
   ) : JObject = {
     if (params.contains("classWeightsMap")) {
-      val classWeightsMap = params("classWeightsMap").asInstanceOf[java.util.LinkedHashMap[String, Float]]
+      val classWeightsMap = params("classWeightsMap").asInstanceOf[java.util.LinkedHashMap[String, Double]]
       val classWeightsList = new Array[Double](classWeightsMap.size)
       var result = JObject()
 
@@ -278,6 +280,46 @@ private[spark] object Helpers {
     }
   }
 
+  def processOverfittingDetectorParams(params: mutable.HashMap[String, Any]) : JObject = {
+    var maybeOdWait = params.get("odWait")
+    if (params.contains("earlyStoppingRounds")) {
+      if (maybeOdWait.isDefined) {
+        throw new CatBoostError("only one of the parameters earlyStoppingRounds, odWait should be initialized")
+      }
+      maybeOdWait = params.get("earlyStoppingRounds")
+    }
+    maybeOdWait match {
+      case Some(odWait) => {
+        if (params.contains("odType")) {
+          if (params("odType").asInstanceOf[EOverfittingDetectorType] != EOverfittingDetectorType.Iter) {
+            throw new CatBoostError(
+              "odWait or earlyStoppingRounds parameter specified with odType != EOverfittingDetectorType.Iter"
+            )
+          }
+        }
+        JObject(
+          "od_type" -> "Iter",
+          "od_wait" -> JLong(odWait.asInstanceOf[Int])
+        )
+      }
+      case None => {
+        params.get("odPval") match {
+          case Some(odPval) => {
+            if (params.contains("odType")) {
+              if (params("odType").asInstanceOf[EOverfittingDetectorType] != EOverfittingDetectorType.IncToDec) {
+                throw new CatBoostError(
+                  "odPval parameter specified with odType != EOverfittingDetectorType.IncToDec"
+                )
+              }
+            }
+            ("od_pval" -> JDouble(odPval.asInstanceOf[Float]))
+          }
+          case None => JObject()
+        }
+      }
+    }
+  }
+
   def processSnapshotIntervalParam(params: mutable.HashMap[String, Any]) : JObject = {
     if (params.contains("snapshotInterval")) {
       println("params.contains('snapshotInterval')")
@@ -306,6 +348,10 @@ private[spark] object Helpers {
     // processed in separate functions
     "class_weights_map" -> null,
     "class_weights_list" -> null,
+    "early_stopping_rounds" -> null,
+    "od_pval" -> null,
+    "od_type" -> null,
+    "od_wait" -> null,
     "snapshot_interval" -> null,
 
     // defined in Predictor
@@ -349,6 +395,7 @@ private[spark] object Helpers {
     JObject()
       .merge(processClassWeightsParams(paramsHashMap, classNamesFromLabelData))
       .merge(processClassNamesFromLabelData(classNamesFromLabelData))
+      .merge(processOverfittingDetectorParams(paramsHashMap))
       .merge(processSnapshotIntervalParam(paramsHashMap))
       .merge(processWithSimpleNameMapping(paramsSeq))
   }

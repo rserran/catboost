@@ -176,8 +176,7 @@ double NCatboostOptions::GetYetiRankDecay(const TLossDescription& lossFunctionCo
     Y_ASSERT(
         lossFunctionConfig.GetLossFunction() == ELossFunction::YetiRank ||
         lossFunctionConfig.GetLossFunction() == ELossFunction::YetiRankPairwise);
-    //TODO(nikitxskv): try to find the best default
-    return GetParamOrDefault(lossFunctionConfig, "decay", 0.99);
+    return GetParamOrDefault(lossFunctionConfig, "decay", 0.85);
 }
 
 double NCatboostOptions::GetLqParam(const TLossDescription& lossFunctionConfig) {
@@ -395,6 +394,7 @@ TString BuildMetricOptionDescription(const NJson::TJsonValue& lossOptions) {
 
 static bool IsFromAucFamily(ELossFunction loss) {
     return loss == ELossFunction::AUC
+        || loss == ELossFunction::QueryAUC
         || loss == ELossFunction::NormalizedGini;
 }
 

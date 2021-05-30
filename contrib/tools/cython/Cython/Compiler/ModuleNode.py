@@ -430,7 +430,11 @@ class ModuleNode(Nodes.Node, Nodes.BlockNode):
             except ImportError:
                 import xml.etree.ElementTree as ET
             coverage_xml = ET.parse(coverage_xml_filename).getroot()
-            for el in coverage_xml.getiterator():
+            if hasattr(coverage_xml, 'iter'):
+                iterator = coverage_xml.iter()  # Python 2.7 & 3.2+
+            else:
+                iterator = coverage_xml.getiterator()
+            for el in iterator:
                 el.tail = None  # save some memory
         else:
             coverage_xml = None
@@ -631,7 +635,10 @@ class ModuleNode(Nodes.Node, Nodes.BlockNode):
             code.putln(json.dumps(metadata, indent=4, sort_keys=True))
             code.putln("END: Cython Metadata */")
             code.putln("")
+
+        code.putln("#ifndef PY_SSIZE_T_CLEAN")
         code.putln("#define PY_SSIZE_T_CLEAN")
+        code.putln("#endif /* PY_SSIZE_T_CLEAN */")
 
         for inc in sorted(env.c_includes.values(), key=IncludeCode.sortkey):
             if inc.location == inc.INITIAL:
